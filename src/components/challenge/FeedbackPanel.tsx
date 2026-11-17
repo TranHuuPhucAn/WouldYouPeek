@@ -21,6 +21,7 @@ type Props = {
   onShowSetup: () => void;
   onShowOutcome: () => void;
   onNext: () => void;
+  pending?: boolean;
 };
 
 export function FeedbackPanel({
@@ -31,6 +32,7 @@ export function FeedbackPanel({
   onShowSetup,
   onShowOutcome,
   onNext,
+  pending = false,
 }: Props) {
   const selected = challenge.options.find(
     (option) => option.id === answer.selectedOptionId,
@@ -165,8 +167,16 @@ export function FeedbackPanel({
             Outcome
           </button>
         </div>
-        <button className="button button-primary" onClick={onNext}>
-          {finalChallenge ? "Finish session" : "Next scenario"}
+        <button
+          className="button button-primary"
+          onClick={onNext}
+          disabled={pending}
+        >
+          {pending
+            ? "Saving…"
+            : finalChallenge
+              ? "Finish session"
+              : "Next scenario"}
           <span aria-hidden="true">→</span>
         </button>
       </div>

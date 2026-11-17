@@ -30,6 +30,32 @@ export default defineConfig({
           restoreMocks: true,
         },
       },
+      {
+        resolve: { alias },
+        test: {
+          name: "integration",
+          environment: "node",
+          include: ["tests/integration/**/*.test.ts"],
+          setupFiles: ["./tests/setup-node.ts"],
+          fileParallelism: false,
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+          clearMocks: true,
+          restoreMocks: true,
+        },
+      },
+      {
+        resolve: { alias },
+        test: {
+          name: "http",
+          environment: "node",
+          include: ["tests/http/**/*.test.ts"],
+          setupFiles: ["./tests/setup-node.ts"],
+          fileParallelism: false,
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+        },
+      },
     ],
   },
 });

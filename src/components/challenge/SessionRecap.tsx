@@ -5,9 +5,13 @@ import { assessmentLabel } from "./FeedbackPanel";
 export function SessionRecap({
   completed,
   onRestart,
+  pending = false,
+  completedAt,
 }: {
   completed: CompletedChallenge[];
   onRestart: () => void;
+  pending?: boolean;
+  completedAt?: string | null;
 }) {
   const hasProScenarios = completed.some(({ answer }) => answer.observedAction);
   return (
@@ -24,6 +28,15 @@ export function SessionRecap({
         Good decisions start with noticing the details. Take a moment to revisit
         yours.
       </p>
+      {completedAt && (
+        <p className="quiet-note">
+          Saved on{" "}
+          {new Date(completedAt).toLocaleDateString("en", {
+            dateStyle: "medium",
+            timeZone: "UTC",
+          })}
+        </p>
+      )}
       <div className="recap-list">
         {completed.map(({ challenge, answer }, index) => (
           <details className="recap-card" key={challenge.id}>
@@ -121,11 +134,16 @@ export function SessionRecap({
           : "Review the conditions behind your choices. This session does not measure your rank or skill."}
       </p>
       <div className="recap-actions">
-        <button className="button button-primary" onClick={onRestart}>
-          Play again <span aria-hidden="true">↺</span>
+        <button
+          className="button button-primary"
+          onClick={onRestart}
+          disabled={pending}
+        >
+          {pending ? "Opening…" : "Play again"}{" "}
+          <span aria-hidden="true">↺</span>
         </button>
-        <Link href="/" className="button button-secondary">
-          Back to home
+        <Link href="/history" className="button button-secondary">
+          Session history
         </Link>
       </div>
     </main>

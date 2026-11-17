@@ -1,129 +1,181 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useChallengeSession } from "@/hooks/use-challenge-session";
-import * as api from "@/lib/client/challenge-api";
-import { answerFor, challenges, summaries } from "./fixtures";
-
-vi.mock("@/lib/client/challenge-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/client/challenge-api")>()),
-  getChallenges: vi.fn(),
-  getChallenge: vi.fn(),
-  submitAnswer: vi.fn(),
+import * as api from "@/lib/client/session-api";
+import { ApiClientError } from "@/lib/client/api-response";
+import { snapshot, viewer } from "./session-fixtures";
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("@/components/auth/AuthStateSync", () => ({
+  invalidateAccountView: () =>
+    window.dispatchEvent(new Event("wyp:identity-invalidated")),
 }));
-
+vi.mock("@/lib/client/session-api", () => ({
+  answerSessionItem: vi.fn(),
+  advanceSession: vi.fn(),
+  getSession: vi.fn(),
+  createOrResumeSession: vi.fn(),
+  validateSessionContinuity: vi.fn(),
+}));
 beforeEach(() => {
-  vi.mocked(api.getChallenges).mockReset().mockResolvedValue(summaries);
-  vi.mocked(api.getChallenge)
+  vi.mocked(api.answerSessionItem)
     .mockReset()
-    .mockImplementation(async (id) =>
-      challenges.find((challenge) => challenge.id === id)!,
-    );
-  vi.mocked(api.submitAnswer).mockReset().mockResolvedValue(answerFor());
+    .mockResolvedValue({ session: snapshot("review"), replayed: false });
+  vi.mocked(api.getSession).mockReset().mockResolvedValue(snapshot());
+  vi.mocked(api.advanceSession)
+    .mockReset()
+    .mockResolvedValue({ session: snapshot("setup", 1), replayed: false });
 });
-
-describe("session request coordination", () => {
-  it("loads catalogue before the first detail and recovers from a detail failure", async () => {
-    vi.mocked(api.getChallenge).mockRejectedValueOnce(new Error("Offline"));
-    const { result } = renderHook(useChallengeSession);
-    await waitFor(() => expect(result.current.state.phase).toBe("error"));
-    expect(result.current.state.error).toBe("Offline");
-    expect(api.getChallenges).toHaveBeenCalledTimes(1);
-    act(() => result.current.retryLoad());
-    await waitFor(() => expect(result.current.state.phase).toBe("setup"));
-    expect(api.getChallenge).toHaveBeenCalledTimes(2);
-    expect(api.getChallenges).toHaveBeenCalledTimes(1);
-  });
-  it("suppresses immediate duplicate submissions and allows retry after failure", async () => {
-    let rejectAnswer!: (error: Error) => void;
-    vi.mocked(api.submitAnswer).mockImplementationOnce(
-      () =>
-        new Promise((_, reject) => {
-          rejectAnswer = reject;
-        }),
+function ready() {
+  const view = renderHook(() => useChallengeSession(snapshot(), viewer.id));
+  act(() => view.result.current.completeSetup());
+  act(() => view.result.current.selectOption("hold"));
+  return view;
+}
+describe("durable command coordination", () => {
+  it("suppresses duplicate clicks and reveals only after save confirmation", async () => {
+    let resolve!: (
+      value: Awaited<ReturnType<typeof api.answerSessionItem>>,
+    ) => void;
+    vi.mocked(api.answerSessionItem).mockImplementation(
+      () => new Promise((r) => (resolve = r)),
     );
-    const { result } = renderHook(useChallengeSession);
-    await waitFor(() => expect(result.current.state.phase).toBe("setup"));
-    act(() => result.current.completeSetup());
-    act(() => result.current.selectOption("hold"));
-    let first!: Promise<void>;
+    const { result } = ready();
     act(() => {
-      first = result.current.submitSelection();
+      void result.current.submitSelection();
       void result.current.submitSelection();
     });
-    expect(api.submitAnswer).toHaveBeenCalledTimes(1);
-    expect(result.current.state.phase).toBe("submitting");
-    await act(async () => {
-      rejectAnswer(new Error("Try again"));
-      await first;
-    });
-    expect(result.current.state.phase).toBe("decision");
-    expect(result.current.state.selectedOptionId).toBe("hold");
-    expect(result.current.state.completed).toHaveLength(0);
-    await act(async () => {
-      await result.current.submitSelection();
-    });
-    expect(api.submitAnswer).toHaveBeenCalledTimes(2);
+    expect(api.answerSessionItem).toHaveBeenCalledTimes(1);
+    expect(result.current.state.feedback).toBeNull();
+    await act(async () =>
+      resolve({ session: snapshot("review"), replayed: false }),
+    );
     expect(result.current.state.phase).toBe("review");
   });
-  it("aborts in-flight loading on unmount and ignores late results", async () => {
-    let resolveList!: (value: typeof summaries) => void;
-    vi.mocked(api.getChallenges).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveList = resolve;
-        }),
+  it("reconciles a lost response before exposing the continuation", async () => {
+    vi.mocked(api.answerSessionItem).mockRejectedValueOnce(
+      new Error("Lost response"),
     );
-    const { unmount } = renderHook(useChallengeSession);
-    const signal = vi.mocked(api.getChallenges).mock.calls[0][0]!;
-    unmount();
-    expect(signal.aborted).toBe(true);
-    await act(async () => {
-      resolveList(summaries);
-    });
-    expect(api.getChallenge).not.toHaveBeenCalled();
+    vi.mocked(api.getSession).mockResolvedValueOnce(snapshot("review"));
+    const { result } = ready();
+    await act(() => result.current.submitSelection());
+    expect(result.current.state.phase).toBe("review");
+    expect(api.answerSessionItem).toHaveBeenCalledTimes(1);
   });
-  it("cancels an answer on restart so a late success cannot complete the fresh session", async () => {
-    let resolveAnswer!: (answer: ReturnType<typeof answerFor>) => void;
-    vi.mocked(api.submitAnswer).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveAnswer = resolve;
-        }),
+  it("retains exactly the same command on retry after an uncertain save", async () => {
+    vi.mocked(api.answerSessionItem).mockRejectedValueOnce(
+      new Error("Offline"),
     );
-    const { result } = renderHook(useChallengeSession);
-    await waitFor(() => expect(result.current.state.phase).toBe("setup"));
-    act(() => result.current.completeSetup());
-    act(() => result.current.selectOption("hold"));
-    let pending!: Promise<void>;
+    vi.mocked(api.getSession).mockRejectedValueOnce(new Error("Offline"));
+    const { result } = ready();
+    await act(() => result.current.submitSelection());
+    expect(result.current.state.unresolved).toBe(true);
+    expect(result.current.state.feedback).toBeNull();
+    act(() => result.current.selectOption("peek"));
+    await act(() => result.current.retrySave());
+    expect(vi.mocked(api.answerSessionItem).mock.calls[1].slice(0, 3)).toEqual(
+      vi.mocked(api.answerSessionItem).mock.calls[0].slice(0, 3),
+    );
+    expect(result.current.state.phase).toBe("review");
+  });
+  it("uses canonical state after a stale revision from another tab", async () => {
+    vi.mocked(api.answerSessionItem).mockRejectedValueOnce(
+      new ApiClientError("SESSION_CONFLICT", "Changed", 409),
+    );
+    vi.mocked(api.getSession).mockResolvedValueOnce(snapshot("setup", 1));
+    const { result } = ready();
+    await act(() => result.current.submitSelection());
+    expect(result.current.state.currentIndex).toBe(1);
+    expect(result.current.state.phase).toBe("setup");
+  });
+  it("keeps final feedback visible while Finish is failing and retries same ID", async () => {
+    vi.mocked(api.advanceSession)
+      .mockRejectedValueOnce(new Error("Offline"))
+      .mockResolvedValueOnce({
+        session: snapshot("completed"),
+        replayed: true,
+      });
+    vi.mocked(api.getSession).mockRejectedValueOnce(new Error("Offline"));
+    const { result } = renderHook(() =>
+      useChallengeSession(snapshot("review", 2), viewer.id),
+    );
+    await act(() => result.current.advance());
+    expect(result.current.state.phase).toBe("review");
+    expect(result.current.state.feedback).toBeTruthy();
+    await act(() => result.current.advance());
+    expect(result.current.state.phase).toBe("complete");
+    expect(vi.mocked(api.advanceSession).mock.calls[1][1]).toEqual(
+      vi.mocked(api.advanceSession).mock.calls[0][1],
+    );
+  });
+  it("aborts on unmount and never displays a late result", async () => {
+    let resolve!: (
+      value: Awaited<ReturnType<typeof api.answerSessionItem>>,
+    ) => void;
+    vi.mocked(api.answerSessionItem).mockImplementation(
+      () => new Promise((r) => (resolve = r)),
+    );
+    const { result, unmount } = ready();
     act(() => {
-      pending = result.current.submitSelection();
+      void result.current.submitSelection();
     });
-    const signal = vi.mocked(api.submitAnswer).mock.calls[0][2]!;
-    act(() => result.current.restart());
-    expect(signal.aborted).toBe(true);
-    await act(async () => {
-      resolveAnswer(answerFor());
-      await pending;
+    const signal = vi.mocked(api.answerSessionItem).mock.calls[0][3];
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    await act(async () =>
+      resolve({ session: snapshot("review"), replayed: false }),
+    );
+  });
+  it("invalidates and aborts on account switch", async () => {
+    vi.mocked(api.answerSessionItem).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const { result } = ready();
+    act(() => {
+      void result.current.submitSelection();
     });
-    await waitFor(() => expect(result.current.state.phase).toBe("setup"));
-    expect(result.current.state.completed).toHaveLength(0);
+    act(() => window.dispatchEvent(new Event("wyp:identity-invalidated")));
+    expect(result.current.state.phase).toBe("auth-required");
+    expect(vi.mocked(api.answerSessionItem).mock.calls[0][3]?.aborted).toBe(
+      true,
+    );
+  });
+  it("requires sign-in again on server auth expiry", async () => {
+    vi.mocked(api.answerSessionItem).mockRejectedValueOnce(
+      new ApiClientError("AUTH_REQUIRED", "Sign in", 401),
+    );
+    const { result } = ready();
+    await act(() => result.current.submitSelection());
+    expect(result.current.state.phase).toBe("auth-required");
     expect(result.current.state.feedback).toBeNull();
   });
-  it("keeps the decision recoverable when feedback does not match the loaded content", async () => {
-    vi.mocked(api.submitAnswer).mockResolvedValueOnce({
-      ...answerFor(),
-      contentVersion: "stale",
-    });
-    const { result } = renderHook(useChallengeSession);
-    await waitFor(() => expect(result.current.state.phase).toBe("setup"));
-    act(() => result.current.completeSetup());
-    act(() => result.current.selectOption("hold"));
-    await act(async () => {
-      await result.current.submitSelection();
-    });
-    expect(result.current.state.phase).toBe("decision");
-    expect(result.current.state.selectedOptionId).toBe("hold");
-    expect(result.current.state.completed).toHaveLength(0);
-    expect(result.current.state.error).toMatch(/incomplete/);
+  it("read-only replay makes no requests", () => {
+    const { result } = renderHook(() =>
+      useChallengeSession(snapshot("review"), viewer.id),
+    );
+    act(() => result.current.showReviewSetup());
+    act(() => result.current.showReviewOutcome());
+    expect(api.advanceSession).not.toHaveBeenCalled();
+    expect(api.answerSessionItem).not.toHaveBeenCalled();
+  });
+  it("Play again creates a separate session and keeps retry ID", async () => {
+    vi.mocked(api.createOrResumeSession)
+      .mockRejectedValueOnce(new Error("Lost"))
+      .mockResolvedValueOnce({
+        session: { ...snapshot(), id: "55555555-5555-4555-8555-555555555555" },
+        created: true,
+        replayed: true,
+      });
+    const { result } = renderHook(() =>
+      useChallengeSession(snapshot("completed"), viewer.id),
+    );
+    await act(() => result.current.createNextSession());
+    await act(() => result.current.createNextSession());
+    expect(vi.mocked(api.createOrResumeSession).mock.calls[1][0]).toEqual(
+      vi.mocked(api.createOrResumeSession).mock.calls[0][0],
+    );
+    expect(router.push).toHaveBeenCalledWith(
+      "/play/55555555-5555-4555-8555-555555555555",
+    );
   });
 });

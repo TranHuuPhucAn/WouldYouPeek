@@ -1,22 +1,10 @@
 import Link from "next/link";
+import { getCurrentAccount } from "@/server/auth/guards";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const viewer = await getCurrentAccount();
   return (
-    <div className="app-shell landing-shell">
-      <header className="site-header">
-        <Link href="/" className="brand" aria-label="Would You Peek home">
-          <span className="brand-mark" aria-hidden="true">
-            +
-          </span>
-          <span>
-            WOULD YOU <strong>PEEK?</strong>
-          </span>
-        </Link>
-        <div className="header-tag">
-          <span className="status-dot" /> THE DECISION LAB{" "}
-          <span className="tag-outline">POV DEMO</span>
-        </div>
-      </header>
+    <div className="landing-shell">
       <main>
         <section className="hero">
           <div className="hero-copy">
@@ -41,14 +29,12 @@ export default function HomePage() {
               on Bind.
             </p>
             <div className="hero-actions">
-              <Link href="/play" className="button button-primary button-large">
-                Play 3 scenarios <span aria-hidden="true">↗</span>
+              <Link href="/demo" className="button button-primary button-large">
+                Watch demo <span aria-hidden="true">↗</span>
               </Link>
-              <span className="hero-meta">
-                No sign-up.
-                <br />
-                Just your next move.
-              </span>
+              <Link href="/play" className="text-button">
+                {viewer ? "Open practice →" : "Sign in to play →"}
+              </Link>
             </div>
             <p className="demo-disclosure">
               <span className="small-diamond" aria-hidden="true" /> Ranked POV

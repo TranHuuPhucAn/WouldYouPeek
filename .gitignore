@@ -4,6 +4,7 @@ out/
 coverage/
 *.tsbuildinfo
 .env*
+!.env.example
 .DS_Store
 *.log
 
@@ -30,3 +31,9 @@ public/qa-*
 *.tmp
 *.swp
 *~
+
+# Local Supabase state, installation metrics and temporary acceptance evidence.
+supabase/.temp/
+supabase/.branches/
+.sites-runtime/
+test-results/
