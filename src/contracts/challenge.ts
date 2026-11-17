@@ -69,6 +69,12 @@ export type ChallengeDetail = ChallengeSummary & {
 };
 
 export type ChallengeListResponse = { challenges: ChallengeSummary[] };
+export type ChallengePreview = ChallengeSummary & {
+  context: string;
+  source?: ChallengeSource;
+  setup: MediaAsset;
+};
+export type ChallengePreviewListResponse = { challenges: ChallengePreview[] };
 export type AnswerRequest = { optionId: string };
 
 export type OptionFeedback = {
@@ -99,6 +105,16 @@ export type ApiErrorCode =
   | "INVALID_REQUEST"
   | "INVALID_OPTION"
   | "CHALLENGE_NOT_FOUND"
+  | "AUTH_REQUIRED"
+  | "EMAIL_NOT_VERIFIED"
+  | "CREATOR_REQUIRED"
+  | "SESSION_NOT_FOUND"
+  | "SESSION_CONFLICT"
+  | "ANSWER_LOCKED"
+  | "IDEMPOTENCY_CONFLICT"
+  | "SESSION_REQUIRED"
+  | "RATE_LIMITED"
+  | "STORAGE_UNAVAILABLE"
   | "INTERNAL_ERROR";
 
 export type ApiErrorResponse = {

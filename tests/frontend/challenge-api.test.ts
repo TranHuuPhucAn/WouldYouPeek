@@ -1,132 +1,104 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  ChallengeApiError,
-  getChallenge,
   getChallenges,
-  submitAnswer,
+  getChallengePreview,
+  ChallengeApiError,
 } from "@/lib/client/challenge-api";
-import { answerFor, challenges, summaries } from "./fixtures";
-
-describe("challenge API adapter", () => {
-  it("unwraps the catalogue and forwards the cancellation signal", async () => {
+import {
+  parseChallengeDetail,
+  parseAnswerResponse,
+  validateAnswerForChallenge,
+} from "@/lib/client/challenge-validation";
+import { challenges, answerFor } from "./fixtures";
+const { id, title, topic, order, mediaStatus, context, setup } = challenges[0];
+const preview = { id, title, topic, order, mediaStatus, context, setup };
+describe("public previews and response validation", () => {
+  it("loads only setup preview fields with no caching", async () => {
     const fetcher = vi
       .fn()
-      .mockResolvedValue(Response.json({ challenges: summaries }));
+      .mockResolvedValue(Response.json({ challenges: [preview] }));
     vi.stubGlobal("fetch", fetcher);
-    const controller = new AbortController();
-    expect(await getChallenges(controller.signal)).toEqual(summaries);
+    expect(await getChallenges()).toEqual([preview]);
     expect(fetcher).toHaveBeenCalledWith("/api/challenges", {
-      signal: controller.signal,
       cache: "no-store",
+      signal: undefined,
     });
   });
-  it("encodes challenge IDs and checks that the response belongs to the request", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(Response.json({ ...challenges[0], id: "a/b" }));
-    vi.stubGlobal("fetch", fetcher);
-    expect((await getChallenge("a/b")).id).toBe("a/b");
-    expect(fetcher.mock.calls[0][0]).toBe("/api/challenges/a%2Fb");
-  });
-  it("posts only the selected option and returns feedback", async () => {
-    const fetcher = vi.fn().mockResolvedValue(Response.json(answerFor()));
-    vi.stubGlobal("fetch", fetcher);
-    expect(
-      (await submitAnswer(challenges[0].id, { optionId: "hold" }))
-        .selectedAssessment,
-    ).toBe("recommended");
-    expect(fetcher).toHaveBeenCalledWith(
-      `/api/challenges/${challenges[0].id}/answer`,
-      expect.objectContaining({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: '{"optionId":"hold"}',
-      }),
-    );
-  });
-  it.each([400, 404, 500])(
-    "preserves a structured %i error",
-    async (status) => {
+  it.each(["question", "options", "reveal", "analysis", "decision"])(
+    "rejects a leaked %s field",
+    async (field) => {
       vi.stubGlobal(
         "fetch",
-        vi.fn().mockResolvedValue(
-          Response.json(
-            {
-              error: {
-                code: "CHALLENGE_NOT_FOUND",
-                message: "Scenario missing.",
-              },
-            },
-            { status },
-          ),
-        ),
+        vi
+          .fn()
+          .mockResolvedValue(Response.json({ ...preview, [field]: "private" })),
       );
-      await expect(getChallenge("missing")).rejects.toMatchObject({
-        name: "ChallengeApiError",
-        code: "CHALLENGE_NOT_FOUND",
-        message: "Scenario missing.",
-        status,
+      await expect(getChallengePreview(id)).rejects.toMatchObject({
+        code: "INVALID_RESPONSE",
       });
     },
   );
-  it("gives readable errors for non-JSON and unstructured failures", async () => {
+  it("rejects wrong resource, duplicate previews and malformed media", async () => {
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }))
-        .mockResolvedValueOnce(Response.json({}, { status: 500 })),
+        .mockResolvedValueOnce(Response.json({ ...preview, id: "wrong" }))
+        .mockResolvedValueOnce(
+          Response.json({ challenges: [preview, preview] }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({ ...preview, setup: { kind: "youtube" } }),
+        ),
     );
-    await expect(getChallenges()).rejects.toMatchObject({
-      code: "INVALID_RESPONSE",
-      status: 502,
-    });
-    await expect(getChallenges()).rejects.toMatchObject({
-      code: "REQUEST_FAILED",
-      status: 500,
-    });
+    await expect(getChallengePreview(id)).rejects.toThrow();
+    await expect(getChallenges()).rejects.toThrow();
+    await expect(getChallengePreview(id)).rejects.toThrow();
   });
-  it("preserves network errors and cancellation", async () => {
-    const abort = new DOMException("Aborted", "AbortError");
-    const network = new TypeError("Failed to fetch");
+  it.each([401, 403, 409, 429, 503])(
+    "retains typed failure status %s",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            Response.json(
+              { error: { code: "AUTH_REQUIRED", message: "Sign in" } },
+              { status },
+            ),
+          ),
+      );
+      await expect(getChallenges()).rejects.toMatchObject({
+        code: "AUTH_REQUIRED",
+        status,
+      });
+    },
+  );
+  it("rejects unreadable and primitive JSON", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValueOnce(abort).mockRejectedValueOnce(network),
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response("invalid"))
+        .mockResolvedValueOnce(Response.json(1)),
     );
-    await expect(getChallenges()).rejects.toBe(abort);
-    await expect(getChallenges()).rejects.toBe(network);
-  });
-  it.each([
-    {},
-    { challenges: [] },
-    { challenges: [{ id: "bad" }] },
-    { challenges: [summaries[0], summaries[0]] },
-  ])("rejects malformed successful catalogues", async (body) => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
     await expect(getChallenges()).rejects.toBeInstanceOf(ChallengeApiError);
+    await expect(getChallenges()).rejects.toThrow();
   });
-  it.each([
-    {},
-    { ...challenges[0], id: "wrong" },
-    { ...challenges[0], options: [] },
-    { ...challenges[0], setup: {} },
-    { ...challenges[0], decision: null },
-  ])("rejects malformed successful challenge responses", async (body) => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
-    await expect(getChallenge(challenges[0].id)).rejects.toMatchObject({
-      code: "INVALID_RESPONSE",
-    });
+  it("preserves abort and network failure", async () => {
+    const abort = new DOMException("Abort", "AbortError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(abort));
+    await expect(getChallenges()).rejects.toBe(abort);
   });
-  it.each([
-    {},
-    { ...answerFor(), challengeId: "wrong" },
-    { ...answerFor(), selectedOptionId: "peek" },
-    { ...answerFor(), optionFeedback: [] },
-    { ...answerFor(), reveal: null },
-  ])("rejects malformed successful answer responses", async (body) => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
-    await expect(
-      submitAnswer(challenges[0].id, { optionId: "hold" }),
-    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  it("validates full saved detail and answer relationship", () => {
+    expect(parseChallengeDetail(challenges[0])).toEqual(challenges[0]);
+    expect(parseAnswerResponse(answerFor())).toEqual(answerFor());
+    expect(() =>
+      validateAnswerForChallenge(
+        { ...answerFor(), contentVersion: "old" },
+        challenges[0],
+      ),
+    ).toThrow();
   });
 });

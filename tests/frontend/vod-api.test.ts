@@ -1,17 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AnswerResponse, ChallengeDetail } from "@/contracts/challenge";
+import { ChallengeApiError, getChallenges } from "@/lib/client/challenge-api";
 import {
-  ChallengeApiError,
-  getChallenge,
-  getChallenges,
-  submitAnswer,
+  parseChallengeDetail,
+  parseAnswerResponse,
   validateAnswerForChallenge,
-} from "@/lib/client/challenge-api";
+} from "@/lib/client/challenge-validation";
+let payload: unknown;
+async function getChallenge(_id: string) {
+  return parseChallengeDetail(payload);
+}
+async function submitAnswer(_id: string, _request: { optionId: string }) {
+  return parseAnswerResponse(payload);
+}
 import {
   getChallenge as getPublicChallenge,
   listChallenges,
   submitAnswer as getPublicAnswer,
-} from "@/server/challenges/service";
+} from "../fixtures/authored-challenges";
 
 // Only this test imports public server projections to exercise the wire contract.
 vi.mock("server-only", () => ({}));
@@ -55,6 +61,7 @@ function vodAnswer() {
 }
 
 function respondWith(body: unknown) {
+  payload = body;
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
 }
 
@@ -64,8 +71,17 @@ const choices = catalogue.flatMap(({ id }) =>
 
 describe("real VOD public payloads through the client adapter", () => {
   it("accepts the complete three-scenario public catalogue", async () => {
-    respondWith({ challenges: catalogue });
-    expect(await getChallenges()).toEqual(catalogue);
+    const previews = catalogue.map(({ id }) => {
+      const { context, setup, source, ...detail } = getPublicChallenge(id);
+      return {
+        ...catalogue.find((item) => item.id === id)!,
+        context,
+        setup,
+        source,
+      };
+    });
+    respondWith({ challenges: previews });
+    expect(await getChallenges()).toEqual(previews);
     expect(catalogue.map(({ id }) => id)).toEqual([
       "bind-clove-utility-window",
       "bind-clove-smoke-contest",

@@ -7,8 +7,21 @@
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --project backend --project frontend",
+    "test:watch": "vitest --project backend --project frontend",
+    "test:backend": "vitest run --project backend",
+    "test:frontend": "vitest run --project frontend",
+    "test:integration": "node scripts/local-supabase.mjs integration",
+    "test:db": "node scripts/local-supabase.mjs test-db",
+    "db:start": "node scripts/local-supabase.mjs start",
+    "db:stop": "node scripts/local-supabase.mjs stop",
+    "db:env": "node scripts/local-supabase.mjs env",
+    "db:reset:local": "node scripts/local-supabase.mjs reset",
+    "db:types": "node scripts/local-supabase.mjs types",
+    "db:types:check": "node scripts/local-supabase.mjs types-check",
+    "db:seed:generate": "node scripts/render-demo-seed.mjs",
+    "db:seed:check": "node scripts/render-demo-seed.mjs --check",
+    "test:http": "node scripts/local-supabase.mjs http"
   },
   "engines": {
     "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
@@ -17,7 +30,9 @@
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "@supabase/supabase-js": "2.119.0",
+    "@supabase/ssr": "0.12.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
@@ -34,10 +49,8 @@
     "prettier": "^3.10.1",
     "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "supabase": "3.2.0"
   },
-  "type": "module",
-  "optionalDependencies": {
-    "@rolldown/binding-darwin-arm64": "^1.2.19"
-  }
+  "type": "module"
 }

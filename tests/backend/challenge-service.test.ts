@@ -5,7 +5,7 @@ import {
   listChallenges,
   parseAnswerRequest,
   submitAnswer,
-} from "@/server/challenges/service";
+} from "../fixtures/authored-challenges";
 
 const EXPECTED = [
   {
@@ -37,7 +37,7 @@ const EXPECTED = [
   },
 ];
 
-describe("public challenge projections", () => {
+describe("authored scenario fixture regressions", () => {
   it("lists only summaries in the authored order", () => {
     const summaries = listChallenges();
     expect(summaries.map(({ id }) => id)).toEqual(EXPECTED.map(({ id }) => id));

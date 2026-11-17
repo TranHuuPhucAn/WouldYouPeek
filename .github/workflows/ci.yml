@@ -1,0 +1,41 @@
+name: Verify
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:seed:check
+      - run: npm run db:start
+      - run: npm run db:reset:local
+      - run: npm run db:env
+      - run: npm run db:types:check
+      - run: npm test
+      - run: npm run test:db
+      - run: npm run test:integration
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Verify the running production API
+        run: |
+          npm start > /tmp/would-you-peek.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/challenges > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:http
+      - if: always()
+        run: npm run db:stop
