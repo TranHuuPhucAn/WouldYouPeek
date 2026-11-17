@@ -1,0 +1,240 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="960"
+  height="540"
+  viewBox="0 0 960 540"
+  role="img"
+  aria-label="missed shot reset decision"
+>
+  <defs>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M30 0H0V30" fill="none" stroke="#25352a" stroke-width=".6" />
+    </pattern>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="8"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto-start-reverse"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#b9dfc2"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <rect width="960" height="540" fill="#142018" />
+  <rect width="960" height="540" fill="url(#grid)" />
+  <text
+    x="36"
+    y="38"
+    fill="#8caa96"
+    font-size="12"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    DECISION POINT
+  </text>
+  <text
+    x="835"
+    y="38"
+    fill="#82998a"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    N ↑
+  </text>
+  <path
+    d="M110 85H850V300H510V455H110Z"
+    fill="#1c2b20"
+    stroke="#52614e"
+    stroke-width="3"
+  />
+  <path d="M510 300V455" stroke="#73806b" stroke-width="7" />
+  <rect
+    x="330"
+    y="292"
+    width="100"
+    height="140"
+    fill="#2c3c30"
+    stroke="#586a58"
+    stroke-width="2"
+  />
+  <path
+    d="M330 292l100 140m-100 0l100 -140"
+    stroke="#3a4d3e"
+    stroke-width="1"
+  />
+  <rect
+    x="275"
+    y="90"
+    width="88"
+    height="83"
+    fill="#2c3c30"
+    stroke="#586a58"
+    stroke-width="2"
+  />
+  <path d="M275 90l88 83m-88 0l88 -83" stroke="#3a4d3e" stroke-width="1" />
+  <text
+    x="593"
+    y="124"
+    fill="#708d76"
+    font-size="18"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    LONG LANE
+  </text>
+  <circle cx="740" cy="212" r="29" fill="#ff8069" opacity=".09" />
+  <circle
+    cx="740"
+    cy="212"
+    r="17"
+    fill="#17221c"
+    stroke="#ff8069"
+    stroke-width="2"
+  />
+  <circle cx="740" cy="212" r="5" fill="#ff8069" />
+  <text
+    x="766"
+    y="217"
+    fill="#ff8069"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ENEMY
+  </text>
+  <path
+    d="M715 215L430 292"
+    stroke="#ff8069"
+    stroke-width="2"
+    fill="none"
+    stroke-dasharray="7 7"
+    opacity=".8"
+  />
+  <circle cx="196" cy="211" r="29" fill="#9bc4da" opacity=".09" />
+  <circle
+    cx="196"
+    cy="211"
+    r="17"
+    fill="#17221c"
+    stroke="#9bc4da"
+    stroke-width="2"
+  />
+  <circle cx="196" cy="211" r="5" fill="#9bc4da" />
+  <text
+    x="222"
+    y="216"
+    fill="#9bc4da"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ALLY
+  </text>
+  <path
+    d="M218 211L650 211"
+    stroke="#9bc4da"
+    stroke-width="2"
+    fill="none"
+    stroke-dasharray="5 7"
+    opacity=".8"
+  />
+  <circle cx="235" cy="372" r="29" fill="#b9dfc2" opacity=".09" />
+  <circle
+    cx="235"
+    cy="372"
+    r="17"
+    fill="#17221c"
+    stroke="#b9dfc2"
+    stroke-width="2"
+  />
+  <circle cx="235" cy="372" r="5" fill="#b9dfc2" />
+  <text
+    x="261"
+    y="377"
+    fill="#b9dfc2"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    YOU
+  </text>
+  <text
+    x="281"
+    y="462"
+    fill="#ffab98"
+    font-size="12"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    EXPOSED CORNER
+  </text>
+  <text
+    x="117"
+    y="74"
+    fill="#afbdac"
+    font-size="12"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ALTERNATE COVER
+  </text>
+  <text
+    x="540"
+    y="350"
+    fill="#d7dccc"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    RESET / WAIT / RE-PEEK
+  </text>
+  <path d="M32 500H928" stroke="#354738" />
+  <text
+    x="36"
+    y="524"
+    fill="#b9dfc2"
+    font-size="11"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ● YOU
+  </text>
+  <text
+    x="155"
+    y="524"
+    fill="#9bc4da"
+    font-size="11"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ● TEAMMATE
+  </text>
+  <text
+    x="320"
+    y="524"
+    fill="#ff8069"
+    font-size="11"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ● OPPONENT
+  </text>
+  <text
+    x="670"
+    y="524"
+    fill="#82998a"
+    font-size="10"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ORIGINAL TRAINING DIAGRAM
+  </text>
+</svg>

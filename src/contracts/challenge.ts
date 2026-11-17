@@ -1,0 +1,106 @@
+export type Assessment = "recommended" | "reasonable" | "risky";
+export type MediaStatus = "ready" | "demo";
+
+export type YouTubeSegment = {
+  kind: "youtube";
+  videoId: string;
+  startSeconds: number;
+  endSeconds: number;
+  alt: string;
+  caption?: string;
+};
+
+export type MediaAsset =
+  | { kind: "video"; src: string; alt: string; caption?: string }
+  | { kind: "illustration"; src: string; alt: string; caption?: string }
+  | YouTubeSegment;
+
+export type DecisionAsset =
+  | { kind: "image"; imageUrl: string; alt: string }
+  | { kind: "paused-video"; atSeconds: number; alt: string };
+
+export type ChallengeSource = {
+  kind: "youtube";
+  videoId: string;
+  url: string;
+  title: string;
+  uploader: string;
+  player: string;
+  matchType: "ranked" | "tournament";
+  map: string;
+  agent: string;
+  round: number;
+  score: string;
+  side: "attack" | "defense";
+  publishedDate?: string;
+  dateNote?: string;
+};
+
+export type ObservedAction = { optionId: string; description: string };
+
+export type AIAnalysis = {
+  author: "ai";
+  notice: string;
+  rationale: string;
+  limitations: string[];
+};
+
+export type ChallengeSummary = {
+  id: string;
+  title: string;
+  topic: string;
+  order: number;
+  mediaStatus: MediaStatus;
+};
+
+export type ChallengeOption = { id: string; label: string };
+
+export type ChallengeDetail = ChallengeSummary & {
+  contentVersion: string;
+  context: string;
+  question?: string;
+  source?: ChallengeSource;
+  knownFacts?: string[];
+  unknowns?: string[];
+  linkedScenarioId?: string;
+  setup: MediaAsset;
+  decision: DecisionAsset;
+  options: ChallengeOption[];
+};
+
+export type ChallengeListResponse = { challenges: ChallengeSummary[] };
+export type AnswerRequest = { optionId: string };
+
+export type OptionFeedback = {
+  optionId: string;
+  assessment: Assessment;
+  explanation: string;
+  acceptableWhen: string[];
+  risks: string[];
+};
+
+export type AnswerResponse = {
+  challengeId: string;
+  contentVersion: string;
+  selectedOptionId: string;
+  selectedAssessment: Assessment;
+  recommendedOptionIds: string[];
+  optionFeedback: OptionFeedback[];
+  takeaway: string;
+  reveal: MediaAsset;
+  outcomeText: string;
+  observedAction?: ObservedAction;
+  matchesPro?: boolean;
+  analysis?: AIAnalysis;
+};
+
+export type ApiErrorCode =
+  | "INVALID_JSON"
+  | "INVALID_REQUEST"
+  | "INVALID_OPTION"
+  | "CHALLENGE_NOT_FOUND"
+  | "INTERNAL_ERROR";
+
+export type ApiErrorResponse = {
+  error: { code: ApiErrorCode; message: string };
+};

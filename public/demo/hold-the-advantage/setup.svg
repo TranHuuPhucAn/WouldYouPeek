@@ -1,0 +1,251 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="960"
+  height="540"
+  viewBox="0 0 960 540"
+  role="img"
+  aria-label="hold the advantage setup"
+>
+  <defs>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M30 0H0V30" fill="none" stroke="#25352a" stroke-width=".6" />
+    </pattern>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="8"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto-start-reverse"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#b9dfc2"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <rect width="960" height="540" fill="#142018" />
+  <rect width="960" height="540" fill="url(#grid)" />
+  <text
+    x="36"
+    y="38"
+    fill="#8caa96"
+    font-size="12"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    SCENE OVERVIEW
+  </text>
+  <text
+    x="835"
+    y="38"
+    fill="#82998a"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    N ↑
+  </text>
+  <path
+    d="M100 160H330V95H840V450H330V295H100Z"
+    fill="#1c2b20"
+    stroke="#52614e"
+    stroke-width="3"
+  />
+  <path
+    d="M330 95V195m0 75v180M710 95v70m75-70v70"
+    stroke="#73806b"
+    stroke-width="7"
+  />
+  <rect
+    x="470"
+    y="340"
+    width="105"
+    height="100"
+    fill="#2c3c30"
+    stroke="#586a58"
+    stroke-width="2"
+  />
+  <path
+    d="M470 340l105 100m-105 0l105 -100"
+    stroke="#3a4d3e"
+    stroke-width="1"
+  />
+  <rect
+    x="760"
+    y="200"
+    width="80"
+    height="80"
+    fill="#2c3c30"
+    stroke="#586a58"
+    stroke-width="2"
+  />
+  <path d="M760 200l80 80m-80 0l80 -80" stroke="#3a4d3e" stroke-width="1" />
+  <path d="M600 320L345 201L345 270Z" fill="#b9dfc2" opacity=".045" />
+  <path
+    d="M600 320L330 232"
+    stroke="#b9dfc2"
+    stroke-width="2"
+    fill="none"
+    stroke-dasharray="7 7"
+    opacity=".8"
+  />
+  <circle cx="600" cy="320" r="29" fill="#b9dfc2" opacity=".09" />
+  <circle
+    cx="600"
+    cy="320"
+    r="17"
+    fill="#17221c"
+    stroke="#b9dfc2"
+    stroke-width="2"
+  />
+  <circle cx="600" cy="320" r="5" fill="#b9dfc2" />
+  <text
+    x="626"
+    y="325"
+    fill="#b9dfc2"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    YOU
+  </text>
+  <circle cx="740" cy="365" r="29" fill="#9bc4da" opacity=".09" />
+  <circle
+    cx="740"
+    cy="365"
+    r="17"
+    fill="#17221c"
+    stroke="#9bc4da"
+    stroke-width="2"
+  />
+  <circle cx="740" cy="365" r="5" fill="#9bc4da" />
+  <text
+    x="766"
+    y="370"
+    fill="#9bc4da"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ALLY
+  </text>
+  <path
+    d="M740 340L748 140"
+    stroke="#9bc4da"
+    stroke-width="2"
+    fill="none"
+    stroke-dasharray="5 7"
+    opacity=".8"
+  />
+  <text
+    x="410"
+    y="135"
+    fill="#708d76"
+    font-size="20"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    SITE
+  </text>
+  <text
+    x="127"
+    y="308"
+    fill="#aebbaa"
+    font-size="12"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    DOORWAY
+  </text>
+  <text
+    x="655"
+    y="307"
+    fill="#e8c98f"
+    font-size="12"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    SPIKE
+  </text>
+  <path
+    d="M674 242l13 18-13 18-13-18Z"
+    fill="none"
+    stroke="#e8c98f"
+    stroke-width="2"
+  />
+  <circle cx="200" cy="232" r="29" fill="#ff8069" opacity=".09" />
+  <circle
+    cx="200"
+    cy="232"
+    r="17"
+    fill="#17221c"
+    stroke="#ff8069"
+    stroke-width="2"
+  />
+  <circle cx="200" cy="232" r="5" fill="#ff8069" />
+  <text
+    x="226"
+    y="237"
+    fill="#ff8069"
+    font-size="13"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    DEFENDER
+  </text>
+  <text
+    x="410"
+    y="472"
+    fill="#d7dccc"
+    font-size="14"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    2v1 · POST-PLANT
+  </text>
+  <path d="M32 500H928" stroke="#354738" />
+  <text
+    x="36"
+    y="524"
+    fill="#b9dfc2"
+    font-size="11"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ● YOU
+  </text>
+  <text
+    x="155"
+    y="524"
+    fill="#9bc4da"
+    font-size="11"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ● TEAMMATE
+  </text>
+  <text
+    x="320"
+    y="524"
+    fill="#ff8069"
+    font-size="11"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ● OPPONENT
+  </text>
+  <text
+    x="670"
+    y="524"
+    fill="#82998a"
+    font-size="10"
+    font-family="monospace"
+    letter-spacing="1.2"
+  >
+    ORIGINAL TRAINING DIAGRAM
+  </text>
+</svg>
