@@ -67,8 +67,6 @@ The runner first verifies an additive upgrade from milestone three with existing
 
 The GitHub Actions workflow runs clean installation, migration/seed/type checks, unit/component tests, real database/integration tests, type checking and a production build for pull requests into `dev` and `main`, and pushes to those branches. GitHub execution begins when you push; local container checks are recorded separately.
 
-See [milestone-four verification](docs/milestone-4-verification.md) for current results and limitations, and the [approved plan](docs/milestone-4-plan.md) for the feature and test scope.
-
 ## Active scenarios
 
 All three use [WASHED GAMER PLAYS APAC RANKED](https://www.youtube.com/watch?v=_yPrykaB2nE) from the verified TenZ channel: player POV, Clove on Bind, ranked. This is the approved fallback to VCT footage. No video has been downloaded or rehosted.
@@ -80,8 +78,6 @@ All three use [WASHED GAMER PLAYS APAC RANKED](https://www.youtube.com/watch?v=_
 | `bind-clove-advantage-reset` | 31:43 | 31:53    | 32:00.5          |
 
 The last two moments are an explicitly linked pair in the same round. The first examines utility timing, the second a low-health contest while down a player, and the third how aggression changes after gaining a 3v1 advantage. None requires a uniquely preferred answer; the successful smoke contest is still assessed as risky.
-
-See [scenario evidence and reasoning](docs/vod-scenarios.md) and the [approved implementation plan](docs/milestone-2-plan.md) for source review, file responsibilities and acceptance checks.
 
 ## Architecture and access
 
