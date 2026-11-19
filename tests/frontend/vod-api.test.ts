@@ -30,7 +30,8 @@ function vodDetail(id = firstId) {
   if (
     detail.setup.kind !== "youtube" ||
     detail.decision.kind !== "paused-video" ||
-    !detail.source
+    !detail.source ||
+    detail.source.kind !== "youtube"
   )
     throw new Error("Expected a public VOD challenge fixture.");
   return {

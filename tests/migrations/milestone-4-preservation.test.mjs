@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { assertDisposableTarget, cleanChildEnvironment } from "../../scripts/local-target.mjs";
-import { applyPendingMigrations, assertDockerOwnership, LAST_M3_MIGRATION } from "../../scripts/local-test-stack.mjs";
+import { applyPendingMigrations, assertDockerOwnership, LAST_M3_MIGRATION, LAST_M4_MIGRATION } from "../../scripts/local-test-stack.mjs";
 
 function sql(target, statement) {
   assertDockerOwnership(target);
@@ -95,7 +95,7 @@ export async function runMigrationPreservation(env = process.env) {
   const target = assertDisposableTarget(env);
   const users = await createM3Baseline(target, env);
   const snapshot = snapshotExistingRecords(target);
-  await applyPendingMigrations(target);
+  await applyPendingMigrations(target, { through: LAST_M4_MIGRATION });
   await assertPreservedRecords(target, snapshot, users, env);
   console.log("Migration preservation passed: existing login, creator role, active/completed sessions, answers, versions and old command receipts survived.");
 }

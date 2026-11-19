@@ -6,6 +6,8 @@ import {
   previewReducer,
   selectPreviewFeedback,
 } from "@/lib/creator/preview-state";
+import { UploadedScenarioPlayer } from "@/components/challenge/UploadedScenarioPlayer";
+import { SourceAttribution } from "@/components/challenge/SourceAttribution";
 import { YouTubeScenarioPlayer } from "@/components/challenge/YouTubeScenarioPlayer";
 import { DecisionPanel } from "@/components/challenge/DecisionPanel";
 import { FeedbackPanel } from "@/components/challenge/FeedbackPanel";
@@ -23,7 +25,10 @@ export function ScenarioPreview({
   const answer = state.selectedOptionId
     ? selectPreviewFeedback(preview, state.selectedOptionId)
     : null;
-  if (challenge.setup.kind !== "youtube")
+  if (
+    challenge.setup.kind !== "youtube" &&
+    challenge.setup.kind !== "uploaded-video"
+  )
     return (
       <p role="alert">This saved preview has no supported player recording.</p>
     );
@@ -36,25 +41,7 @@ export function ScenarioPreview({
       </div>
       <div className="creator-preview-context">
         <p>{challenge.context}</p>
-        {challenge.source && (
-          <div className="source-attribution">
-            <span className="mono">
-              {challenge.source.player} · {challenge.source.agent} ·{" "}
-              {challenge.source.map}
-            </span>
-            <p>
-              Round {challenge.source.round} · {challenge.source.score} ·{" "}
-              {challenge.source.side === "attack" ? "Attacking" : "Defending"}
-            </p>
-            <a href={challenge.source.url} target="_blank" rel="noreferrer">
-              Source: {challenge.source.uploader} ↗
-            </a>
-            <p className="source-note">
-              {challenge.source.title}. Opening the source can reveal the
-              outcome.
-            </p>
-          </div>
-        )}
+        {challenge.source && <SourceAttribution source={challenge.source} />}
         {!!challenge.knownFacts?.length && (
           <details>
             <summary>Player-visible information</summary>
@@ -76,23 +63,52 @@ export function ScenarioPreview({
           </details>
         )}
       </div>
-      <YouTubeScenarioPlayer
-        key={state.attempt}
-        setup={challenge.setup}
-        reveal={
-          state.phase === "review" && answer?.reveal.kind === "youtube"
-            ? answer.reveal
-            : undefined
-        }
-        mode={
-          state.phase === "review"
-            ? state.reviewMedia === "outcome"
-              ? "reveal"
-              : "review-setup"
-            : state.phase
-        }
-        onComplete={() => dispatch({ type: "SETUP_COMPLETE" })}
-      />
+      {challenge.setup.kind === "uploaded-video" ? (
+        <UploadedScenarioPlayer
+          key={state.attempt}
+          setup={challenge.setup}
+          reveal={
+            state.phase === "review" && answer?.reveal.kind === "uploaded-video"
+              ? answer.reveal
+              : undefined
+          }
+          mode={
+            state.phase === "review"
+              ? state.reviewMedia === "outcome"
+                ? "reveal"
+                : "review-setup"
+              : state.phase
+          }
+          context={{
+            kind: "creator-scenario",
+            scenarioId: preview.scenario.id,
+            revision: preview.scenario.revision,
+            phase:
+              state.phase === "review" && state.reviewMedia === "outcome"
+                ? "reveal"
+                : "setup",
+          }}
+          onComplete={() => dispatch({ type: "SETUP_COMPLETE" })}
+        />
+      ) : (
+        <YouTubeScenarioPlayer
+          key={state.attempt}
+          setup={challenge.setup}
+          reveal={
+            state.phase === "review" && answer?.reveal.kind === "youtube"
+              ? answer.reveal
+              : undefined
+          }
+          mode={
+            state.phase === "review"
+              ? state.reviewMedia === "outcome"
+                ? "reveal"
+                : "review-setup"
+              : state.phase
+          }
+          onComplete={() => dispatch({ type: "SETUP_COMPLETE" })}
+        />
+      )}
       {state.phase === "decision" && (
         <DecisionPanel
           question={challenge.question}

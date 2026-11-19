@@ -32,9 +32,9 @@ const labels: Record<keyof ReviewChecklist, string> = {
   pauseTimingChecked:
     "I checked that the pause occurs before the decision is revealed.",
   continuationChecked:
-    "I played the continuation and checked the observed action and embed.",
+    "I played the continuation and checked the observed action and playback.",
   normalSpeedAudioChecked:
-    "I listened at normal speed and checked source audio for spoilers.",
+    "I listened at normal speed and checked source audio for spoilers, or accounted for a silent recording.",
   alternativeChoicesChecked:
     "I reviewed each alternative, its assumptions, risks and uncertainties.",
   sourceAttributionChecked:
@@ -147,6 +147,10 @@ export function CreatorReview({
           "The draft changed after this command. Reload the latest saved preview before continuing.",
         );
       } else {
+        // Review/publication changes the owner revision, while this preview's draft stays identical.
+        setPreview((saved) =>
+          saved ? { ...saved, scenario: result.scenario } : null,
+        );
         setChecklist(result.scenario.review?.checklist ?? emptyChecklist());
         setConflict(false);
         setNotice(

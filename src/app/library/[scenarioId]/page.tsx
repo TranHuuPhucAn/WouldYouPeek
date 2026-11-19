@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requirePageAccount } from "@/app/protected-page";
 import { getLibraryScenario } from "@/server/library/service";
 import { ApiError } from "@/server/http";
+import { SourceAttribution } from "@/components/challenge/SourceAttribution";
 import { ScenarioMedia } from "@/components/challenge/ScenarioMedia";
 import { ScenarioStart } from "@/components/library/ScenarioStart";
 export default async function LibraryScenarioPage({
@@ -28,7 +29,11 @@ export default async function LibraryScenarioPage({
         </div>
         <div className="library-detail-grid">
           <section>
-            <ScenarioMedia media={item.setup} label="Setup preview" />
+            <ScenarioMedia
+              media={item.setup}
+              label="Setup preview"
+              context={{ kind: "library-scenario", scenarioId }}
+            />
             <p className="preview-context">{item.context}</p>
             <div className="source-attribution">
               <p>
@@ -36,22 +41,7 @@ export default async function LibraryScenarioPage({
                   ? "Creator-reviewed analysis with AI assistance"
                   : "Creator-reviewed analysis"}
               </p>
-              {item.source && (
-                <>
-                  <p>
-                    Round {item.source.round} · {item.source.score} ·{" "}
-                    {item.source.side === "attack" ? "Attacking" : "Defending"}
-                  </p>
-                  <a href={item.source.url} target="_blank" rel="noreferrer">
-                    Source: {item.source.uploader} ↗
-                  </a>
-                  <p className="quiet-note">
-                    Opening the original recording may reveal the outcome.
-                    Attribution and scenario analysis are supplied by the
-                    creator.
-                  </p>
-                </>
-              )}
+              {item.source && <SourceAttribution source={item.source} />}
             </div>
           </section>
           <ScenarioStart scenarioId={scenarioId} />

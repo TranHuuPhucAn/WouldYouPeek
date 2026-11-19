@@ -9,6 +9,7 @@ import type {
   ChallengeSource,
   ScenarioAnalysis,
 } from "@/contracts/challenge";
+import { isSafeCreditUrl } from "@/lib/creator/content";
 import { validateSegment } from "@/lib/video/segment-controller";
 
 import { ApiClientError as ChallengeApiError } from "./api-response";
@@ -40,6 +41,29 @@ function isMedia(value: unknown): value is MediaAsset {
         endSeconds: value.endSeconds,
       })
     );
+  if (value.kind === "uploaded-video")
+    return (
+      typeof value.assetId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value.assetId,
+      ) &&
+      typeof value.startSeconds === "number" &&
+      typeof value.endSeconds === "number" &&
+      validateSegment({
+        startSeconds: value.startSeconds,
+        endSeconds: value.endSeconds,
+      }) &&
+      Object.keys(value).every((key) =>
+        [
+          "kind",
+          "assetId",
+          "startSeconds",
+          "endSeconds",
+          "alt",
+          "caption",
+        ].includes(key),
+      )
+    );
   return (
     (value.kind === "video" || value.kind === "illustration") &&
     isText(value.src)
@@ -60,11 +84,9 @@ function isDecision(value: unknown): value is DecisionAsset {
 function isSource(value: unknown): value is ChallengeSource {
   if (
     !isRecord(value) ||
-    value.kind !== "youtube" ||
-    !isText(value.videoId) ||
-    !/^[\w-]{11}$/.test(value.videoId) ||
-    !["url", "title", "uploader", "player", "map", "agent", "score"].every(
-      (key) => isText(value[key]),
+    !["youtube", "uploaded"].includes(String(value.kind)) ||
+    !["title", "uploader", "player", "map", "agent", "score"].every((key) =>
+      isText(value[key]),
     ) ||
     !["ranked", "tournament"].includes(String(value.matchType)) ||
     !["attack", "defense"].includes(String(value.side)) ||
@@ -73,6 +95,39 @@ function isSource(value: unknown): value is ChallengeSource {
     value.round < 1 ||
     (value.publishedDate !== undefined && !isText(value.publishedDate)) ||
     (value.dateNote !== undefined && !isText(value.dateNote))
+  )
+    return false;
+  if (value.kind === "uploaded")
+    return (
+      typeof value.assetId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value.assetId,
+      ) &&
+      typeof value.creditUrl === "string" &&
+      (value.creditUrl === "" || isSafeCreditUrl(value.creditUrl)) &&
+      Object.keys(value).every((key) =>
+        [
+          "kind",
+          "assetId",
+          "creditUrl",
+          "title",
+          "uploader",
+          "player",
+          "map",
+          "agent",
+          "score",
+          "matchType",
+          "round",
+          "side",
+          "publishedDate",
+          "dateNote",
+        ].includes(key),
+      )
+    );
+  if (
+    !isText(value.videoId) ||
+    !/^[\w-]{11}$/.test(value.videoId) ||
+    !isText(value.url)
   )
     return false;
   try {
@@ -143,7 +198,16 @@ export function parseChallengePreview(value: unknown): ChallengePreview {
   if (
     body.setup.kind === "youtube" &&
     (!body.source ||
+      body.source.kind !== "youtube" ||
       body.source.videoId !== body.setup.videoId ||
+      body.mediaStatus !== "ready")
+  )
+    invalidResponse();
+  if (
+    body.setup.kind === "uploaded-video" &&
+    (!body.source ||
+      body.source.kind !== "uploaded" ||
+      body.source.assetId !== body.setup.assetId ||
       body.mediaStatus !== "ready")
   )
     invalidResponse();
@@ -173,10 +237,15 @@ export function parseChallengeDetail(value: unknown): ChallengeDetail {
       body.options.length
   )
     invalidResponse();
-  if (body.setup.kind === "youtube") {
+  if (body.setup.kind === "youtube" || body.setup.kind === "uploaded-video") {
+    const sourceMatches =
+      body.setup.kind === "youtube"
+        ? body.source?.kind === "youtube" &&
+          body.source.videoId === body.setup.videoId
+        : body.source?.kind === "uploaded" &&
+          body.source.assetId === body.setup.assetId;
     if (
-      !body.source ||
-      body.source.videoId !== body.setup.videoId ||
+      !sourceMatches ||
       body.decision.kind !== "paused-video" ||
       body.decision.atSeconds !== body.setup.endSeconds ||
       !body.question ||
@@ -236,7 +305,11 @@ export function parseAnswerResponse(value: unknown): AnswerResponse {
     body.observedAction !== undefined ||
     body.matchesPro !== undefined ||
     body.analysis !== undefined;
-  if (hasComparison || body.reveal.kind === "youtube") {
+  if (
+    hasComparison ||
+    body.reveal.kind === "youtube" ||
+    body.reveal.kind === "uploaded-video"
+  ) {
     if (
       !isRecord(body.observedAction) ||
       !isText(body.observedAction.optionId) ||
@@ -269,6 +342,17 @@ export function validateAnswerForChallenge(
     if (
       answer.reveal.kind !== "youtube" ||
       answer.reveal.videoId !== challenge.setup.videoId ||
+      answer.reveal.startSeconds !== challenge.setup.endSeconds ||
+      !answer.observedAction ||
+      !ids.includes(answer.observedAction.optionId) ||
+      !answer.analysis ||
+      typeof answer.matchesPro !== "boolean"
+    )
+      invalidResponse();
+  } else if (challenge.setup.kind === "uploaded-video") {
+    if (
+      answer.reveal.kind !== "uploaded-video" ||
+      answer.reveal.assetId !== challenge.setup.assetId ||
       answer.reveal.startSeconds !== challenge.setup.endSeconds ||
       !answer.observedAction ||
       !ids.includes(answer.observedAction.optionId) ||

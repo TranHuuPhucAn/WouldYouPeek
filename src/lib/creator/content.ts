@@ -1,4 +1,8 @@
-import type { CreatorDraftContent, ValidationIssue } from "@/contracts/creator";
+import type {
+  CreatorDraftContent,
+  UploadedCreatorSource,
+  ValidationIssue,
+} from "@/contracts/creator";
 
 export const CREATOR_LIMITS = {
   requestBytes: 65_536,
@@ -167,8 +171,10 @@ export function normalizeDraftContent(
           ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, trim(x)]))
           : v;
   const normalized = trim(content) as CreatorDraftContent;
-  const source = parseYouTubeSource(normalized.source.url);
-  if (source) normalized.source.url = source.url;
+  if (normalized.source.kind !== "uploaded") {
+    const source = parseYouTubeSource(normalized.source.url);
+    if (source) normalized.source.url = source.url;
+  }
   return normalized;
 }
 
@@ -215,7 +221,16 @@ export function validateDraftContent(value: unknown): ValidationIssue[] {
     text(value[key], max, key);
   list(value.knownFacts, "knownFacts");
   list(value.unknowns, "unknowns");
-  if (shape(value.source, sourceKeys, "source")) {
+  const uploaded = record(value.source) && value.source.kind === "uploaded";
+  const allowedSourceKeys = uploaded
+    ? [
+        ...sourceKeys.filter((key) => key !== "url"),
+        "kind",
+        "assetId",
+        "creditUrl",
+      ]
+    : sourceKeys;
+  if (shape(value.source, allowedSourceKeys, "source")) {
     const s = value.source;
     for (const key of [
       "title",
@@ -228,7 +243,23 @@ export function validateDraftContent(value: unknown): ValidationIssue[] {
       "dateNote",
     ])
       text(s[key], 300, `source.${key}`);
-    text(s.url, 2048, "source.url");
+    if (uploaded) {
+      if (
+        s.assetId !== null &&
+        (typeof s.assetId !== "string" || !UUID.test(s.assetId))
+      )
+        issue("source.assetId", "Choose an uploaded video.");
+      text(s.creditUrl, 2048, "source.creditUrl");
+      if (
+        typeof s.creditUrl === "string" &&
+        s.creditUrl.trim() &&
+        !isSafeCreditUrl(s.creditUrl)
+      )
+        issue(
+          "source.creditUrl",
+          "Use an HTTPS source credit link or leave it empty.",
+        );
+    } else text(s.url, 2048, "source.url");
     if (
       s.matchType !== null &&
       s.matchType !== "ranked" &&
@@ -347,7 +378,6 @@ export function validatePublishContent(value: unknown): ValidationIssue[] {
       message: "Include at least one player-visible fact.",
     });
   for (const key of [
-    "url",
     "title",
     "uploader",
     "player",
@@ -359,7 +389,9 @@ export function validatePublishContent(value: unknown): ValidationIssue[] {
     "side",
   ] as const)
     required(content.source[key], `source.${key}`);
-  if (!parseYouTubeSource(content.source.url))
+  if (content.source.kind === "uploaded")
+    required(content.source.assetId, "source.assetId");
+  else if (!parseYouTubeSource(content.source.url))
     issues.push({
       path: "source.url",
       code: "YOUTUBE_SOURCE",
@@ -434,4 +466,34 @@ export function validatePublishContent(value: unknown): ValidationIssue[] {
   required(content.observedAction.description, "observedAction.description");
   required(content.analysis.rationale, "analysis.rationale");
   return issues.slice(0, 100);
+}
+
+export function getDraftSourceKind(
+  source: CreatorDraftContent["source"],
+): "youtube" | "uploaded" {
+  return source.kind === "uploaded" ? "uploaded" : "youtube";
+}
+export function createUploadedSource(
+  assetId: string | null = null,
+): UploadedCreatorSource {
+  const { url: _url, ...attribution } = createEmptyDraft().source as Extract<
+    CreatorDraftContent["source"],
+    { url: string }
+  >;
+  return { ...attribution, kind: "uploaded", assetId, creditUrl: "" };
+}
+export function isSafeCreditUrl(raw: string): boolean {
+  try {
+    const value = new URL(raw);
+    return (
+      raw === raw.trim() &&
+      value.protocol === "https:" &&
+      !!value.hostname &&
+      !value.username &&
+      !value.password &&
+      !/[\s\u0000-\u001f\u007f]/.test(raw)
+    );
+  } catch {
+    return false;
+  }
 }

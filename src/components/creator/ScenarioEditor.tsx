@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type {
   CreatorScenarioSnapshot,
@@ -14,7 +14,7 @@ import { useScenarioEditor } from "@/hooks/use-scenario-editor";
 import { AnalysisFields } from "./AnalysisFields";
 import { DecisionFields } from "./DecisionFields";
 import { SourceFields } from "./SourceFields";
-import { TimingFields } from "./TimingFields";
+import { VideoTimingEditor } from "./VideoTimingEditor";
 import { fieldId } from "./EditorFields";
 import { CreatorStatus } from "./CreatorStatus";
 
@@ -29,6 +29,22 @@ export function ScenarioEditor({
     { state } = editor;
   const [inputIssues, setInputIssues] = useState<ValidationIssue[]>([]);
   const [showIssues, setShowIssues] = useState(false);
+  const [sourceReset, setSourceReset] = useState(0);
+  const [pendingSource, setPendingSource] = useState<{
+    source: typeof state.content.source;
+    field: string;
+  } | null>(null);
+  const cancelSourceButton = useRef<HTMLButtonElement>(null);
+  const focusTimingAfterChange = useRef(false);
+  useEffect(() => {
+    if (pendingSource) cancelSourceButton.current?.focus();
+  }, [pendingSource]);
+  useEffect(() => {
+    if (focusTimingAfterChange.current) {
+      focusTimingAfterChange.current = false;
+      document.getElementById(fieldId("media.startSeconds"))?.focus();
+    }
+  }, [sourceReset]);
   const dirty = editor.dirty || inputIssues.length > 0;
   useEffect(() => {
     if (!dirty || state.invalid) return;
@@ -68,6 +84,7 @@ export function ScenarioEditor({
   useEffect(() => {
     setInputIssues([]);
     setShowIssues(false);
+    setPendingSource(null);
   }, [state.resetKey]);
   if (state.invalid)
     return (
@@ -83,6 +100,96 @@ export function ScenarioEditor({
   const structural = [...validateDraftContent(normalized), ...inputIssues];
   const readiness = validatePublishContent(normalized);
   const issues = showIssues ? [...structural, ...readiness] : inputIssues;
+  function replaceSource(source: typeof state.content.source) {
+    const media = state.content.media;
+    const identity = (value: typeof source) =>
+      value.kind === "uploaded" ? `upload:${value.assetId}` : value.url;
+    if (identity(source) === identity(state.content.source)) {
+      editor.update({ ...state.content, source });
+      return true;
+    }
+    const hasMarks =
+      [media.startSeconds, media.decisionSeconds, media.endSeconds].some(
+        (value) => value !== null,
+      ) || !!(media.setupAlt || media.decisionAlt || media.revealAlt);
+    if (hasMarks) {
+      const field =
+        source.kind !== state.content.source.kind
+          ? "source.kind"
+          : source.kind === "uploaded"
+            ? "source.assetId"
+            : "source.url";
+      setPendingSource({ source, field });
+      return false;
+    }
+    applySource(source);
+    return true;
+  }
+  function applySource(
+    source: typeof state.content.source,
+    focusTiming = false,
+  ) {
+    // The creator can keep editing while deciding. Preserve the latest attribution text.
+    const {
+      title,
+      uploader,
+      player,
+      map,
+      agent,
+      score,
+      matchType,
+      round,
+      side,
+      publishedDate,
+      dateNote,
+    } = state.content.source;
+    const attribution = {
+      title,
+      uploader,
+      player,
+      map,
+      agent,
+      score,
+      matchType,
+      round,
+      side,
+      publishedDate,
+      dateNote,
+    };
+    const nextSource: typeof source =
+      source.kind === "uploaded"
+        ? {
+            ...attribution,
+            kind: "uploaded",
+            assetId: source.assetId,
+            creditUrl:
+              state.content.source.kind === "uploaded"
+                ? state.content.source.creditUrl
+                : source.creditUrl,
+          }
+        : { ...attribution, url: source.url };
+    editor.update({
+      ...state.content,
+      source: nextSource,
+      media: {
+        startSeconds: null,
+        decisionSeconds: null,
+        endSeconds: null,
+        setupAlt: "",
+        decisionAlt: "",
+        revealAlt: "",
+      },
+    });
+    setPendingSource(null);
+    focusTimingAfterChange.current = focusTiming;
+    setSourceReset((value) => value + 1);
+    setInputIssues([]);
+  }
+  function cancelSourceChange() {
+    const field = pendingSource?.field;
+    setPendingSource(null);
+    if (field) document.getElementById(fieldId(field))?.focus();
+  }
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setShowIssues(true);
@@ -109,6 +216,45 @@ export function ScenarioEditor({
           reviewed={!!state.snapshot.review}
         />
       </div>
+      {pendingSource && (
+        <section
+          className="creator-alert"
+          role="alertdialog"
+          aria-modal="false"
+          aria-labelledby="source-change-title"
+          aria-describedby="source-change-description"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              cancelSourceChange();
+            }
+          }}
+        >
+          <h2 id="source-change-title">Change the source recording?</h2>
+          <p id="source-change-description">
+            This clears the three timestamps and media descriptions. Your
+            question, choices, and analysis stay in the draft. Check them
+            against the new recording before saving.
+          </p>
+          <div className="creator-save-actions">
+            <button
+              ref={cancelSourceButton}
+              type="button"
+              className="button button-secondary"
+              onClick={cancelSourceChange}
+            >
+              Cancel source change
+            </button>
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => applySource(pendingSource.source, true)}
+            >
+              Change source
+            </button>
+          </div>
+        </section>
+      )}
       <form onSubmit={handleSubmit} noValidate>
         <div className="creator-savebar">
           <div role="status" aria-live="polite">
@@ -223,9 +369,11 @@ export function ScenarioEditor({
           source={state.content.source}
           onChange={(source) => editor.update({ ...state.content, source })}
           issues={issues}
+          onReplace={replaceSource}
         />
-        <TimingFields
-          key={state.resetKey}
+        <VideoTimingEditor
+          key={`${state.resetKey}-${sourceReset}`}
+          source={state.content.source}
           media={state.content.media}
           onChange={(media) => editor.update({ ...state.content, media })}
           issues={issues}

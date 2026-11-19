@@ -211,6 +211,7 @@ describe("save recovery without lost typing or silent rebasing", () => {
         knownFacts: ["  Existing fact  "],
         source: {
           ...result.current.state.content.source,
+          kind: undefined,
           url: "https://youtu.be/_yPrykaB2nE?t=1705",
         },
       }),
@@ -221,9 +222,9 @@ describe("save recovery without lost typing or silent rebasing", () => {
     const sent = vi.mocked(api.saveCreatorScenario).mock.calls[0][1];
     expect(sent.content.title).toBe("First");
     expect(sent.content.knownFacts).toEqual(["Existing fact"]);
-    expect(sent.content.source.url).toBe(
-      "https://www.youtube.com/watch?v=_yPrykaB2nE",
-    );
+    expect(
+      sent.content.source.kind !== "uploaded" && sent.content.source.url,
+    ).toBe("https://www.youtube.com/watch?v=_yPrykaB2nE");
     act(() =>
       result.current.update({
         ...result.current.state.content,

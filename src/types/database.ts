@@ -134,17 +134,53 @@ isOneToOne: false
             "advance_training_session":
 { Args: { "p_expected_revision": number,"p_from_item_id": string,"p_request_id": string,"p_session_id": string }; Returns: Json
                            },
+"authorize_video_playback":
+{ Args: { "p_context": Json }; Returns: Json
+                           },
+"begin_creator_video_delete":
+{ Args: { "p_asset_id": string,"p_expected_revision": number,"p_request_id": string }; Returns: Json
+                           },
+"claim_video_validation":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"complete_creator_video_upload":
+{ Args: { "p_asset_id": string,"p_expected_revision": number,"p_request_id": string }; Returns: Json
+                           },
+"complete_video_validation":
+{ Args: { "p_asset_id": string,"p_fence": string,"p_metadata": Json,"p_object_version": string }; Returns: boolean
+                           },
 "create_creator_scenario":
 { Args: { "p_request_id": string }; Returns: Json
                            },
+"create_creator_video":
+{ Args: { "p_byte_size": number,"p_content_fingerprint": string,"p_file_name": string,"p_mime_type": string,"p_request_id": string }; Returns: Json
+                           },
 "enable_creator":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"fail_video_validation":
+{ Args: { "p_asset_id": string,"p_code": string,"p_fence": string,"p_retryable": boolean }; Returns: boolean
+                           },
+"finish_creator_video_delete":
+{ Args: { "p_asset_id": string,"p_request_id": string }; Returns: Json
+                           },
+"finish_creator_video_upload_session":
+{ Args: { "p_asset_id": string,"p_fence": string,"p_upload_url": string }; Returns: Json
                            },
 "get_creator_review_preview":
 { Args: { "p_revision": number,"p_scenario_id": string }; Returns: Json
                            },
 "get_creator_scenario":
 { Args: { "p_scenario_id": string }; Returns: Json
+                           },
+"get_creator_video":
+{ Args: { "p_asset_id": string }; Returns: Json
+                           },
+"get_creator_video_request":
+{ Args: { "p_request_id": string }; Returns: Json
+                           },
+"get_creator_video_upload_session":
+{ Args: { "p_asset_id": string }; Returns: Json
                            },
 "get_library_preview":
 { Args: { "p_scenario_id": string }; Returns: Json
@@ -158,6 +194,9 @@ isOneToOne: false
 "list_creator_scenarios":
 { Args: { "p_cursor"?: string,"p_limit"?: number,"p_status"?: string }; Returns: Json
                            },
+"list_creator_videos":
+{ Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
+                           },
 "list_library_previews":
 { Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
                            },
@@ -169,6 +208,18 @@ isOneToOne: false
                            },
 "publish_creator_scenario":
 { Args: { "p_expected_revision": number,"p_request_id": string,"p_review_id": string,"p_scenario_id": string }; Returns: Json
+                           },
+"release_creator_video_upload_session":
+{ Args: { "p_asset_id": string,"p_fence": string }; Returns: boolean
+                           },
+"renew_video_validation_lease":
+{ Args: { "p_asset_id": string,"p_fence": string }; Returns: boolean
+                           },
+"report_video_validator_heartbeat":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"retry_creator_video_validation":
+{ Args: { "p_asset_id": string,"p_expected_revision": number,"p_request_id": string }; Returns: Json
                            },
 "review_creator_scenario":
 { Args: { "p_checklist": Json,"p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json

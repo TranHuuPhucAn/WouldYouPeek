@@ -2,25 +2,35 @@ import type { AnswerResponse, Assessment, ChallengeDetail } from "./challenge";
 
 export type ValidationIssue = { path: string; code: string; message: string };
 export type CreatorFilter = "all" | "unpublished" | "published" | "withdrawn";
+export type CreatorSourceAttribution = {
+  title: string;
+  uploader: string;
+  player: string;
+  map: string;
+  agent: string;
+  score: string;
+  matchType: "ranked" | "tournament" | null;
+  round: number | null;
+  side: "attack" | "defense" | null;
+  publishedDate: string;
+  dateNote: string;
+};
+export type YouTubeCreatorSource = CreatorSourceAttribution & {
+  url: string;
+  kind?: never;
+};
+export type UploadedCreatorSource = CreatorSourceAttribution & {
+  kind: "uploaded";
+  assetId: string | null;
+  creditUrl: string;
+};
+export type CreatorSource = YouTubeCreatorSource | UploadedCreatorSource;
 export type CreatorDraftContent = {
   title: string;
   topic: string;
   context: string;
   question: string;
-  source: {
-    url: string;
-    title: string;
-    uploader: string;
-    player: string;
-    map: string;
-    agent: string;
-    score: string;
-    matchType: "ranked" | "tournament" | null;
-    round: number | null;
-    side: "attack" | "defense" | null;
-    publishedDate: string;
-    dateNote: string;
-  };
+  source: CreatorSource;
   media: {
     startSeconds: number | null;
     decisionSeconds: number | null;

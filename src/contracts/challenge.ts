@@ -10,16 +10,26 @@ export type YouTubeSegment = {
   caption?: string;
 };
 
+export type UploadedVideoSegment = {
+  kind: "uploaded-video";
+  assetId: string;
+  startSeconds: number;
+  endSeconds: number;
+  alt: string;
+  caption?: string;
+};
+
 export type MediaAsset =
   | { kind: "video"; src: string; alt: string; caption?: string }
   | { kind: "illustration"; src: string; alt: string; caption?: string }
-  | YouTubeSegment;
+  | YouTubeSegment
+  | UploadedVideoSegment;
 
 export type DecisionAsset =
   | { kind: "image"; imageUrl: string; alt: string }
   | { kind: "paused-video"; atSeconds: number; alt: string };
 
-export type ChallengeSource = {
+export type YouTubeChallengeSource = {
   kind: "youtube";
   videoId: string;
   url: string;
@@ -35,6 +45,12 @@ export type ChallengeSource = {
   publishedDate?: string;
   dateNote?: string;
 };
+
+export type UploadedChallengeSource = Omit<
+  YouTubeChallengeSource,
+  "kind" | "videoId" | "url"
+> & { kind: "uploaded"; assetId: string; creditUrl: string };
+export type ChallengeSource = YouTubeChallengeSource | UploadedChallengeSource;
 
 export type ObservedAction = { optionId: string; description: string };
 
@@ -123,7 +139,15 @@ export type ApiErrorCode =
   | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
   | "STORAGE_UNAVAILABLE"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "VIDEO_NOT_FOUND"
+  | "VIDEO_CONFLICT"
+  | "VIDEO_NOT_READY"
+  | "VIDEO_IN_USE"
+  | "UPLOAD_LIMIT_REACHED"
+  | "UPLOAD_EXPIRED"
+  | "VIDEO_UNSUPPORTED"
+  | "MEDIA_UNAVAILABLE";
 
 export type ApiErrorResponse = {
   error: { code: ApiErrorCode; message: string; details?: ApiErrorDetails };

@@ -74,7 +74,9 @@ function media(value: unknown) {
     input,
     input.kind === "youtube"
       ? ["kind", "videoId", "startSeconds", "endSeconds", "alt", "caption"]
-      : ["kind", "src", "alt", "caption"],
+      : input.kind === "uploaded-video"
+        ? ["kind", "assetId", "startSeconds", "endSeconds", "alt", "caption"]
+        : ["kind", "src", "alt", "caption"],
   );
 }
 function source(value: unknown) {
@@ -83,6 +85,8 @@ function source(value: unknown) {
     : pick(value, [
         "kind",
         "videoId",
+        "assetId",
+        "creditUrl",
         "url",
         "title",
         "uploader",

@@ -1,11 +1,7 @@
 "use client";
-import { useState } from "react";
 import type { CreatorDraftContent, ValidationIssue } from "@/contracts/creator";
-import {
-  formatTimestampInput,
-  getTimingSummary,
-  parseTimestampInput,
-} from "@/lib/creator/timestamps";
+import { getTimingSummary } from "@/lib/creator/timestamps";
+import type { TimingField, TimingState } from "@/lib/creator/timing-state";
 import { TextField } from "./EditorFields";
 const times = [
   ["startSeconds", "Setup starts"],
@@ -16,38 +12,15 @@ export function TimingFields({
   media,
   onChange,
   issues,
-  onInputIssues,
+  raw,
+  onTimeChange,
 }: {
   media: CreatorDraftContent["media"];
   onChange: (media: CreatorDraftContent["media"]) => void;
   issues: ValidationIssue[];
-  onInputIssues: (issues: ValidationIssue[]) => void;
+  raw: TimingState;
+  onTimeChange: (field: TimingField, text: string) => void;
 }) {
-  const [raw, setRaw] = useState(
-    () =>
-      Object.fromEntries(
-        times.map(([key]) => [key, formatTimestampInput(media[key])]),
-      ) as Record<(typeof times)[number][0], string>,
-  );
-  function update(key: (typeof times)[number][0], value: string) {
-    const next = { ...raw, [key]: value };
-    setRaw(next);
-    const inputIssues = times.flatMap(([name]) => {
-      const parsed = parseTimestampInput(next[name]);
-      return parsed.error
-        ? [
-            {
-              path: `media.${name}`,
-              code: "TIMESTAMP_FORMAT",
-              message: parsed.error,
-            },
-          ]
-        : [];
-    });
-    onInputIssues(inputIssues);
-    const result = parseTimestampInput(value);
-    if (!result.error) onChange({ ...media, [key]: result.value });
-  }
   const durations = getTimingSummary(media);
   return (
     <fieldset className="creator-section">
@@ -63,7 +36,7 @@ export function TimingFields({
             path={`media.${key}`}
             label={label}
             value={raw[key]}
-            onChange={(value) => update(key, value)}
+            onChange={(value) => onTimeChange(key, value)}
             issues={issues}
             maxLength={16}
             hint="Seconds, mm:ss or hh:mm:ss. Up to 3 decimal places."

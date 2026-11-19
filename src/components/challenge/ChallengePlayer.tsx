@@ -11,6 +11,8 @@ import { DecisionPanel } from "./DecisionPanel";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { SessionRecap } from "./SessionRecap";
 import { YouTubeScenarioPlayer } from "./YouTubeScenarioPlayer";
+import { UploadedScenarioPlayer } from "./UploadedScenarioPlayer";
+import { SourceAttribution } from "./SourceAttribution";
 
 export function ChallengePlayer({
   initialSession,
@@ -135,6 +137,36 @@ export function ChallengePlayer({
                       }
                       onComplete={session.completeSetup}
                     />
+                  ) : challenge.setup.kind === "uploaded-video" ? (
+                    <UploadedScenarioPlayer
+                      key={challenge.id}
+                      setup={challenge.setup}
+                      reveal={
+                        state.feedback?.reveal.kind === "uploaded-video"
+                          ? state.feedback.reveal
+                          : undefined
+                      }
+                      mode={
+                        isDecision
+                          ? "decision"
+                          : state.phase === "review"
+                            ? state.reviewMedia === "outcome"
+                              ? "reveal"
+                              : "review-setup"
+                            : "setup"
+                      }
+                      context={{
+                        kind: "session-item",
+                        sessionId: state.snapshot.id,
+                        itemId: state.snapshot.items[state.currentIndex].id,
+                        phase:
+                          state.phase === "review" &&
+                          state.reviewMedia === "outcome"
+                            ? "reveal"
+                            : "setup",
+                      }}
+                      onComplete={session.completeSetup}
+                    />
                   ) : (
                     <ScenarioMedia
                       key={`${challenge.id}-${state.phase === "setup" ? "setup" : isDecision ? "decision" : state.reviewMedia}`}
@@ -184,32 +216,7 @@ export function ChallengePlayer({
                     </p>
                   )}
                   {challenge.source && (
-                    <div className="source-attribution">
-                      <span className="mono">
-                        {challenge.source.player} · {challenge.source.agent} ·{" "}
-                        {challenge.source.map}
-                      </span>
-                      <p>
-                        Round {challenge.source.round} ·{" "}
-                        {challenge.source.score} ·{" "}
-                        {challenge.source.side === "attack"
-                          ? "Attacking"
-                          : "Defending"}
-                      </p>
-                      <a
-                        href={challenge.source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Source: {challenge.source.uploader} ↗
-                      </a>
-                      <p className="source-note">
-                        {challenge.source.matchType === "ranked"
-                          ? "Ranked player recording"
-                          : "Tournament recording"}
-                        . Opening the source can reveal the outcome.
-                      </p>
-                    </div>
+                    <SourceAttribution source={challenge.source} />
                   )}
                   {challenge.knownFacts?.length ? (
                     <div className="context-facts">

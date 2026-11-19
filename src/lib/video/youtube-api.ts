@@ -10,6 +10,9 @@ export type YouTubePlayer = {
   pauseVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
+  getDuration?(): number;
+  getVolume?(): number;
+  setVolume?(volume: number): void;
   getPlayerState(): number;
   getIframe(): HTMLIFrameElement;
   destroy(): void;

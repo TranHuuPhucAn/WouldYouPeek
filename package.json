@@ -6,7 +6,7 @@
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit --incremental false",
     "test": "vitest run --project backend --project frontend",
     "test:watch": "vitest --project backend --project frontend",
     "test:backend": "vitest run --project backend",
@@ -24,18 +24,23 @@
     "db:types:check": "node scripts/local-supabase.mjs types-check",
     "db:seed:generate": "node scripts/render-demo-seed.mjs",
     "db:seed:check": "node scripts/render-demo-seed.mjs --check",
-    "test:http": "node scripts/local-supabase.mjs http"
+    "test:http": "node scripts/local-supabase.mjs http",
+    "media:setup": "node scripts/local-media-worker.mjs setup",
+    "media:check": "node scripts/local-media-worker.mjs check",
+    "media:worker": "node scripts/local-media-worker.mjs worker",
+    "media:fixtures": "node scripts/generate-video-fixtures.mjs"
   },
   "engines": {
     "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1",
-    "@supabase/supabase-js": "2.119.0",
-    "@supabase/ssr": "0.12.7"
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
@@ -50,10 +55,11 @@
     "jsdom": "^29.1.1",
     "postcss": "^8.5.33",
     "prettier": "^3.10.1",
+    "supabase": "3.2.0",
     "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0",
-    "supabase": "3.2.0"
+    "vitest": "^5.1.0"
   },
   "type": "module"
 }

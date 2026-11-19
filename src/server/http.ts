@@ -29,6 +29,14 @@ const ERROR_STATUS: Record<ApiErrorCode, number> = {
   PAYLOAD_TOO_LARGE: 413,
   RATE_LIMITED: 429,
   STORAGE_UNAVAILABLE: 503,
+  VIDEO_NOT_FOUND: 404,
+  VIDEO_CONFLICT: 409,
+  VIDEO_NOT_READY: 409,
+  VIDEO_IN_USE: 409,
+  UPLOAD_LIMIT_REACHED: 429,
+  UPLOAD_EXPIRED: 410,
+  VIDEO_UNSUPPORTED: 422,
+  MEDIA_UNAVAILABLE: 503,
 };
 export class ApiError extends Error {
   constructor(
@@ -275,6 +283,15 @@ export function databaseError(error: {
     ACTIVE_SESSION_EXISTS:
       "Finish your current session before starting a different scenario.",
     PAYLOAD_TOO_LARGE: "This request is too large.",
+    VIDEO_NOT_FOUND: "This video could not be found.",
+    VIDEO_CONFLICT: "This video has changed. Reload it to continue.",
+    VIDEO_NOT_READY: "Wait for this video to finish validation.",
+    VIDEO_IN_USE: "This video is referenced by a draft or saved publication.",
+    UPLOAD_LIMIT_REACHED: "Your video upload limit has been reached.",
+    UPLOAD_EXPIRED:
+      "This upload has expired. Remove it and start a new upload.",
+    VIDEO_UNSUPPORTED: "Use a supported MP4 recording.",
+    MEDIA_UNAVAILABLE: "This video is temporarily unavailable.",
   };
   const code = error.message as ApiErrorCode;
   if (Object.hasOwn(messages, code)) {
