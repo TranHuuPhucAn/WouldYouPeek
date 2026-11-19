@@ -2,7 +2,7 @@
 
 A Valorant decision-practice app for advanced players. Watch a professional player’s POV, make a choice at a paused moment, then watch the continuation and read conditional analysis. The demo contains three approved moments from TenZ’s ranked stream on Bind.
 
-Matching the pro and making a defensible decision are separate outcomes. Explanations are AI-authored interpretations, with observable facts and missing context identified separately.
+Matching the pro and making a defensible decision are separate outcomes. Creators can author, review and publish their own scenarios. Explanations distinguish creator-written or AI-assisted analysis; the original demo retains its AI-authored attribution. Observable facts and missing context remain separate from interpretations.
 
 ## Run locally
 
@@ -23,11 +23,25 @@ Use **Watch demo** as a guest to view setup clips. Choose **Join the lab**, regi
 
 After verification, start a session. Watch setup, choose an action, and submit. The answer is saved before the pro’s continuation and analysis appear. **Next scenario** advances the saved checkpoint; **Finish session** completes the final review. History retains completed sessions. Refreshing an unanswered scenario restarts setup; refreshing a saved answer restores review. Unsubmitted selections and video time are not persisted.
 
-Under **Account**, any verified learner can enable creator access. Creators retain learner access. The creator landing is included; uploading, editing and publishing scenarios come in milestone four.
+Under **Account**, any verified learner can enable creator access. Creators retain learner access. Open **Creator studio** to create a private draft, enter a YouTube source and timestamps, write context, choices and analysis, and explicitly save. Incomplete drafts can be saved. Preview uses only the saved draft and does not create a learner session.
+
+When the draft is complete, preview it, review the source and explanations, and record the checklist. **Publish** makes that exact reviewed content available in the verified learner **Library**. Learners can start one library scenario at a time or keep playing the three-scenario demo. If another session is active, resume it explicitly before starting a different target.
+
+Editing a published scenario leaves its previous version available until a new reviewed version is published. Content changes invalidate the review. **Unpublish** removes the scenario from discovery and new starts; existing sessions and history retain their original version. Republishing requires another review. Creator review is self-review, not independent moderation.
+
+If upgrading an existing milestone-three local installation, preserve your accounts and sessions by applying only the pending migrations:
+
+```sh
+npm ci
+npm run db:start
+npm run db:migrate:local
+npm run db:env
+npm run dev
+```
 
 YouTube playback requires an internet connection. Use `127.0.0.1:3000` consistently: auth callbacks and mutation-origin checks are configured for that address. If changing the port or hostname, update `NEXT_PUBLIC_APP_URL` in `.env.local`, `auth.site_url` and `auth.additional_redirect_urls` in `supabase/config.toml`, then restart the app and local services.
 
-Stop the web server with `Ctrl+C`; stop local services with `npm run db:stop`. Stopping preserves database volumes. Starting again restores accounts and sessions. **`npm run db:reset:local` deletes local accounts and progress**, recreates the disposable database and seeds the three scenarios; use it only when intentionally resetting local test data.
+Stop the web server with `Ctrl+C`; stop local services with `npm run db:stop`. Stopping preserves database volumes. Starting again restores accounts and sessions. **`npm run db:reset:local` deletes local accounts, creator content and progress**, recreates the development database and seeds the three demo scenarios. It is unnecessary for normal upgrades or verification.
 
 To serve an optimized build locally, keep Supabase running and use:
 
@@ -40,27 +54,20 @@ npm start
 
 ```sh
 npm ci
-npm run db:start
-npm run db:reset:local
-npm run db:env
-npm run db:seed:check
-npm run db:types:check
-npm test
-npm run test:db
-npm run test:integration
-npm run typecheck
-npm run build
+npm run test:ci
 ```
 
-With the app running at `http://127.0.0.1:3000` in another terminal, run `npm run test:http` to exercise the actual Next.js API with two disposable learner accounts. CI runs this against the production build.
+Keep Docker running. The full command creates an ignored `.wyp-test-work/<run-id>/` source copy and a uniquely named disposable Supabase project. It uses API port 55321, database 55322, inbox 55324 and an app at `http://localhost:3100`. These ports must be free. The different app hostname also isolates browser auth cookies from your development app at `127.0.0.1:3000`.
 
-`npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `test:db` runs real PostgreSQL pgTAP tests. `test:integration` obtains ephemeral local test credentials from the running CLI, creates disposable accounts, exercises Auth/Data API/RPC behavior, and removes its own accounts. Its target guard rejects hosted addresses before administrative setup or cleanup. The local inbox retains test messages until you clear it.
+The runner first verifies an additive upgrade from milestone three with existing accounts, creator access and saved sessions. It then resets only its disposable database and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
+
+`npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `npm run test:scripts` checks isolation, cleanup and pipeline failure handling without Docker. Database, integration and HTTP suites refuse the normal development project and hosted targets; run them through `test:ci` so publication fixtures remain isolated. Test administrator credentials are never passed to the web app.
 
 `db:seed:generate` regenerates SQL from the canonical fixtures; `db:types` regenerates TypeScript from the local schema. Their `:check` counterparts detect drift. These scripts accept no extra remote-target arguments. Type checking first generates Next.js route types. Builds use Webpack; development uses Turbopack.
 
 The GitHub Actions workflow runs clean installation, migration/seed/type checks, unit/component tests, real database/integration tests, type checking and a production build for pull requests into `dev` and `main`, and pushes to those branches. GitHub execution begins when you push; local container checks are recorded separately.
 
-See [milestone-three verification](docs/milestone-3-verification.md) for exact results and remaining manual checks. The earlier milestone-two baseline was 203 tests; it does not verify accounts or persistence.
+See [milestone-four verification](docs/milestone-4-verification.md) for current results and limitations, and the [approved plan](docs/milestone-4-plan.md) for the feature and test scope.
 
 ## Active scenarios
 
@@ -80,7 +87,10 @@ See [scenario evidence and reasoning](docs/vod-scenarios.md) and the [approved i
 
 The app uses Next.js App Router, React, TypeScript, Supabase Auth and Postgres. Supabase SSR handles request-scoped cookies. The proxy refreshes identity; pages, services and database functions independently enforce access. Normal app requests use the caller’s session and public key. Administrator credentials exist only in guarded local test setup.
 
-- `src/contracts/`: shared preview, account and saved-session contracts.
+- `src/contracts/`: shared preview, account, authoring, library and saved-session contracts.
+- `src/components/creator/`, `src/hooks/use-scenario-editor.ts`, `src/lib/creator/`: explicit-save editor, saved preview, review and publication controls, shared content validation and editor state.
+- `src/server/creator/`, `src/app/api/creator/`: owner-scoped drafts, review records, publication and withdrawal commands.
+- `src/app/library/`, `src/components/library/`, `src/server/library/`: verified-only published previews and selected-scenario starts.
 - `src/server/auth/`, `src/app/(auth)/`, `src/lib/supabase/`: validation, auth actions, confirmation/recovery callbacks, verified identity and cookie refresh.
 - `src/server/training/` and `src/app/api/sessions/`: canonical session reads and atomic start, answer and advance commands.
 - `src/lib/client/`, `src/lib/session/`, `src/hooks/use-challenge-session.ts`: validated responses, durable checkpoint hydration, retry reconciliation and auth-change cancellation.
@@ -89,7 +99,7 @@ The app uses Next.js App Router, React, TypeScript, Supabase Auth and Postgres. 
 - `supabase/fixtures/demo-scenarios.json`: the canonical authored dataset. `scripts/render-demo-seed.mjs` generates `supabase/seed.sql`; runtime repositories read the database.
 - `tests/backend/`, `tests/frontend/`, `tests/integration/`, `supabase/tests/database/`: complementary unit, component, real-service and permission/transaction tests.
 
-Guests can read setup-only previews. Verified accounts can play and read their own history. Creator enrollment affects only the current account and grants no access to other learners’ records. Private answer keys cannot be read directly through the public Data API. Session functions run under a restricted non-login role that does not own application tables or bypass row-level security. A separate trigger-only role synchronizes trusted email confirmation into a protected profile column; neither runtime role needs direct auth-table access.
+Guests can read demo setup-only previews. Verified accounts can browse the library, play and read their own history. Creator enrollment affects only the current account and grants no access to others' private drafts or learner records. Private answer keys cannot be read directly through the public Data API. Session and authoring functions use separate restricted non-login roles that do not own application tables or bypass row-level security. A trigger-only role synchronizes trusted email confirmation into a protected profile column; runtime roles need no direct auth-table access.
 
 Each session pins immutable scenario versions. Answers and review checkpoints commit together. One account has at most one active session. Commands carry a request UUID and expected revision; retrying an identical command returns the current canonical snapshot of its original session, even after completion. Reusing the UUID with different input fails. Losing a response or encountering a stale tab triggers reconciliation rather than another attempt.
 
@@ -102,7 +112,17 @@ Each session pins immutable scenario versions. Answers and review checkpoints co
 | `POST /api/challenges/[id]/answer`                     | Retired: guests receive 401; signed-in callers receive 409 `SESSION_REQUIRED`.  |
 | `GET /api/account`                                     | Current account and capabilities.                                               |
 | `POST /api/account/creator`                            | Verified self-enrollment; empty JSON object.                                    |
-| `POST /api/sessions`                                   | `{ requestId }`; create or resume one active session.                           |
+| `GET /api/creator/scenarios?status=all&cursor=...`      | Verified creator's own draft/publication summaries.                            |
+| `POST /api/creator/scenarios`                         | `{ requestId }`; create a private draft.                                       |
+| `GET /api/creator/scenarios/[id]`                     | Owner's current saved draft and publication state.                             |
+| `PUT /api/creator/scenarios/[id]`                     | `{ requestId, expectedRevision, content }`; explicitly save a bounded draft.   |
+| `GET /api/creator/scenarios/[id]/review?revision=...`  | Owner-only preview of the exact saved revision.                                |
+| `POST /api/creator/scenarios/[id]/review`             | `{ requestId, expectedRevision, checklist }`; record self-review.              |
+| `POST /api/creator/scenarios/[id]/publish`            | `{ requestId, expectedRevision, reviewId }`; publish atomically.               |
+| `POST /api/creator/scenarios/[id]/unpublish`          | `{ requestId, expectedRevision }`; delist new starts.                          |
+| `GET /api/library/scenarios?cursor=...`               | Verified-only published creator previews, without answers.                    |
+| `GET /api/library/scenarios/[id]`                    | One published setup-only preview.                                             |
+| `POST /api/sessions`                                   | `{ requestId, target }`; `target` is `{ kind: 'demo' }` or `{ kind: 'scenario', scenarioId }`. Omitting it retains the demo behavior. |
 | `GET /api/sessions?cursor=...`                         | Own paginated history.                                                          |
 | `GET /api/sessions/[sessionId]`                        | Own canonical saved session.                                                    |
 | `POST /api/sessions/[sessionId]/items/[itemId]/answer` | `{ optionId, requestId, expectedRevision }`; atomically save answer and review. |
@@ -112,7 +132,9 @@ Auth forms use Server Actions. Cookie-authenticated JSON writes require the conf
 
 ## Content and playback
 
-Edit the canonical JSON fixture and increment `contentVersion` when changing published content, then regenerate and review the seed. Reapplying identical seed content is harmless; changing an existing version fails. A local reset is destructive and is not a content-update workflow for hosted data. Creator editing/publishing will provide that workflow in milestone four.
+Use the creator studio for new scenarios and revisions. Source titles, attribution, player identity and round details are entered by the creator; the app parses the YouTube URL but does not verify that metadata through an external API. It never downloads or rehosts the video. Saving unchanged normalized content retains the review; changes require fresh review. Publishing pins immutable content and an answer key, with idempotent receipts protecting retries and stale revisions preventing silent overwrites.
+
+The original system-owned demo remains in the canonical JSON fixture. To maintain that fixture, increment `contentVersion` when changing published content, then regenerate and review the seed. Reapplying identical seed content is harmless; changing an existing version fails. Creators cannot edit the system demo.
 
 Each scenario needs player-visible context, unknowns, bounded setup/decision/continuation times, options with independent assessments, an observed action, conditional explanations and review evidence. Evaluate choices using information available before the pause. Do not infer a player’s intent or unavailable team communications. AI drafts and source audio need editorial review before publication.
 
@@ -129,4 +151,4 @@ The seven `artifacts/vod-review/scenario-*.jpg` images preserve visual source ev
 5. **Milestone five:** automatic whole-VOD extraction into drafts, approved by a creator before publication.
 6. Expand the reviewed library, improve feedback and analytics, then prepare hosted deployment and production email delivery.
 
-Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/user`. GitHub pushes and merges remain with the repository owner. Hosted deployment, custom SMTP, uploads, extraction and public publication are outside this milestone.
+Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/creator`. GitHub pushes and merges remain with the repository owner. Hosted deployment, custom SMTP, uploads and automatic extraction remain later work.

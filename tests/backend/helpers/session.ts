@@ -9,6 +9,8 @@ export const requestId = "22222222-2222-4222-8222-222222222222";
 export function snapshot(): SessionSnapshot {
   return {
     id: sessionId,
+    target: { kind: "demo" },
+    title: "Three-scenario demo",
     status: "in_progress",
     phase: "setup",
     revision: 0,

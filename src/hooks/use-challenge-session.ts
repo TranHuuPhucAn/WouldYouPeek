@@ -189,7 +189,7 @@ export function useChallengeSession(
     dispatch({ type: "COMMAND_STARTED" });
     try {
       const response = await createOrResumeSession(
-        { requestId: startId.current },
+        { requestId: startId.current, target: state.snapshot.target },
         controller.signal,
       );
       if (!controller.signal.aborted && valid.current)
@@ -198,7 +198,14 @@ export function useChallengeSession(
       if (!controller.signal.aborted && !authFailure(error))
         dispatch({
           type: "COMMAND_FAILED",
-          message: "Your new session couldn’t open. Please try again.",
+          message:
+            error instanceof ApiClientError &&
+            error.code === "SCENARIO_UNAVAILABLE"
+              ? "This scenario is no longer available for new sessions. Your saved history is still here. Choose another in the library."
+              : error instanceof ApiClientError &&
+                  error.code === "ACTIVE_SESSION_EXISTS"
+                ? "Another session is active. Open Play to resume it before starting again."
+                : "Your new session couldn’t open. Please try again.",
           unresolved: false,
         });
     } finally {

@@ -37,3 +37,4 @@ supabase/.temp/
 supabase/.branches/
 .sites-runtime/
 test-results/
+.wyp-test-work/

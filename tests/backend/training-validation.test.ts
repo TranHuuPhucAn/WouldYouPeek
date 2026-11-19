@@ -24,6 +24,36 @@ describe("session command input", () => {
       }),
     ).toMatchObject({ fromItemId: uuid });
   });
+  it("distinguishes legacy demo starts from explicit selected targets", () => {
+    expect(
+      parseStartSession({ requestId: uuid, target: { kind: "demo" } }),
+    ).toEqual({ requestId: uuid, target: { kind: "demo" } });
+    expect(
+      parseStartSession({
+        requestId: uuid,
+        target: {
+          kind: "scenario",
+          scenarioId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+        },
+      }),
+    ).toEqual({
+      requestId: uuid,
+      target: {
+        kind: "scenario",
+        scenarioId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      },
+    });
+  });
+  it.each([
+    null,
+    { kind: "demo", scenarioId: uuid },
+    { kind: "scenario" },
+    { kind: "scenario", scenarioId: "legacy-demo-slug" },
+    { kind: "scenario", scenarioId: uuid, ownerId: uuid },
+    { kind: "playlist" },
+  ])("rejects malformed selected target %j", (target) =>
+    expect(() => parseStartSession({ requestId: uuid, target })).toThrow(),
+  );
   it.each([
     {},
     null,

@@ -179,3 +179,41 @@ describe("durable command coordination", () => {
     );
   });
 });
+
+describe("selected scenario replay", () => {
+  it("starts the original scenario target again and retains its UUID on a lost response", async () => {
+    const { selectedSnapshot } = await import("./creator-fixtures");
+    const selected = selectedSnapshot("completed");
+    vi.mocked(api.createOrResumeSession)
+      .mockReset()
+      .mockRejectedValueOnce(new Error("Lost response"))
+      .mockResolvedValueOnce({
+        session: selectedSnapshot(),
+        created: true,
+        replayed: false,
+      });
+    const { result } = renderHook(() =>
+      useChallengeSession(selected, viewer.id),
+    );
+    await act(() => result.current.createNextSession());
+    await act(() => result.current.createNextSession());
+    const calls = vi.mocked(api.createOrResumeSession).mock.calls;
+    expect(calls[0][0].target).toEqual(selected.target);
+    expect(calls[1][0]).toEqual(calls[0][0]);
+  });
+  it("retains the saved recap when a scenario has been withdrawn", async () => {
+    const { selectedSnapshot } = await import("./creator-fixtures");
+    vi.mocked(api.createOrResumeSession)
+      .mockReset()
+      .mockRejectedValueOnce(
+        new ApiClientError("SCENARIO_UNAVAILABLE", "Unavailable", 404),
+      );
+    const { result } = renderHook(() =>
+      useChallengeSession(selectedSnapshot("completed"), viewer.id),
+    );
+    await act(() => result.current.createNextSession());
+    expect(result.current.state.phase).toBe("complete");
+    expect(result.current.state.completed).toHaveLength(1);
+    expect(result.current.state.error).toMatch(/no longer available/);
+  });
+});

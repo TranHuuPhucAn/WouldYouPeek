@@ -1,7 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { SiteHeader } from "@/components/navigation/SiteHeader";
+import NotFound from "@/app/not-found";
 import { viewer } from "./session-fixtures";
+it("uses neutral unavailable-page copy with destinations for creators and learners", () => {
+  render(<NotFound />);
+  expect(
+    screen.getByRole("heading", { name: "This page isn’t available." }),
+  ).toBeVisible();
+  for (const [name, href] of [
+    ["Back to home", "/"],
+    ["Scenario library", "/library"],
+    ["Session history", "/history"],
+    ["Creator workspace", "/creator"],
+  ])
+    expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
+});
 it("offers guests preview and authentication navigation", () => {
   render(<SiteHeader viewer={null} />);
   expect(screen.getByRole("link", { name: "Demo" })).toHaveAttribute(

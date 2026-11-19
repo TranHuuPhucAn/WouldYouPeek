@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { assertDisposableTarget } from "../../../scripts/local-target.mjs";
 
 type LocalConfig = {
   url: string;
@@ -7,8 +8,8 @@ type LocalConfig = {
   mailUrl: string;
 };
 
-/** Destructive integration setup is deliberately confined to the standard local stack. */
-export function assertLocalTestTarget(rawUrl: string, port = "54321"): URL {
+/** URL validation supplements the owned disposable-workspace check below. */
+export function assertLocalTestTarget(rawUrl: string, port = "55321"): URL {
   const url = new URL(rawUrl);
   if (
     url.protocol !== "http:" ||
@@ -28,17 +29,17 @@ export function assertLocalTestTarget(rawUrl: string, port = "54321"): URL {
 }
 
 export function getLocalTestConfig(): LocalConfig {
+  assertDisposableTarget(process.env);
   const url = process.env.SUPABASE_TEST_URL ?? "";
   const publishableKey = process.env.SUPABASE_TEST_PUBLISHABLE_KEY ?? "";
   const serviceRoleKey = process.env.SUPABASE_TEST_SERVICE_ROLE_KEY ?? "";
-  const mailUrl =
-    process.env.SUPABASE_TEST_MAIL_URL ?? "http://127.0.0.1:54324";
+  const mailUrl = process.env.SUPABASE_TEST_MAIL_URL ?? "";
   if (!url || !publishableKey || !serviceRoleKey)
     throw new Error(
-      "Local Supabase integration credentials are missing. Use npm run test:integration with the local stack running.",
+      "Disposable test credentials are missing. Use npm run test:ci.",
     );
   assertLocalTestTarget(url);
-  assertLocalTestTarget(mailUrl, "54324");
+  assertLocalTestTarget(mailUrl, "55324");
   return { url, publishableKey, serviceRoleKey, mailUrl };
 }
 

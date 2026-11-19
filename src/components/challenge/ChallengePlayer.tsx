@@ -67,6 +67,7 @@ export function ChallengePlayer({
             onRestart={session.restart}
             pending={state.pending}
             completedAt={state.snapshot.completedAt}
+            title={state.snapshot.title}
           />
         </>
       ) : (
@@ -84,7 +85,7 @@ export function ChallengePlayer({
                 {String(state.catalogue.length || 3).padStart(2, "0")}
               </span>
               <div className="progress-segments" aria-hidden="true">
-                {[0, 1, 2].map((index) => (
+                {state.catalogue.map((_, index) => (
                   <i
                     key={index}
                     className={index <= state.currentIndex ? "filled" : ""}

@@ -1,36 +1,34 @@
 import Link from "next/link";
 import { requirePageAccount } from "@/app/protected-page";
+import { listOwnedScenarios } from "@/server/creator/service";
+import { CreatorDashboard } from "@/components/creator/CreatorDashboard";
 export default async function CreatorPage() {
   const viewer = await requirePageAccount("/creator");
+  const initial = viewer.role === "creator" ? await listOwnedScenarios() : null;
   return (
     <main className="page-shell">
       <div className="page-heading">
         <span className="eyebrow">CREATOR SPACE</span>
-        <h1>
-          {viewer.role === "creator"
-            ? "Your perspective belongs here."
-            : "Help others read the moment."}
-        </h1>
-      </div>
-      <section className="surface-card">
-        <h2>
-          {viewer.role === "creator"
-            ? "Creator access is enabled."
-            : "Enable creator access to get ready."}
-        </h2>
+        <h1>Your perspective belongs here.</h1>
         <p>
-          Scenario authoring, VOD uploads and publishing arrive in the next
-          milestone. For now, keep exploring the learner experience.
+          Frame the decision. Explore the alternatives. Help another player see
+          more.
         </p>
-        <Link
-          className="button button-primary"
-          href={viewer.role === "creator" ? "/play" : "/account"}
-        >
-          {viewer.role === "creator"
-            ? "Back to practice →"
-            : "Manage creator access →"}
-        </Link>
-      </section>
+      </div>
+      {initial ? (
+        <CreatorDashboard key={viewer.id} initial={initial} />
+      ) : (
+        <section className="surface-card">
+          <h2>Enable creator access to get started.</h2>
+          <p>
+            Add YouTube scenarios, write your analysis, then review and publish
+            them for learners. Creator access also keeps all learner features.
+          </p>
+          <Link className="button button-primary" href="/account">
+            Manage creator access →
+          </Link>
+        </section>
+      )}
     </main>
   );
 }

@@ -21,7 +21,8 @@ describe("real local authentication and captured email", () => {
     ]) {
       expect(() => assertLocalTestTarget(value)).toThrow();
     }
-    expect(assertLocalTestTarget("http://127.0.0.1:54321").port).toBe("54321");
+    expect(() => assertLocalTestTarget("http://127.0.0.1:54321")).toThrow();
+    expect(assertLocalTestTarget("http://127.0.0.1:55321").port).toBe("55321");
   });
 
   it("requires real email confirmation, rejects replay, resets password and signs out", async () => {

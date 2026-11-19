@@ -16,6 +16,7 @@ export function SiteHeader({ viewer }: { viewer: AccountUser | null }) {
         {viewer ? (
           <>
             <Link href="/play">Play</Link>
+            <Link href="/library">Library</Link>
             <Link href="/history">History</Link>
             {viewer.role === "creator" && <Link href="/creator">Creator</Link>}
             <Link href="/account">Account</Link>

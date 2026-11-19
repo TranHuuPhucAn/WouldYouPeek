@@ -1,4 +1,6 @@
 import type { AnswerResponse, ChallengeDetail } from "./challenge";
+export type SessionTarget =
+  { kind: "demo" } | { kind: "scenario"; scenarioId: string };
 
 export type SavedAnswer = {
   id: string;
@@ -13,6 +15,8 @@ export type SessionItem = {
 };
 export type SessionSnapshot = {
   id: string;
+  target: SessionTarget;
+  title: string;
   status: "in_progress" | "completed";
   phase: "setup" | "review" | "completed";
   revision: number;
@@ -31,6 +35,8 @@ export type CreateSessionResponse = SessionMutationResponse & {
 };
 export type SessionSummary = {
   id: string;
+  target: SessionTarget;
+  title: string;
   status: "in_progress" | "completed";
   answeredCount: number;
   totalCount: number;
@@ -42,7 +48,7 @@ export type SessionHistoryResponse = {
   sessions: SessionSummary[];
   nextCursor: string | null;
 };
-export type StartSessionRequest = { requestId: string };
+export type StartSessionRequest = { requestId: string; target?: SessionTarget };
 export type AnswerSessionRequest = {
   optionId: string;
   requestId: string;

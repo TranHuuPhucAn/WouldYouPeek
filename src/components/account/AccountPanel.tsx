@@ -83,7 +83,8 @@ export function AccountPanel({ viewer }: { viewer: AccountUser }) {
           and saved sessions.
         </p>
         <p className="quiet-note">
-          Scenario authoring arrives in the next milestone.
+          Turn a YouTube moment into a scenario, review every choice, and
+          publish it to the learner library.
         </p>
         {account.role === "creator" ? (
           <Link href="/creator" className="button button-primary">

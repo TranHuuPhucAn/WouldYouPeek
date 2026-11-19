@@ -16,6 +16,8 @@ export function snapshot(
 ): SessionSnapshot {
   return {
     id: sessionId,
+    target: { kind: "demo" },
+    title: "TenZ · Clove · Bind",
     status: phase === "completed" ? "completed" : "in_progress",
     phase,
     revision:
@@ -45,6 +47,8 @@ export function sessionSummary(phase: SessionSnapshot["phase"] = "setup") {
   const value = snapshot(phase);
   return {
     id: value.id,
+    target: value.target,
+    title: value.title,
     status: value.status,
     answeredCount: value.items.filter((item) => item.answer).length,
     totalCount: value.items.length,

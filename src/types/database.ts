@@ -61,14 +61,14 @@ isOneToOne: false
                   ]
                 },"scenarios": {
                   Row: {
-                    "current_version": string | null,"id": string,"is_demo": boolean,"is_published": boolean,"sort_order": number,"title": string,"topic": string
+                    "created_at": string,"creator_id": string | null,"current_version": string | null,"first_published_at": string | null,"id": string,"is_demo": boolean,"is_published": boolean,"published_at": string | null,"sort_order": number,"title": string,"topic": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "current_version"?: string | null,"id": string,"is_demo"?: boolean,"is_published"?: boolean,"sort_order": number,"title": string,"topic": string
+                    "created_at"?: string,"creator_id"?: string | null,"current_version"?: string | null,"first_published_at"?: string | null,"id": string,"is_demo"?: boolean,"is_published"?: boolean,"published_at"?: string | null,"sort_order": number,"title": string,"topic": string,"updated_at"?: string
                   }
                   Update: {
-                    "current_version"?: string | null,"id"?: string,"is_demo"?: boolean,"is_published"?: boolean,"sort_order"?: number,"title"?: string,"topic"?: string
+                    "created_at"?: string,"creator_id"?: string | null,"current_version"?: string | null,"first_published_at"?: string | null,"id"?: string,"is_demo"?: boolean,"is_published"?: boolean,"published_at"?: string | null,"sort_order"?: number,"title"?: string,"topic"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -107,17 +107,23 @@ isOneToOne: false
                   ]
                 },"training_sessions": {
                   Row: {
-                    "completed_at": string | null,"created_at": string,"current_index": number | null,"id": string,"phase": string,"revision": number,"updated_at": string,"user_id": string
+                    "completed_at": string | null,"created_at": string,"current_index": number | null,"id": string,"phase": string,"revision": number,"target_kind": string,"target_scenario_id": string | null,"target_title": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"updated_at"?: string,"user_id": string
+                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"target_kind"?: string,"target_scenario_id"?: string | null,"target_title"?: string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"updated_at"?: string,"user_id"?: string
+                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"target_kind"?: string,"target_scenario_id"?: string | null,"target_title"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "training_sessions_target_scenario_id_fkey"
+      columns: ["target_scenario_id"]
+isOneToOne: false
+      referencedRelation: "scenarios"
+      referencedColumns: ["id"]
+    }
                   ]
                 }
           }
@@ -128,8 +134,20 @@ isOneToOne: false
             "advance_training_session":
 { Args: { "p_expected_revision": number,"p_from_item_id": string,"p_request_id": string,"p_session_id": string }; Returns: Json
                            },
+"create_creator_scenario":
+{ Args: { "p_request_id": string }; Returns: Json
+                           },
 "enable_creator":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"get_creator_review_preview":
+{ Args: { "p_revision": number,"p_scenario_id": string }; Returns: Json
+                           },
+"get_creator_scenario":
+{ Args: { "p_scenario_id": string }; Returns: Json
+                           },
+"get_library_preview":
+{ Args: { "p_scenario_id": string }; Returns: Json
                            },
 "get_scenario_preview":
 { Args: { "p_scenario_id": string }; Returns: Json
@@ -137,17 +155,38 @@ isOneToOne: false
 "get_training_session":
 { Args: { "p_session_id": string }; Returns: Json
                            },
+"list_creator_scenarios":
+{ Args: { "p_cursor"?: string,"p_limit"?: number,"p_status"?: string }; Returns: Json
+                           },
+"list_library_previews":
+{ Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
+                           },
 "list_scenario_previews":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "list_training_sessions":
 { Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
                            },
+"publish_creator_scenario":
+{ Args: { "p_expected_revision": number,"p_request_id": string,"p_review_id": string,"p_scenario_id": string }; Returns: Json
+                           },
+"review_creator_scenario":
+{ Args: { "p_checklist": Json,"p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json
+                           },
+"save_creator_scenario":
+{ Args: { "p_content": Json,"p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json
+                           },
+"start_selected_training_session":
+{ Args: { "p_request_id": string,"p_target": Json }; Returns: Json
+                           },
 "start_training_session":
 { Args: { "p_request_id": string }; Returns: Json
                            },
 "submit_session_answer":
 { Args: { "p_expected_revision": number,"p_item_id": string,"p_option_id": string,"p_request_id": string,"p_session_id": string }; Returns: Json
+                           },
+"unpublish_creator_scenario":
+{ Args: { "p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json
                            }
           }
           Enums: {

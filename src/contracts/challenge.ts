@@ -38,12 +38,13 @@ export type ChallengeSource = {
 
 export type ObservedAction = { optionId: string; description: string };
 
-export type AIAnalysis = {
-  author: "ai";
+export type ScenarioAnalysis = {
+  author: "ai" | "creator" | "ai-assisted";
   notice: string;
   rationale: string;
   limitations: string[];
 };
+export type AIAnalysis = ScenarioAnalysis & { author: "ai" };
 
 export type ChallengeSummary = {
   id: string;
@@ -97,7 +98,7 @@ export type AnswerResponse = {
   outcomeText: string;
   observedAction?: ObservedAction;
   matchesPro?: boolean;
-  analysis?: AIAnalysis;
+  analysis?: ScenarioAnalysis;
 };
 
 export type ApiErrorCode =
@@ -113,10 +114,20 @@ export type ApiErrorCode =
   | "ANSWER_LOCKED"
   | "IDEMPOTENCY_CONFLICT"
   | "SESSION_REQUIRED"
+  | "SCENARIO_NOT_FOUND"
+  | "SCENARIO_CONFLICT"
+  | "DRAFT_NOT_READY"
+  | "REVIEW_REQUIRED"
+  | "SCENARIO_UNAVAILABLE"
+  | "ACTIVE_SESSION_EXISTS"
+  | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
   | "STORAGE_UNAVAILABLE"
   | "INTERNAL_ERROR";
 
 export type ApiErrorResponse = {
-  error: { code: ApiErrorCode; message: string };
+  error: { code: ApiErrorCode; message: string; details?: ApiErrorDetails };
 };
+export type ApiErrorDetails =
+  | { issues: import("./creator").ValidationIssue[] }
+  | { activeSession: import("./session").SessionSummary };

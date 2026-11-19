@@ -7,7 +7,7 @@ import type {
   MediaAsset,
   DecisionAsset,
   ChallengeSource,
-  AIAnalysis,
+  ScenarioAnalysis,
 } from "@/contracts/challenge";
 import { validateSegment } from "@/lib/video/segment-controller";
 
@@ -87,10 +87,10 @@ function isSource(value: unknown): value is ChallengeSource {
     return false;
   }
 }
-function isAnalysis(value: unknown): value is AIAnalysis {
+function isAnalysis(value: unknown): value is ScenarioAnalysis {
   return (
     isRecord(value) &&
-    value.author === "ai" &&
+    ["ai", "creator", "ai-assisted"].includes(String(value.author)) &&
     isText(value.notice) &&
     isText(value.rationale) &&
     isTextList(value.limitations)

@@ -32,6 +32,11 @@ it("waits for enrollment confirmation and preserves learner access", async () =>
     await screen.findByRole("link", { name: /Open creator/ }),
   ).toBeVisible();
   expect(screen.getByText(/Creator and learner/)).toBeVisible();
+  expect(
+    screen.getByText(
+      /review every choice, and publish it to the learner library/,
+    ),
+  ).toBeVisible();
 });
 it("offers retry without optimistic role change after failure", async () => {
   vi.mocked(enableCreatorAccess).mockRejectedValueOnce(new Error("Offline"));

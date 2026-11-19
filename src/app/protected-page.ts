@@ -14,3 +14,8 @@ export async function requirePageAccount(returnTo: string) {
     throw error;
   }
 }
+export async function requirePageCreator(returnTo: string) {
+  const viewer = await requirePageAccount(returnTo);
+  if (viewer.role !== "creator") redirect("/account");
+  return viewer;
+}

@@ -15,7 +15,7 @@ import {
   validateAnswerForChallenge,
 } from "@/lib/client/challenge-validation";
 import { ApiError } from "@/server/http";
-import { UUID_PATTERN } from "./validation";
+import { UUID_PATTERN, parseSessionTarget } from "./validation";
 
 function invalid(): never {
   throw new ApiError(
@@ -52,6 +52,20 @@ function integer(value: unknown): number {
 function boolean(value: unknown): boolean {
   if (typeof value !== "boolean") invalid();
   return value;
+}
+function sessionMetadata(input: Record<string, unknown>) {
+  try {
+    const target = parseSessionTarget(input.target);
+    if (
+      typeof input.title !== "string" ||
+      !input.title.trim() ||
+      input.title.length > 300
+    )
+      invalid();
+    return { target, title: input.title };
+  } catch {
+    return invalid();
+  }
 }
 const summaryKeys = ["id", "title", "topic", "order", "mediaStatus"];
 function media(value: unknown) {
@@ -184,6 +198,7 @@ export function toSavedAnswer(
 }
 export function toSessionSnapshot(value: unknown): SessionSnapshot {
   const input = record(value);
+  const metadata = sessionMetadata(input);
   if (
     !Array.isArray(input.items) ||
     input.items.length === 0 ||
@@ -203,6 +218,11 @@ export function toSessionSnapshot(value: unknown): SessionSnapshot {
     };
   });
   if (new Set(items.map((item) => item.id)).size !== items.length) invalid();
+  if (
+    metadata.target.kind === "scenario" &&
+    (items.length !== 1 || items[0].challenge.id !== metadata.target.scenarioId)
+  )
+    invalid();
   const phase = input.phase;
   if (phase !== "setup" && phase !== "review" && phase !== "completed")
     invalid();
@@ -234,6 +254,7 @@ export function toSessionSnapshot(value: unknown): SessionSnapshot {
   if (phase !== "completed" && input.completedAt !== null) invalid();
   return {
     id: id(input.id),
+    ...metadata,
     status: phase === "completed" ? "completed" : "in_progress",
     phase,
     revision,
@@ -251,12 +272,13 @@ export function toSessionSummary(value: unknown): SessionSummary {
   if (
     totalCount < 1 ||
     answeredCount > totalCount ||
-    !["in_progress", "completed"].includes(String(input.status))
+    (input.status !== "in_progress" && input.status !== "completed")
   )
     invalid();
   if (input.status === "completed" && answeredCount !== totalCount) invalid();
   return {
     id: id(input.id),
+    ...sessionMetadata(input),
     status: input.status as SessionSummary["status"],
     answeredCount,
     totalCount,

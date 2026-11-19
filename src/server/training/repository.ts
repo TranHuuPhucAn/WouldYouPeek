@@ -4,12 +4,19 @@ import { databaseError } from "@/server/http";
 import type {
   AnswerSessionRequest,
   AdvanceSessionRequest,
+  SessionTarget,
 } from "@/contracts/session";
-export async function startOrResumeSession(requestId: string) {
+export async function startOrResumeSession(
+  requestId: string,
+  target?: SessionTarget,
+) {
   const client = await createServerSupabaseClient();
-  const { data, error } = await client.rpc("start_training_session", {
-    p_request_id: requestId,
-  });
+  const { data, error } = target
+    ? await client.rpc("start_selected_training_session", {
+        p_request_id: requestId,
+        p_target: target,
+      })
+    : await client.rpc("start_training_session", { p_request_id: requestId });
   if (error) databaseError(error);
   return data;
 }

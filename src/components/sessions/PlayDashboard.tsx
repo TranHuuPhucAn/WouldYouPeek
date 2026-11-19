@@ -13,6 +13,7 @@ export function PlayDashboard({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [conflict, setConflict] = useState<SessionSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef<string | null>(null);
   const request = useRef<AbortController | null>(null);
@@ -26,7 +27,7 @@ export function PlayDashboard({
     setError(null);
     try {
       const response = await createOrResumeSession(
-        { requestId: requestId.current },
+        { requestId: requestId.current, target: { kind: "demo" } },
         controller.signal,
       );
       if (!controller.signal.aborted)
@@ -40,7 +41,23 @@ export function PlayDashboard({
         invalidateAccountView();
         return;
       }
-      setError("Your session couldn’t open. Retry to safely resume or start.");
+      if (
+        error instanceof ApiClientError &&
+        error.code === "ACTIVE_SESSION_EXISTS"
+      ) {
+        setConflict(
+          error.details && "activeSession" in error.details
+            ? error.details.activeSession
+            : null,
+        );
+        setError(
+          "Another session is active. Resume it before starting the demo.",
+        );
+        requestId.current = null;
+      } else
+        setError(
+          "Your session couldn’t open. Retry to safely resume or start.",
+        );
     } finally {
       if (request.current === controller) {
         request.current = null;
@@ -51,7 +68,9 @@ export function PlayDashboard({
   return (
     <section className="surface-card session-start">
       <div>
-        <span className="eyebrow">TENZ · CLOVE · BIND</span>
+        <span className="eyebrow">
+          {activeSession?.title ?? "TENZ · CLOVE · BIND"}
+        </span>
         <h2>
           {activeSession
             ? "Pick up where you paused."
@@ -87,6 +106,17 @@ export function PlayDashboard({
                 ? "Retry opening session"
                 : "Start 3 scenarios →"}
           </button>
+        )}
+        <Link href="/library" className="text-button">
+          Explore scenario library →
+        </Link>
+        {conflict && (
+          <Link
+            href={`/play/${conflict.id}`}
+            className="button button-secondary"
+          >
+            Resume current session →
+          </Link>
         )}
         <Link href="/history" className="text-button">
           View saved sessions

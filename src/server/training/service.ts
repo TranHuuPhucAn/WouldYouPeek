@@ -18,7 +18,9 @@ export async function startSession(input: unknown) {
   await requireVerifiedUser();
   const command = parseStartSession(input);
   return toCreateResponse(
-    await repository.startOrResumeSession(command.requestId),
+    await (command.target
+      ? repository.startOrResumeSession(command.requestId, command.target)
+      : repository.startOrResumeSession(command.requestId)),
   );
 }
 export async function getSession(sessionId: string) {

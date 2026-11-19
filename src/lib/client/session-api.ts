@@ -7,6 +7,7 @@ import type {
   SessionSnapshot,
   SessionSummary,
   StartSessionRequest,
+  SessionTarget,
 } from "@/contracts/session";
 import { ApiClientError, readApiResponse } from "./api-response";
 import {
@@ -29,6 +30,22 @@ export const isDate = (value: unknown): value is string =>
 const isCount = (value: unknown): value is number =>
   Number.isSafeInteger(value) && Number(value) >= 0;
 
+export function parseSessionTarget(value: unknown): SessionTarget {
+  if (!isRecord(value)) invalidResponse();
+  if (value.kind === "demo" && Object.keys(value).length === 1)
+    return { kind: "demo" };
+  if (
+    value.kind === "scenario" &&
+    isUuid(value.scenarioId) &&
+    Object.keys(value).length === 2
+  )
+    return { kind: "scenario", scenarioId: value.scenarioId };
+  return invalidResponse();
+}
+function requireTitle(value: unknown) {
+  if (typeof value !== "string" || !value.trim() || value.length > 300)
+    invalidResponse();
+}
 export function parseSessionSnapshot(
   value: unknown,
   expectedId?: string,
@@ -45,6 +62,14 @@ export function parseSessionSnapshot(
   )
     invalidResponse();
   const body = value as SessionSnapshot;
+  parseSessionTarget(body.target);
+  requireTitle(body.title);
+  if (
+    body.target.kind === "scenario" &&
+    (body.items.length !== 1 ||
+      body.items[0].challenge.id !== body.target.scenarioId)
+  )
+    invalidResponse();
   if (body.status === "completed") {
     if (
       body.phase !== "completed" ||
@@ -117,6 +142,8 @@ export function validateSessionContinuity(
 ): void {
   if (
     next.id !== previous.id ||
+    next.title !== previous.title ||
+    JSON.stringify(next.target) !== JSON.stringify(previous.target) ||
     next.items.length !== previous.items.length ||
     next.items.some((item, index) => {
       const before = previous.items[index];
@@ -150,6 +177,13 @@ export function parseSessionSummary(value: unknown): SessionSummary {
     (value.status === "completed"
       ? !isDate(value.completedAt) || value.answeredCount !== value.totalCount
       : value.completedAt !== null)
+  )
+    invalidResponse();
+  parseSessionTarget(value.target);
+  requireTitle(value.title);
+  if (
+    (value.target as SessionTarget).kind === "scenario" &&
+    value.totalCount !== 1
   )
     invalidResponse();
   return value as SessionSummary;
@@ -214,9 +248,16 @@ export async function createOrResumeSession(
   signal?: AbortSignal,
 ): Promise<CreateSessionResponse> {
   requireCommand(input.requestId);
+  if (input.target !== undefined) parseSessionTarget(input.target);
   const value = await request("/api/sessions", signal, input);
   if (!isRecord(value) || typeof value.created !== "boolean") invalidResponse();
-  return { ...mutation(value), created: value.created };
+  const result = { ...mutation(value), created: value.created };
+  if (
+    input.target &&
+    JSON.stringify(input.target) !== JSON.stringify(result.session.target)
+  )
+    invalidResponse();
+  return result;
 }
 export async function getSession(id: string, signal?: AbortSignal) {
   requireId(id);

@@ -77,6 +77,7 @@ export function SessionHistory({
                   timeZone: "UTC",
                 })}
               </h2>
+              <p className="history-title">{item.title}</p>
               <p>
                 {item.answeredCount} of {item.totalCount} decisions saved
               </p>

@@ -4,6 +4,7 @@ import type {
   StartSessionRequest,
   AnswerSessionRequest,
   AdvanceSessionRequest,
+  SessionTarget,
 } from "@/contracts/session";
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -43,14 +44,41 @@ function revision(value: unknown): number {
   return value;
 }
 export function parseStartSession(value: unknown): StartSessionRequest {
-  const input = object(value, ["requestId"]);
-  return { requestId: parseUuid(input.requestId) };
+  const hasTarget = Boolean(
+    value && typeof value === "object" && Object.hasOwn(value, "target"),
+  );
+  const input = object(
+    value,
+    hasTarget ? ["requestId", "target"] : ["requestId"],
+  );
+  return {
+    requestId: parseUuid(input.requestId),
+    ...(hasTarget ? { target: parseSessionTarget(input.target) } : {}),
+  };
+}
+export function parseSessionTarget(value: unknown): SessionTarget {
+  if (
+    value &&
+    typeof value === "object" &&
+    "kind" in value &&
+    value.kind === "demo"
+  ) {
+    object(value, ["kind"]);
+    return { kind: "demo" };
+  }
+  const target = object(value, ["kind", "scenarioId"]);
+  if (target.kind !== "scenario")
+    throw new ApiError("INVALID_REQUEST", "Choose a supported session target.");
+  return {
+    kind: "scenario",
+    scenarioId: parseUuid(target.scenarioId).toLowerCase(),
+  };
 }
 export function parseAnswerCommand(value: unknown): AnswerSessionRequest {
   const input = object(value, ["optionId", "requestId", "expectedRevision"]);
   if (
     typeof input.optionId !== "string" ||
-    !/^[a-z0-9-]{1,100}$/.test(input.optionId)
+    !/^[a-z0-9-]{1,100}$/i.test(input.optionId)
   )
     throw new ApiError("INVALID_REQUEST", "Choose a valid option.");
   return {
