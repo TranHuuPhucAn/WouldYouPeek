@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import type { AccountUser } from "@/contracts/auth";
+import type { SessionSnapshot } from "@/contracts/session";
+import { SessionPersistenceNotice } from "@/components/sessions/SessionPersistenceNotice";
 import { useEffect, useRef } from "react";
 import { useChallengeSession } from "@/hooks/use-challenge-session";
 import { ScenarioMedia } from "./ScenarioMedia";
@@ -9,8 +12,14 @@ import { FeedbackPanel } from "./FeedbackPanel";
 import { SessionRecap } from "./SessionRecap";
 import { YouTubeScenarioPlayer } from "./YouTubeScenarioPlayer";
 
-export function ChallengePlayer() {
-  const session = useChallengeSession();
+export function ChallengePlayer({
+  initialSession,
+  viewer,
+}: {
+  initialSession: SessionSnapshot;
+  viewer: AccountUser;
+}) {
+  const session = useChallengeSession(initialSession, viewer.id);
   const { state } = session;
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -41,20 +50,13 @@ export function ChallengePlayer() {
         ? "Recorded outcome"
         : "Recorded gameplay";
   return (
-    <div className="app-shell">
-      <header className="site-header">
-        <Link className="brand" href="/" aria-label="Would You Peek home">
-          <span className="brand-mark" aria-hidden="true">
-            +
-          </span>
-          <span>
-            WOULD YOU <strong>PEEK?</strong>
-          </span>
-        </Link>
-        <span className="header-tag">
-          THE DECISION LAB <span className="tag-outline">PRO POV</span>
-        </span>
-      </header>
+    <div>
+      <SessionPersistenceNotice
+        pending={state.pending}
+        error={state.error}
+        unresolved={state.unresolved}
+        onRetry={session.retrySave}
+      />
       {state.phase === "complete" ? (
         <>
           <h2 className="sr-only" ref={heading} tabIndex={-1}>
@@ -63,6 +65,9 @@ export function ChallengePlayer() {
           <SessionRecap
             completed={state.completed}
             onRestart={session.restart}
+            pending={state.pending}
+            completedAt={state.snapshot.completedAt}
+            title={state.snapshot.title}
           />
         </>
       ) : (
@@ -80,7 +85,7 @@ export function ChallengePlayer() {
                 {String(state.catalogue.length || 3).padStart(2, "0")}
               </span>
               <div className="progress-segments" aria-hidden="true">
-                {[0, 1, 2].map((index) => (
+                {state.catalogue.map((_, index) => (
                   <i
                     key={index}
                     className={index <= state.currentIndex ? "filled" : ""}
@@ -89,25 +94,13 @@ export function ChallengePlayer() {
               </div>
             </div>
           </div>
-          {state.phase === "loading" ? (
-            <div className="status-panel" role="status">
-              <span className="loading-cross" aria-hidden="true">
-                +
-              </span>
-              <h1>Setting the scene…</h1>
-              <p>Getting your next decision ready.</p>
-            </div>
-          ) : state.phase === "error" ? (
-            <div className="status-panel" role="alert">
-              <span className="error-symbol">!</span>
-              <h1>Let’s try that again.</h1>
-              <p>{state.error}</p>
-              <button
-                className="button button-primary"
-                onClick={session.retryLoad}
-              >
-                Retry loading
-              </button>
+          {state.phase === "auth-required" ? (
+            <div className="status-panel">
+              <h1>Sign in to continue.</h1>
+              <p>Your confirmed progress is saved.</p>
+              <Link href="/sign-in" className="button button-primary">
+                Sign in
+              </Link>
             </div>
           ) : challenge && media ? (
             <>
@@ -159,7 +152,7 @@ export function ChallengePlayer() {
                       question={challenge.question}
                       options={challenge.options}
                       selectedOptionId={state.selectedOptionId}
-                      pending={state.phase === "submitting"}
+                      pending={state.phase === "submitting" || state.unresolved}
                       error={state.error}
                       onSelect={session.selectOption}
                       onSubmit={session.submitSelection}
@@ -177,6 +170,7 @@ export function ChallengePlayer() {
                       onShowSetup={session.showReviewSetup}
                       onShowOutcome={session.showReviewOutcome}
                       onNext={session.nextChallenge}
+                      pending={state.pending}
                     />
                   )}
                 </div>

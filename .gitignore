@@ -4,6 +4,7 @@ out/
 coverage/
 *.tsbuildinfo
 .env*
+!.env.example
 .DS_Store
 *.log
 
@@ -19,6 +20,9 @@ AGENTS.md
 .npmrc
 .netrc
 
+# Local project plans and verification notes.
+/docs/
+
 # Keep only the curated evidence required by docs and content tests.
 /artifacts/*
 !/artifacts/vod-review/
@@ -30,3 +34,10 @@ public/qa-*
 *.tmp
 *.swp
 *~
+
+# Local Supabase state, installation metrics and temporary acceptance evidence.
+supabase/.temp/
+supabase/.branches/
+.sites-runtime/
+test-results/
+.wyp-test-work/

@@ -11,9 +11,15 @@ import {
   getChallenge,
   listChallenges,
   submitAnswer,
-} from "@/server/challenges/service";
+} from "../fixtures/authored-challenges";
 
 vi.mock("server-only", () => ({}));
+import { snapshot, viewer } from "./session-fixtures";
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("@/components/auth/AuthStateSync", () => ({
+  invalidateAccountView: vi.fn(),
+}));
 
 const provider = vi.hoisted(() => ({
   instances: [] as Array<{
@@ -78,20 +84,60 @@ vi.mock("@/lib/video/youtube-api", () => ({
 
 it("completes the actual three-VOD catalogue with persistent decisions, replay, comparison, recap and reset", async () => {
   provider.instances.length = 0;
+  let canonical = snapshot();
+  canonical.items = canonical.items.map((item, index) => ({
+    ...item,
+    challenge: getChallenge(listChallenges()[index].id),
+  }));
   const fetcher = vi.fn<typeof fetch>(async (input, init) => {
     const path = String(input);
-    if (path === "/api/challenges")
-      return Response.json({ challenges: listChallenges() });
-    const id = path.split("/")[3];
-    return Response.json(
-      init?.method === "POST"
-        ? submitAnswer(id, JSON.parse(String(init.body)))
-        : getChallenge(id),
-    );
+    if (init?.method !== "POST") return Response.json(canonical);
+    const request = JSON.parse(String(init.body));
+    if (path.endsWith("/answer")) {
+      const item = canonical.items[canonical.currentIndex!];
+      item.answer = {
+        id: `44444444-4444-4444-8444-44444444444${item.position}`,
+        answeredAt: viewer.createdAt,
+        result: submitAnswer(item.challenge.id, { optionId: request.optionId }),
+      };
+      canonical = {
+        ...canonical,
+        phase: "review",
+        revision: canonical.revision + 1,
+      };
+    } else if (path.endsWith("/advance")) {
+      canonical =
+        canonical.currentIndex === canonical.items.length - 1
+          ? {
+              ...canonical,
+              status: "completed",
+              phase: "completed",
+              currentIndex: null,
+              completedAt: viewer.createdAt,
+              revision: canonical.revision + 1,
+            }
+          : {
+              ...canonical,
+              phase: "setup",
+              currentIndex: canonical.currentIndex! + 1,
+              revision: canonical.revision + 1,
+            };
+    } else
+      return Response.json({
+        session: { ...snapshot(), id: "55555555-5555-4555-8555-555555555555" },
+        replayed: false,
+        created: true,
+      });
+    return Response.json({ session: canonical, replayed: false });
   });
   vi.stubGlobal("fetch", fetcher);
   const user = userEvent.setup();
-  const view = render(<ChallengePlayer />);
+  const view = render(
+    <ChallengePlayer
+      initialSession={structuredClone(canonical)}
+      viewer={viewer}
+    />,
+  );
   const catalogue = listChallenges();
   // Different-but-defensible, same-but-risky, then a defensible match.
   const choices = ["cover-contact", "contest-short", "clear-forward"];
@@ -192,18 +238,21 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
   ).toBeVisible();
   expect(
     fetcher.mock.calls.filter(([, init]) => init?.method === "POST"),
-  ).toHaveLength(3);
+  ).toHaveLength(6);
   await user.click(screen.getByRole("button", { name: /Play again/ }));
-  await screen.findByRole("heading", { level: 1, name: catalogue[0].title });
-  expect(screen.getByLabelText("Scenario 1 of 3")).toBeVisible();
-  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-
-  // Remount represents refresh: no answer or completed-session state persists.
+  expect(router.push).toHaveBeenCalledWith(
+    "/play/55555555-5555-4555-8555-555555555555",
+  );
+  // Reloading the original completed session preserves its historical recap.
   view.unmount();
-  render(<ChallengePlayer />);
-  await screen.findByRole("heading", { level: 1, name: catalogue[0].title });
-  expect(screen.getByLabelText("Scenario 1 of 3")).toBeVisible();
+  render(
+    <ChallengePlayer
+      initialSession={structuredClone(canonical)}
+      viewer={viewer}
+    />,
+  );
   expect(
-    screen.queryByRole("region", { name: "Answer feedback" }),
-  ).not.toBeInTheDocument();
+    screen.getByRole("heading", { level: 1, name: /Three calls/ }),
+  ).toBeVisible();
+  expect(document.querySelectorAll("details.recap-card")).toHaveLength(3);
 });

@@ -2,157 +2,87 @@ import { describe, expect, it } from "vitest";
 import {
   createInitialSessionState,
   sessionReducer,
-  type SessionState,
 } from "@/lib/session/session-reducer";
-import { answerFor, challenges, summaries } from "./fixtures";
-
-function decisionState(): SessionState {
-  let state = sessionReducer(createInitialSessionState(), {
-    type: "CATALOGUE_LOADED",
-    challenges: summaries,
-  });
-  state = sessionReducer(state, {
-    type: "CHALLENGE_LOADED",
-    challenge: challenges[0],
-  });
-  return sessionReducer(state, { type: "SETUP_FINISHED" });
-}
-
-describe("session state rules", () => {
-  it("ignores setup completion from another scenario or a completed phase", () => {
-    const state = sessionReducer(decisionState(), { type: "REPLAY_SETUP" });
+import { snapshot, viewer } from "./session-fixtures";
+const initial = () =>
+  createInitialSessionState({ snapshot: snapshot(), viewerId: viewer.id });
+describe("persistent session reducer", () => {
+  it("requires setup completion and rejects late completion from another scenario", () => {
+    const state = initial();
     expect(
-      sessionReducer(state, {
-        type: "SETUP_FINISHED",
-        challengeId: challenges[1].id,
-      }),
+      sessionReducer(state, { type: "SETUP_FINISHED", challengeId: "wrong" }),
     ).toBe(state);
-    const decision = sessionReducer(state, {
-      type: "SETUP_FINISHED",
-      challengeId: challenges[0].id,
-    });
-    expect(decision.phase).toBe("decision");
-    expect(
-      sessionReducer(decision, {
-        type: "SETUP_FINISHED",
-        challengeId: challenges[0].id,
-      }),
-    ).toBe(decision);
-  });
-  it("begins empty and ignores attempts to skip unanswered challenges", () => {
-    const state = createInitialSessionState();
-    expect(state.phase).toBe("loading");
-    expect(state.completed).toEqual([]);
-    expect(sessionReducer(state, { type: "NEXT_CHALLENGE" })).toBe(state);
-    expect(
-      sessionReducer(decisionState(), { type: "NEXT_CHALLENGE" }).phase,
-    ).toBe("decision");
-  });
-  it("rejects invalid selections and submission without a selection", () => {
-    const state = decisionState();
-    expect(
-      sessionReducer(state, { type: "SELECT_OPTION", optionId: "invalid" }),
-    ).toBe(state);
-    expect(sessionReducer(state, { type: "SUBMIT_STARTED" })).toBe(state);
-  });
-  it("preserves a selection through setup replay", () => {
-    let state = sessionReducer(decisionState(), {
-      type: "SELECT_OPTION",
-      optionId: "peek",
-    });
-    state = sessionReducer(state, { type: "REPLAY_SETUP" });
-    expect(state.phase).toBe("setup");
-    state = sessionReducer(state, { type: "SETUP_FINISHED" });
-    expect(state.selectedOptionId).toBe("peek");
-    expect(state.phase).toBe("decision");
-  });
-  it("keeps the unanswered decision intact when submission fails", () => {
-    let state = sessionReducer(decisionState(), {
-      type: "SELECT_OPTION",
-      optionId: "hold",
-    });
-    state = sessionReducer(state, { type: "SUBMIT_STARTED" });
-    state = sessionReducer(state, {
-      type: "SUBMIT_FAILED",
-      message: "Try again",
-    });
-    expect(state.phase).toBe("decision");
-    expect(state.selectedOptionId).toBe("hold");
-    expect(state.completed).toHaveLength(0);
-    expect(state.error).toBe("Try again");
-  });
-  it("records each answer once, clears next-choice state, and reviews the third answer before recap", () => {
-    let state = decisionState();
-    for (let index = 0; index < 3; index++) {
-      state = sessionReducer(state, {
-        type: "SELECT_OPTION",
-        optionId: "hold",
-      });
-      state = sessionReducer(state, { type: "SUBMIT_STARTED" });
-      state = sessionReducer(state, {
-        type: "SUBMIT_SUCCEEDED",
-        answer: answerFor(challenges[index].id),
-      });
-      expect(state.phase).toBe("review");
-      expect(state.completed).toHaveLength(index + 1);
-      expect(
-        sessionReducer(state, {
-          type: "SUBMIT_SUCCEEDED",
-          answer: answerFor(challenges[index].id),
-        }),
-      ).toBe(state);
-      expect(
-        sessionReducer(state, { type: "SELECT_OPTION", optionId: "peek" }),
-      ).toBe(state);
-      state = sessionReducer(state, { type: "NEXT_CHALLENGE" });
-      if (index < 2) {
-        expect(state.selectedOptionId).toBeNull();
-        expect(state.feedback).toBeNull();
-        state = sessionReducer(state, {
-          type: "CHALLENGE_LOADED",
-          challenge: challenges[index + 1],
-        });
-        state = sessionReducer(state, { type: "SETUP_FINISHED" });
-      }
-    }
-    expect(state.phase).toBe("complete");
-    expect(sessionReducer(state, { type: "RESTART" })).toEqual(
-      createInitialSessionState(),
+    expect(sessionReducer(state, { type: "SETUP_FINISHED" }).phase).toBe(
+      "decision",
     );
   });
-  it("changes review media without changing the submitted answer", () => {
-    let state = sessionReducer(decisionState(), {
-      type: "SELECT_OPTION",
-      optionId: "hold",
-    });
-    state = sessionReducer(state, { type: "SUBMIT_STARTED" });
-    state = sessionReducer(state, {
-      type: "SUBMIT_SUCCEEDED",
-      answer: answerFor(),
-    });
-    const reviewed = sessionReducer(state, {
-      type: "SET_REVIEW_MEDIA",
-      media: "setup",
-    });
-    expect(reviewed.reviewMedia).toBe("setup");
-    expect(reviewed.completed).toBe(state.completed);
+  it("keeps an unsubmitted selection during replay", () => {
+    let state = sessionReducer(initial(), { type: "SETUP_FINISHED" });
+    state = sessionReducer(state, { type: "SELECT_OPTION", optionId: "hold" });
+    state = sessionReducer(state, { type: "REPLAY_SETUP" });
+    expect(state.selectedOptionId).toBe("hold");
+    expect(state.snapshot.items[0].answer).toBeNull();
   });
-  it("retries a failed load and ignores an unrelated late detail", () => {
-    let state = sessionReducer(createInitialSessionState(), {
-      type: "CATALOGUE_LOADED",
-      challenges: summaries,
+  it("rejects invalid selection and unresolved command changes", () => {
+    let state = sessionReducer(initial(), { type: "SETUP_FINISHED" });
+    expect(
+      sessionReducer(state, { type: "SELECT_OPTION", optionId: "bad" }),
+    ).toBe(state);
+    state = sessionReducer(state, {
+      type: "COMMAND_FAILED",
+      message: "Retry",
+      unresolved: true,
     });
     expect(
+      sessionReducer(state, { type: "SELECT_OPTION", optionId: "hold" }),
+    ).toBe(state);
+  });
+  it("reveals only canonical saved feedback and never completes final review locally", () => {
+    const state = sessionReducer(initial(), {
+      type: "HYDRATE",
+      snapshot: snapshot("review", 2),
+      viewerId: viewer.id,
+    });
+    expect(state.phase).toBe("review");
+    expect(state.completed).toHaveLength(3);
+    const pending = sessionReducer(state, { type: "COMMAND_STARTED" });
+    expect(pending.phase).toBe("review");
+    expect(
+      sessionReducer(pending, {
+        type: "COMMAND_FAILED",
+        message: "Offline",
+        unresolved: true,
+      }).feedback,
+    ).toEqual(state.feedback);
+  });
+  it("rejects older revisions, foreign session and changed identity", () => {
+    const state = createInitialSessionState({
+      snapshot: snapshot("review"),
+      viewerId: viewer.id,
+    });
+    for (const [next, id] of [
+      [snapshot(), viewer.id],
+      [{ ...snapshot("review"), id: "other" }, viewer.id],
+      [snapshot("review"), "another-user"],
+    ] as const)
+      expect(
+        sessionReducer(state, {
+          type: "HYDRATE",
+          snapshot: next,
+          viewerId: id,
+        }),
+      ).toBe(state);
+  });
+  it("clears displayed private state on signout and ignores late hydration", () => {
+    const state = sessionReducer(initial(), { type: "AUTH_REQUIRED" });
+    expect(state.challenge).toBeNull();
+    expect(state.completed).toEqual([]);
+    expect(
       sessionReducer(state, {
-        type: "CHALLENGE_LOADED",
-        challenge: challenges[1],
+        type: "HYDRATE",
+        snapshot: snapshot("review"),
+        viewerId: viewer.id,
       }),
     ).toBe(state);
-    state = sessionReducer(state, { type: "LOAD_FAILED", message: "Network" });
-    expect(state.phase).toBe("error");
-    state = sessionReducer(state, { type: "RETRY_LOAD" });
-    expect(state.loadTarget).toBe("challenge");
-    expect(state.phase).toBe("loading");
-    expect(state.error).toBeNull();
   });
 });

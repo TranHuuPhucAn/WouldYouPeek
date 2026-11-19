@@ -1,27 +1,49 @@
 # Would You Peek?
 
-A local Valorant decision-practice app for advanced players. Watch a professional player's POV, make a choice at a paused moment, then watch the continuation with conditional analysis below. The active demo contains three approved moments from TenZ's ranked stream on Bind.
+A Valorant decision-practice app for advanced players. Watch a professional player’s POV, make a choice at a paused moment, then watch the continuation and read conditional analysis. The demo contains three approved moments from TenZ’s ranked stream on Bind.
 
-Matching the pro and making a defensible decision are independent outcomes. Explanations are static AI-authored interpretations, with observable facts and missing context identified separately.
+Matching the pro and making a defensible decision are separate outcomes. Creators can author, review and publish their own scenarios. Explanations distinguish creator-written or AI-assisted analysis; the original demo retains its AI-authored attribution. Observable facts and missing context remain separate from interpretations.
 
 ## Run locally
 
-Install **Node.js 24.x and npm**, then clone and start the project:
+Install **Node.js 24.x**, npm and a running **Docker Desktop** (or compatible Docker runtime). The Supabase CLI is pinned in the project’s development dependencies; a global installation or hosted Supabase account is unnecessary.
 
 ```sh
 git clone https://github.com/TranHuuPhucAn/WouldYouPeek.git
 cd WouldYouPeek
 npm ci
+npm run db:start
+npm run db:env
 npm run dev
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000), choose **Play 3 scenarios**, then press **Play setup**. The video pauses for your choice; submit to watch the pro's continuation and read the analysis below it.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The first database start downloads local service images and applies the migrations and demo seed. `db:env` creates an ignored `.env.local` using the local API URL and public key; it never writes an administrator key into the application environment. `.env.example` documents the three settings.
 
-No environment variables, accounts, database or API keys are required. YouTube playback needs an internet connection. Progress lives in the React session; refreshing starts over. Stop the server with `Ctrl+C`. If port 3000 is occupied, use `npm run dev -- --port 3001` and open the URL printed by Next.js.
+Use **Watch demo** as a guest to view setup clips. Choose **Join the lab**, register with an email and a password of 12–128 characters including uppercase, lowercase and a number, then open the confirmation email in the [local email inbox](http://127.0.0.1:54324). These local emails are captured; no real email is sent. Password-reset and verification-resend messages use the same inbox.
 
-The current setup has been verified on Apple Silicon macOS. The test runner still uses a Darwin-specific native dependency workaround; fresh installs and test execution on other platforms remain unverified.
+After verification, start a session. Watch setup, choose an action, and submit. The answer is saved before the pro’s continuation and analysis appear. **Next scenario** advances the saved checkpoint; **Finish session** completes the final review. History retains completed sessions. Refreshing an unanswered scenario restarts setup; refreshing a saved answer restores review. Unsubmitted selections and video time are not persisted.
 
-To run an optimized production build locally:
+Under **Account**, any verified learner can enable creator access. Creators retain learner access. Open **Creator studio** to create a private draft, enter a YouTube source and timestamps, write context, choices and analysis, and explicitly save. Incomplete drafts can be saved. Preview uses only the saved draft and does not create a learner session.
+
+When the draft is complete, preview it, review the source and explanations, and record the checklist. **Publish** makes that exact reviewed content available in the verified learner **Library**. Learners can start one library scenario at a time or keep playing the three-scenario demo. If another session is active, resume it explicitly before starting a different target.
+
+Editing a published scenario leaves its previous version available until a new reviewed version is published. Content changes invalidate the review. **Unpublish** removes the scenario from discovery and new starts; existing sessions and history retain their original version. Republishing requires another review. Creator review is self-review, not independent moderation.
+
+If upgrading an existing milestone-three local installation, preserve your accounts and sessions by applying only the pending migrations:
+
+```sh
+npm ci
+npm run db:start
+npm run db:migrate:local
+npm run db:env
+npm run dev
+```
+
+YouTube playback requires an internet connection. Use `127.0.0.1:3000` consistently: auth callbacks and mutation-origin checks are configured for that address. If changing the port or hostname, update `NEXT_PUBLIC_APP_URL` in `.env.local`, `auth.site_url` and `auth.additional_redirect_urls` in `supabase/config.toml`, then restart the app and local services.
+
+Stop the web server with `Ctrl+C`; stop local services with `npm run db:stop`. Stopping preserves database volumes. Starting again restores accounts and sessions. **`npm run db:reset:local` deletes local accounts, creator content and progress**, recreates the development database and seeds the three demo scenarios. It is unnecessary for normal upgrades or verification.
+
+To serve an optimized build locally, keep Supabase running and use:
 
 ```sh
 npm run build
@@ -31,98 +53,98 @@ npm start
 ## Verify
 
 ```sh
-npm test
-npm run typecheck
-npm run build
+npm ci
+npm run test:ci
 ```
 
-Run one test project with `npm test -- --project backend` or `npm test -- --project frontend`. Type checking generates Next.js route types first, so generated `.next/` files and `next-env.d.ts` do not need to be committed. `npm start` serves a successful production build. The build uses Webpack because Turbopack's CSS worker could not open its internal port in this environment; the development server uses Turbopack.
+Keep Docker running. The full command creates an ignored `.wyp-test-work/<run-id>/` source copy and a uniquely named disposable Supabase project. It uses API port 55321, database 55322, inbox 55324 and an app at `http://localhost:3100`. These ports must be free. The different app hostname also isolates browser auth cookies from your development app at `127.0.0.1:3000`.
 
-### Milestone two verification
+The runner first verifies an additive upgrade from milestone three with existing accounts, creator access and saved sessions. It then resets only its disposable database and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
 
-Implemented and checked on 17 November 2026:
+`npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `npm run test:scripts` checks isolation, cleanup and pipeline failure handling without Docker. Database, integration and HTTP suites refuse the normal development project and hosted targets; run them through `test:ci` so publication fixtures remain isolated. Test administrator credentials are never passed to the web app.
 
-- **203 tests passed across 15 files**: 68 backend and 135 frontend tests.
-- TypeScript checking and the production Webpack build passed.
-- The built server passed 13 HTTP checks: catalogue, all three public details and all nine answer choices, including no-store headers, disclosure boundaries and comparison consistency.
-- The actual catalogue completed a full automated session with a simulated YouTube provider: paused choices, selection-preserving replay, independent comparison/assessment, feedback beneath the video, recap, restart and refresh reset.
-- The temporary embed-probe page was removed and the verification server stopped.
+`db:seed:generate` regenerates SQL from the canonical fixtures; `db:types` regenerates TypeScript from the local schema. Their `:check` counterparts detect drift. These scripts accept no extra remote-target arguments. Type checking first generates Next.js route types. Builds use Webpack; development uses Turbopack.
 
-The selected source loaded and played in an official YouTube embed during an initial browser probe. That probe also confirmed that reaching YouTube's end boundary displays an end screen, so the app pauses early to retain the scene. Browser control became unavailable before the final app could be exercised. Accurate pauses for all three scenarios, normal-speed audio/spoiler review, and the final desktop/mobile, keyboard, replay, recovery and background-tab checks remain unverified. Automated player tests use a simulated provider and do not replace those checks.
-
-The seven source screenshots in `artifacts/vod-review/` document the earlier visual review. Milestone one's 101-test/browser results concern the illustrative prototype and do not verify this VOD implementation. Older prototype screenshots and unused research captures are excluded from this repository.
+The GitHub Actions workflow runs clean installation, migration/seed/type checks, unit/component tests, real database/integration tests, type checking and a production build for pull requests into `dev` and `main`, and pushes to those branches. GitHub execution begins when you push; local container checks are recorded separately.
 
 ## Active scenarios
 
 All three use [WASHED GAMER PLAYS APAC RANKED](https://www.youtube.com/watch?v=_yPrykaB2nE) from the verified TenZ channel: player POV, Clove on Bind, ranked. This is the approved fallback to VCT footage. No video has been downloaded or rehosted.
 
-| Scenario | Setup | Decision | Continuation end |
-| --- | --- | --- | --- |
-| `bind-clove-utility-window` | 28:25 | 28:33 | 28:38 |
-| `bind-clove-smoke-contest` | 31:25 | 31:29.5 | 31:37 |
-| `bind-clove-advantage-reset` | 31:43 | 31:53 | 32:00.5 |
+| Scenario                     | Setup | Decision | Continuation end |
+| ---------------------------- | ----- | -------- | ---------------- |
+| `bind-clove-utility-window`  | 28:25 | 28:33    | 28:38            |
+| `bind-clove-smoke-contest`   | 31:25 | 31:29.5  | 31:37            |
+| `bind-clove-advantage-reset` | 31:43 | 31:53    | 32:00.5          |
 
 The last two moments are an explicitly linked pair in the same round. The first examines utility timing, the second a low-health contest while down a player, and the third how aggression changes after gaining a 3v1 advantage. None requires a uniquely preferred answer; the successful smoke contest is still assessed as risky.
 
-See [scenario evidence and reasoning](docs/vod-scenarios.md) and the [approved implementation plan](docs/milestone-2-plan.md) for source review, file responsibilities and acceptance checks.
+## Architecture and access
 
-## Playback and learner flow
+The app uses Next.js App Router, React, TypeScript, Supabase Auth and Postgres. Supabase SSR handles request-scoped cookies. The proxy refreshes identity; pages, services and database functions independently enforce access. Normal app requests use the caller’s session and public key. Administrator credentials exist only in guarded local test setup.
 
-The YouTube player stays mounted from setup through the decision. Replaying setup preserves the learner's selection. Submitting locks the answer, starts the pro's continuation and displays analysis beneath it. If autoplay is blocked, an explicit Play continuation control is available. Post-answer review can replay setup or continuation without creating another attempt. Recap presents the choice, pro comparison and assessment separately.
+- `src/contracts/`: shared preview, account, authoring, library and saved-session contracts.
+- `src/components/creator/`, `src/hooks/use-scenario-editor.ts`, `src/lib/creator/`: explicit-save editor, saved preview, review and publication controls, shared content validation and editor state.
+- `src/server/creator/`, `src/app/api/creator/`: owner-scoped drafts, review records, publication and withdrawal commands.
+- `src/app/library/`, `src/components/library/`, `src/server/library/`: verified-only published previews and selected-scenario starts.
+- `src/server/auth/`, `src/app/(auth)/`, `src/lib/supabase/`: validation, auth actions, confirmation/recovery callbacks, verified identity and cookie refresh.
+- `src/server/training/` and `src/app/api/sessions/`: canonical session reads and atomic start, answer and advance commands.
+- `src/lib/client/`, `src/lib/session/`, `src/hooks/use-challenge-session.ts`: validated responses, durable checkpoint hydration, retry reconciliation and auth-change cancellation.
+- `src/components/challenge/`: the existing bounded YouTube player, choices, advanced analysis and recap.
+- `supabase/migrations/`: profiles, versioned scenarios, sessions, immutable attempts, private answer keys and command receipts, RLS and narrowly granted functions.
+- `supabase/fixtures/demo-scenarios.json`: the canonical authored dataset. `scripts/render-demo-seed.mjs` generates `supabase/seed.sql`; runtime repositories read the database.
+- `tests/backend/`, `tests/frontend/`, `tests/integration/`, `supabase/tests/database/`: complementary unit, component, real-service and permission/transaction tests.
 
-Playback uses the official YouTube IFrame API with source attribution and external accessible controls. The app polls playback time and pauses 0.30 seconds before the approved endpoint; this margin still needs live-browser verification. Replay reloads the bounded interval because seeking can cancel the provider's end bound. Network failure, unavailable sources and disabled embedding have retry/error states; background-tab handling pauses playback.
+Guests can read demo setup-only previews. Verified accounts can browse the library, play and read their own history. Creator enrollment affects only the current account and grants no access to others' private drafts or learner records. Private answer keys cannot be read directly through the public Data API. Session and authoring functions use separate restricted non-login roles that do not own application tables or bypass row-level security. A trigger-only role synchronizes trusted email confirmation into a protected profile column; runtime roles need no direct auth-table access.
 
-YouTube seeking and browser scheduling are not frame-perfect. The public source remains accessible, so this is an educational disclosure flow rather than an anti-cheating mechanism. Production publication should wait for the remaining playback and audio checks in the plan.
-
-## Architecture
-
-- `src/contracts/challenge.ts`: shared API types, including source metadata, bounded YouTube segments, paused decisions and conditional feedback.
-- `src/server/challenges/data.ts`: server-only scenario catalogue, observations, AI analysis and separate visual/audio/embed review states.
-- `src/server/challenges/service.ts`: safe public projections, submission validation and independent pro-choice comparison.
-- `src/server/http.ts` and `src/app/api/challenges/**`: consistent JSON responses and three thin route handlers.
-- `src/lib/client/challenge-api.ts`: response validation, including timestamps, option references, comparison consistency and answer/challenge agreement.
-- `src/lib/session/session-reducer.ts` and `src/hooks/use-challenge-session.ts`: session transitions, request cancellation, selection preservation and submission guards.
-- `src/lib/video/youtube-api.ts`: shared script loading, provider construction and recoverable errors.
-- `src/lib/video/segment-controller.ts`: pure interval validation and playback decisions.
-- `src/components/challenge/YouTubeScenarioPlayer.tsx`: persistent player, bounded replay, timing monitor and lifecycle cleanup.
-- `src/components/challenge/**`: context, decisions, conditional analysis and recap. `ScenarioMedia.tsx` retains image and native-video support.
-- `public/demo/**`: original milestone-one diagrams retained for illustrative regression fixtures.
+Each session pins immutable scenario versions. Answers and review checkpoints commit together. One account has at most one active session. Commands carry a request UUID and expected revision; retrying an identical command returns the current canonical snapshot of its original session, even after completion. Reusing the UUID with different input fails. Losing a response or encountering a stale tab triggers reconciliation rather than another attempt.
 
 ## API
 
-| Endpoint | Response |
-| --- | --- |
-| `GET /api/challenges` | `{ challenges: ChallengeSummary[] }`, in authored order. |
-| `GET /api/challenges/[id]` | Context, source, visible facts, unknowns, setup bounds, paused-decision metadata and option labels. |
-| `POST /api/challenges/[id]/answer` | Accepts only `{ "optionId": "use-meddle" }`; returns assessment, per-option conditions/risks, observed action, pro comparison, AI analysis and continuation. |
+| Endpoint                                               | Access and result                                                               |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `GET /api/challenges`                                  | Public setup-only preview catalogue.                                            |
+| `GET /api/challenges/[id]`                             | Public preview; no question, choices, feedback or reveal interval.              |
+| `POST /api/challenges/[id]/answer`                     | Retired: guests receive 401; signed-in callers receive 409 `SESSION_REQUIRED`.  |
+| `GET /api/account`                                     | Current account and capabilities.                                               |
+| `POST /api/account/creator`                            | Verified self-enrollment; empty JSON object.                                    |
+| `GET /api/creator/scenarios?status=all&cursor=...`      | Verified creator's own draft/publication summaries.                            |
+| `POST /api/creator/scenarios`                         | `{ requestId }`; create a private draft.                                       |
+| `GET /api/creator/scenarios/[id]`                     | Owner's current saved draft and publication state.                             |
+| `PUT /api/creator/scenarios/[id]`                     | `{ requestId, expectedRevision, content }`; explicitly save a bounded draft.   |
+| `GET /api/creator/scenarios/[id]/review?revision=...`  | Owner-only preview of the exact saved revision.                                |
+| `POST /api/creator/scenarios/[id]/review`             | `{ requestId, expectedRevision, checklist }`; record self-review.              |
+| `POST /api/creator/scenarios/[id]/publish`            | `{ requestId, expectedRevision, reviewId }`; publish atomically.               |
+| `POST /api/creator/scenarios/[id]/unpublish`          | `{ requestId, expectedRevision }`; delist new starts.                          |
+| `GET /api/library/scenarios?cursor=...`               | Verified-only published creator previews, without answers.                    |
+| `GET /api/library/scenarios/[id]`                    | One published setup-only preview.                                             |
+| `POST /api/sessions`                                   | `{ requestId, target }`; `target` is `{ kind: 'demo' }` or `{ kind: 'scenario', scenarioId }`. Omitting it retains the demo behavior. |
+| `GET /api/sessions?cursor=...`                         | Own paginated history.                                                          |
+| `GET /api/sessions/[sessionId]`                        | Own canonical saved session.                                                    |
+| `POST /api/sessions/[sessionId]/items/[itemId]/answer` | `{ optionId, requestId, expectedRevision }`; atomically save answer and review. |
+| `POST /api/sessions/[sessionId]/advance`               | `{ fromItemId, requestId, expectedRevision }`; advance review or finish.        |
 
-Initial GET responses exclude assessments, observed action, analysis, outcome, reveal bounds and internal review metadata. Answer fields remain server-only until submission. Recommended-option lists may be empty.
+Auth forms use Server Actions. Cookie-authenticated JSON writes require the configured same-origin request. Private responses use no-store handling. Missing or foreign sessions return 404; stale or conflicting commands return 409; unavailable storage returns 503 without a fixture fallback. Auth and input errors use safe messages without provider internals.
 
-Errors use `{ error: { code, message } }`: invalid JSON/body/options return 400, unknown challenges return 404, and unexpected errors return a generic 500. Responses use `Cache-Control: no-store`. Submissions are stateless and deterministic; the server stores no personal data or attempt history. `contentVersion` identifies authored content, and the client rejects feedback for a different content version.
+## Content and playback
 
-## Edit the content
+Use the creator studio for new scenarios and revisions. Source titles, attribution, player identity and round details are entered by the creator; the app parses the YouTube URL but does not verify that metadata through an external API. It never downloads or rehosts the video. Saving unchanged normalized content retains the review; changes require fresh review. Publishing pins immutable content and an answer key, with idempotent receipts protecting retries and stale revisions preventing silent overwrites.
 
-Update `src/server/challenges/data.ts`. Each VOD record needs source metadata, setup/decision/reveal times, player-visible facts, unknowns, three options with independent assessments, an observed action referencing an option, conditional explanations, AI-analysis attribution and internal review evidence. Use the same video ID across source/setup/reveal, end setup at the decision and start continuation there.
+The original system-owned demo remains in the canonical JSON fixture. To maintain that fixture, increment `contentVersion` when changing published content, then regenerate and review the seed. Reapplying identical seed content is harmless; changing an existing version fails. Creators cannot edit the system demo.
 
-Evaluate a decision using information available before the pause. Keep the visible outcome separate from inferred rationale; do not infer a player's intent or unavailable team communications. Review the normal-speed audio as well as the visuals for spoilers. A visual review alone does not qualify a source for publication.
+Each scenario needs player-visible context, unknowns, bounded setup/decision/continuation times, options with independent assessments, an observed action, conditional explanations and review evidence. Evaluate choices using information available before the pause. Do not infer a player’s intent or unavailable team communications. AI drafts and source audio need editorial review before publication.
 
-The illustration and native-video branches remain supported for regression coverage. Illustrative fixtures must retain `mediaStatus: "demo"`, an image decision and an authored continuation; they must not imply a professional-player comparison.
+The official YouTube iframe remains mounted through setup and decision. Playback pauses with a 0.30-second margin; browser scheduling and seeking are not frame-perfect. Replaying setup preserves an unsubmitted selection. Post-answer replay is read-only. Errors and blocked autoplay have explicit retry/play controls. The original public video and repository fixture remain inspectable; this is an educational reveal sequence, not an anti-cheating mechanism.
 
-## Test structure
+The seven `artifacts/vod-review/scenario-*.jpg` images preserve visual source evidence. Simulated player tests establish application behavior, not normal-speed audio quality or tactical correctness. No video is downloaded or rehosted, and no storage bucket is needed yet.
 
-- Backend: catalogue integrity, evidence references, safe projections, all nine choices, independent comparison/assessment, defensive copies, request validation and route errors.
-- Frontend: response validation, reducer and asynchronous hook, full session flow, comparison/analysis rendering and image/native-video regressions.
-- YouTube: script loading/retry, pure timing boundaries, player lifecycle, replay, autoplay fallback, failures, visibility handling and stale-event cleanup using a simulated provider.
+## Project progression
 
-Vitest uses Node for backend tests and jsdom for frontend tests. The `server-only` marker is mocked only in tests, including the tests that connect the real catalogue to the client; the Next.js build retains the actual import boundary. Tests establish application behaviour and internal consistency, not tactical correctness or improvements to in-game performance.
+1. **Milestone one:** illustrative decision-player prototype.
+2. **Milestone two:** three curated real player-POV VOD scenarios and conditional analysis.
+3. **Milestone three:** verified accounts, learner/creator access, persistent versioned sessions and history.
+4. **Milestone four:** creator scenario submission, editing, review and publishing.
+5. **Milestone five:** automatic whole-VOD extraction into drafts, approved by a creator before publication.
+6. Expand the reviewed library, improve feedback and analytics, then prepare hosted deployment and production email delivery.
 
-## Future milestones
-
-- Add login and two roles: **learners** access scenarios; **creators** upload scenarios and author questions and explanations.
-- Prefer creator-authored explanations long term. Keep AI drafts subject to editorial review.
-- Build an automatic pipeline from a whole VOD to proposed decision segments, pause points, questions, observed actions and draft analysis.
-- Keep extracted scenarios as drafts until a creator reviews, edits and approves them for publication.
-- Expand the reviewed library across players, maps and decision types, using VCT footage when genuine player-only information is available.
-- Add persistent progress, a database and media storage when the creator workflow requires them.
-
-Accounts, uploads, extraction, persistence and deployment are outside this local demo milestone.
+Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/creator`. GitHub pushes and merges remain with the repository owner. Hosted deployment, custom SMTP, uploads and automatic extraction remain later work.

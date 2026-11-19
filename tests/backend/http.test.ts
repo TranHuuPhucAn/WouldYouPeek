@@ -12,7 +12,7 @@ describe("HTTP response helpers", () => {
     const response = jsonResponse({ ok: true }, 201);
     expect(response.status).toBe(201);
     expect(response.headers.get("content-type")).toContain("application/json");
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toEqual({ ok: true });
   });
 

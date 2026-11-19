@@ -1,18 +1,31 @@
 import type { Metadata } from "next";
+import { getCurrentAccount } from "@/server/auth/guards";
+import { SiteHeader } from "@/components/navigation/SiteHeader";
+import { AuthStateSync } from "@/components/auth/AuthStateSync";
 import "./globals.css";
-
 export const metadata: Metadata = {
   title: "Would You Peek? — Make the call",
   description:
-    "Three tactical scenarios. Make your call before the reveal, then explore the reasoning. A Valorant-inspired decision lab with original demo diagrams.",
+    "Watch real Valorant POVs, make your call, and return to saved decisions and debriefs.",
 };
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const viewer = await getCurrentAccount();
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body>
+        <AuthStateSync
+          key={viewer?.id ?? "guest"}
+          viewerId={viewer?.id ?? null}
+          authSnapshotKey={crypto.randomUUID()}
+        >
+          <div className="app-shell">
+            <SiteHeader viewer={viewer} />
+            {children}
+          </div>
+        </AuthStateSync>
+      </body>
     </html>
   );
 }

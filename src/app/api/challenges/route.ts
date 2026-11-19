@@ -1,6 +1,7 @@
-import { listChallenges } from "@/server/challenges/service";
+import { listChallengePreviews } from "@/server/challenges/service";
 import { handleRoute } from "@/server/http";
-
-export async function GET(): Promise<Response> {
-  return handleRoute(() => ({ challenges: listChallenges() }));
+export async function GET() {
+  return handleRoute(async () => ({
+    challenges: await listChallengePreviews(),
+  }));
 }

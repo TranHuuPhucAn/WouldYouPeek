@@ -1,3 +1,4 @@
+import { AnalysisNote } from "./AnalysisNote";
 import type {
   AnswerResponse,
   Assessment,
@@ -21,6 +22,8 @@ type Props = {
   onShowSetup: () => void;
   onShowOutcome: () => void;
   onNext: () => void;
+  pending?: boolean;
+  nextLabel?: string;
 };
 
 export function FeedbackPanel({
@@ -31,6 +34,8 @@ export function FeedbackPanel({
   onShowSetup,
   onShowOutcome,
   onNext,
+  pending = false,
+  nextLabel,
 }: Props) {
   const selected = challenge.options.find(
     (option) => option.id === answer.selectedOptionId,
@@ -70,23 +75,7 @@ export function FeedbackPanel({
           </small>
         </div>
       )}
-      {answer.analysis && (
-        <section className="analysis-note" aria-label="AI analysis">
-          <span className="eyebrow">AI ANALYSIS · INTERPRETATION</span>
-          <p>{answer.analysis.rationale}</p>
-          <small>{answer.analysis.notice}</small>
-          {answer.analysis.limitations.length > 0 && (
-            <details className="analysis-limitations">
-              <summary>What remains uncertain</summary>
-              <ul>
-                {answer.analysis.limitations.map((limitation) => (
-                  <li key={limitation}>{limitation}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </section>
-      )}
+      {answer.analysis && <AnalysisNote analysis={answer.analysis} />}
       {hasComparison && answer.recommendedOptionIds.length === 0 && (
         <p className="conditional-note">
           There is no single preferred answer here. Compare the conditions that
@@ -165,8 +154,18 @@ export function FeedbackPanel({
             Outcome
           </button>
         </div>
-        <button className="button button-primary" onClick={onNext}>
-          {finalChallenge ? "Finish session" : "Next scenario"}
+        <button
+          className="button button-primary"
+          onClick={onNext}
+          disabled={pending}
+        >
+          {pending
+            ? "Saving…"
+            : nextLabel
+              ? nextLabel
+              : finalChallenge
+                ? "Finish session"
+                : "Next scenario"}
           <span aria-hidden="true">→</span>
         </button>
       </div>
