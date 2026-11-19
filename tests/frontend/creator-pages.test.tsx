@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { requirePageAccount, requirePageCreator } from "@/app/protected-page";
 import CreatorPage from "@/app/creator/page";
+import CreatorVideosPage from "@/app/creator/videos/page";
+import { listVideos } from "@/server/video/service";
+import { videoList } from "./video-fixtures";
 import EditorPage from "@/app/creator/scenarios/[id]/page";
 import ReviewPage from "@/app/creator/scenarios/[id]/review/page";
 import LibraryPage from "@/app/library/page";
@@ -28,6 +31,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("@/server/auth/guards", () => ({ requireVerifiedUser: vi.fn() }));
+vi.mock("@/server/video/service", () => ({ listVideos: vi.fn() }));
+vi.mock("@/components/creator/VideoLibrary", () => ({
+  VideoLibrary: () => <div>Private owner recordings</div>,
+}));
 vi.mock("@/server/creator/service", () => ({
   listOwnedScenarios: vi.fn(),
   findOwnedScenario: vi.fn(),
@@ -67,6 +74,7 @@ vi.mock("@/components/challenge/ScenarioMedia", () => ({
   ScenarioMedia: () => <div>Safe setup only</div>,
 }));
 beforeEach(() => {
+  vi.mocked(listVideos).mockReset().mockResolvedValue(videoList());
   vi.mocked(requireVerifiedUser)
     .mockReset()
     .mockResolvedValue({
@@ -184,5 +192,18 @@ describe("server page authorization and safe load boundaries", () => {
     await expect(
       LibraryDetailPage({ params: Promise.resolve({ scenarioId: creatorId }) }),
     ).rejects.toThrow("NOT_FOUND");
+  });
+});
+
+describe("private creator recording page", () => {
+  it("loads the video library after creator authorization", async () => {
+    render(await CreatorVideosPage());
+    expect(screen.getByText("Private owner recordings")).toBeInTheDocument();
+    expect(listVideos).toHaveBeenCalledOnce();
+  });
+  it("does not fetch recordings for learners", async () => {
+    vi.mocked(requireVerifiedUser).mockResolvedValue(viewer);
+    await expect(CreatorVideosPage()).rejects.toThrow();
+    expect(listVideos).not.toHaveBeenCalled();
   });
 });

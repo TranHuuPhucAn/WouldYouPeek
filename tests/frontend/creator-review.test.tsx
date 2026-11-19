@@ -29,8 +29,16 @@ vi.mock("@/components/auth/AuthStateSync", () => ({
     window.dispatchEvent(new Event("wyp:identity-invalidated")),
 }));
 vi.mock("@/components/creator/ScenarioPreview", () => ({
-  ScenarioPreview: () => (
-    <input aria-label="Preview state marker" defaultValue="preserved" />
+  ScenarioPreview: ({
+    preview,
+  }: {
+    preview: import("@/contracts/creator").CreatorReviewPreview;
+  }) => (
+    <input
+      aria-label="Preview state marker"
+      defaultValue="preserved"
+      data-owner-revision={preview.scenario.revision}
+    />
   ),
 }));
 beforeEach(() => {
@@ -41,20 +49,16 @@ beforeEach(() => {
       replayed: false,
       publishedVersion: null,
     });
-  vi.mocked(api.publishCreatorScenario)
-    .mockReset()
-    .mockResolvedValue({
-      scenario: published(),
-      replayed: false,
-      publishedVersion: "creator-1",
-    });
-  vi.mocked(api.unpublishCreatorScenario)
-    .mockReset()
-    .mockResolvedValue({
-      scenario: withdrawn(),
-      replayed: false,
-      publishedVersion: null,
-    });
+  vi.mocked(api.publishCreatorScenario).mockReset().mockResolvedValue({
+    scenario: published(),
+    replayed: false,
+    publishedVersion: "creator-1",
+  });
+  vi.mocked(api.unpublishCreatorScenario).mockReset().mockResolvedValue({
+    scenario: withdrawn(),
+    replayed: false,
+    publishedVersion: null,
+  });
   vi.mocked(api.getCreatorScenario)
     .mockReset()
     .mockResolvedValue(creatorSnapshot());
@@ -122,6 +126,10 @@ describe("review and publication controls", () => {
     );
     expect(screen.getByLabelText("Preview state marker")).toHaveValue(
       "Still at continuation",
+    );
+    expect(screen.getByLabelText("Preview state marker")).toHaveAttribute(
+      "data-owner-revision",
+      "2",
     );
     fireEvent.click(screen.getByRole("button", { name: "Publish scenario" }));
     await waitFor(() =>

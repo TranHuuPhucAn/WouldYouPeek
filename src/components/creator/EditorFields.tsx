@@ -76,7 +76,7 @@ export function SelectField({
   path: string;
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) => void | boolean;
   choices: { value: string; label: string }[];
   issues?: ValidationIssue[];
 }) {
@@ -87,7 +87,10 @@ export function SelectField({
       <select
         id={fieldId(path)}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          const selection = event.currentTarget;
+          if (onChange(selection.value) === false) selection.value = value;
+        }}
         aria-invalid={!!error}
         aria-describedby={error ? `${fieldId(path)}-error` : undefined}
       >

@@ -13,6 +13,19 @@ import { AnalysisFields } from "@/components/creator/AnalysisFields";
 import { useState } from "react";
 import * as api from "@/lib/client/creator-api";
 import { creatorSnapshot, validContent } from "./creator-fixtures";
+import { createUploadedSource } from "@/lib/creator/content";
+import { listCreatorVideos } from "@/lib/client/video-api";
+import { readyVideo, videoList, VIDEO_ID, OWNER_ID } from "./video-fixtures";
+vi.mock("@/lib/client/video-api", () => ({ listCreatorVideos: vi.fn() }));
+vi.mock("@/hooks/use-authoring-video", () => ({
+  useAuthoringVideo: () => ({
+    hasSource: false,
+    ready: false,
+    seeking: false,
+    time: 0,
+    duration: null,
+  }),
+}));
 vi.mock("@/lib/client/creator-api", () => ({
   saveCreatorScenario: vi.fn(),
   getCreatorScenario: vi.fn(),
@@ -22,6 +35,14 @@ vi.mock("@/components/auth/AuthStateSync", () => ({
     window.dispatchEvent(new Event("wyp:identity-invalidated")),
 }));
 beforeEach(() => {
+  vi.mocked(listCreatorVideos)
+    .mockReset()
+    .mockResolvedValue(
+      videoList([
+        readyVideo(),
+        { ...readyVideo(), id: OWNER_ID, fileName: "second.mp4" },
+      ]),
+    );
   vi.mocked(api.saveCreatorScenario)
     .mockReset()
     .mockImplementation(async (_id, input) => {
@@ -196,4 +217,126 @@ describe("stable choice identities", () => {
       ),
     ).toBeInTheDocument();
   });
+});
+
+const timingLabels = [
+  "Setup starts",
+  "Decision pause",
+  "Continuation ends",
+  "Setup description",
+  "Paused moment description",
+  "Continuation description",
+];
+function mediaFieldValues() {
+  return timingLabels.map(
+    (label) => (screen.getByLabelText(label) as HTMLInputElement).value,
+  );
+}
+function savedUploadedScenario() {
+  const initial = creatorSnapshot();
+  if (initial.draft.content.source.kind === "uploaded")
+    throw new Error("Expected the original YouTube fixture");
+  const { url: _url, ...attribution } = initial.draft.content.source;
+  initial.draft.content.source = {
+    ...createUploadedSource(VIDEO_ID),
+    ...attribution,
+    kind: "uploaded",
+    assetId: VIDEO_ID,
+  };
+  return initial;
+}
+
+it("cancels source replacement in-page without changing any saved marks or descriptions", () => {
+  const initial = creatorSnapshot(),
+    nativeConfirm = vi.spyOn(window, "confirm");
+  render(<ScenarioEditor initial={initial} viewerId="owner" />);
+  const original = screen.getByLabelText("YouTube URL") as HTMLInputElement,
+    originalUrl = original.value,
+    originalMedia = mediaFieldValues();
+  fireEvent.change(original, {
+    target: { value: "https://youtu.be/abcdefghijk" },
+  });
+  const dialog = screen.getByRole("alertdialog", {
+    name: "Change the source recording?",
+  });
+  expect(
+    screen.getByRole("button", { name: "Cancel source change" }),
+  ).toHaveFocus();
+  expect(original).toHaveValue(originalUrl);
+  expect(mediaFieldValues()).toEqual(originalMedia);
+  expect(nativeConfirm).not.toHaveBeenCalled();
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(original).toHaveFocus();
+  expect(original).toHaveValue(originalUrl);
+  expect(mediaFieldValues()).toEqual(originalMedia);
+  expect(screen.getByText("All changes saved")).toBeInTheDocument();
+  expect(api.saveCreatorScenario).not.toHaveBeenCalled();
+});
+
+it("confirms a source change, clears only timing and media descriptions, and keeps latest authored text", () => {
+  const initial = creatorSnapshot();
+  render(<ScenarioEditor initial={initial} viewerId="owner" />);
+  fireEvent.change(screen.getByLabelText("YouTube URL"), {
+    target: { value: "https://youtu.be/abcdefghijk" },
+  });
+  fireEvent.change(screen.getByLabelText("Player"), {
+    target: { value: "Updated player credit" },
+  });
+  fireEvent.change(screen.getByLabelText("Decision question"), {
+    target: { value: "Updated question while deciding" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Change source" }));
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("YouTube URL")).toHaveValue(
+    "https://youtu.be/abcdefghijk",
+  );
+  expect(mediaFieldValues()).toEqual(timingLabels.map(() => ""));
+  expect(screen.getByLabelText("Setup starts")).toHaveFocus();
+  expect(screen.getByLabelText("Player")).toHaveValue("Updated player credit");
+  expect(screen.getByLabelText("Decision question")).toHaveValue(
+    "Updated question while deciding",
+  );
+  expect(screen.getByLabelText("Choice 1 explanation")).toHaveValue(
+    initial.draft.content.options[0].explanation,
+  );
+  expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  expect(api.saveCreatorScenario).not.toHaveBeenCalled();
+});
+
+it("cancels and confirms an uploaded-to-YouTube switch with matching dropdown and field state", async () => {
+  render(<ScenarioEditor initial={savedUploadedScenario()} viewerId="owner" />);
+  await screen.findByRole("option", { name: "recording.mp4" });
+  const originalMedia = mediaFieldValues();
+  const kind = screen.getByLabelText("Video source");
+  fireEvent.change(kind, { target: { value: "youtube" } });
+  expect(kind).toHaveValue("uploaded");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel source change" }));
+  expect(kind).toHaveValue("uploaded");
+  expect(kind).toHaveFocus();
+  expect(screen.getByLabelText("Uploaded recording")).toHaveValue(VIDEO_ID);
+  expect(mediaFieldValues()).toEqual(originalMedia);
+  fireEvent.change(kind, { target: { value: "youtube" } });
+  fireEvent.click(screen.getByRole("button", { name: "Change source" }));
+  expect(kind).toHaveValue("youtube");
+  expect(screen.getByLabelText("YouTube URL")).toHaveValue("");
+  expect(screen.queryByLabelText("Uploaded recording")).not.toBeInTheDocument();
+  expect(mediaFieldValues()).toEqual(timingLabels.map(() => ""));
+});
+
+it("keeps an uploaded asset on cancellation and clears marks only after confirming its replacement", async () => {
+  render(<ScenarioEditor initial={savedUploadedScenario()} viewerId="owner" />);
+  await screen.findByRole("option", { name: "second.mp4" });
+  const originalMedia = mediaFieldValues();
+  const source = screen.getByLabelText("Uploaded recording");
+  fireEvent.change(source, { target: { value: OWNER_ID } });
+  fireEvent.click(screen.getByRole("button", { name: "Cancel source change" }));
+  expect(source).toHaveValue(VIDEO_ID);
+  expect(source).toHaveFocus();
+  expect(mediaFieldValues()).toEqual(originalMedia);
+  fireEvent.change(source, { target: { value: OWNER_ID } });
+  fireEvent.click(screen.getByRole("button", { name: "Change source" }));
+  expect(source).toHaveValue(OWNER_ID);
+  expect(mediaFieldValues()).toEqual(timingLabels.map(() => ""));
+  expect(screen.getByLabelText("Setup starts")).toHaveFocus();
 });

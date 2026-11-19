@@ -11,6 +11,7 @@ import { cleanChildEnvironment, localUrl, OWNER_FILE, readDisposableWorkspace, T
 
 const sourceDefault = fileURLToPath(new URL("../", import.meta.url));
 export const LAST_M3_MIGRATION = "20261117000500";
+export const LAST_M4_MIGRATION = "20261118000400";
 const sourceEntries = ["src", "tests", "scripts", "public", "supabase", "docs", "README.md",
   "package.json", "package-lock.json", "next.config.ts", "postcss.config.mjs", "tsconfig.json", "vitest.config.ts", ".env.example"];
 
@@ -175,14 +176,16 @@ export function applicationEnvironment(testEnv) {
     NEXT_PUBLIC_APP_URL: testEnv.NEXT_PUBLIC_APP_URL };
 }
 
-export async function applyPendingMigrations(target) {
+export async function applyPendingMigrations(target, { through, cli = runCli } = {}) {
   const owned = readDisposableWorkspace(target.workspace);
+  if (through !== undefined && !/^\d{14}$/.test(through)) throw new Error("Invalid migration boundary.");
   const pending = join(owned.workspace, ".wyp-pending-migrations");
   if (existsSync(pending)) for (const name of readdirSync(pending)) {
     if (!/^\d{14}_[\w-]+\.sql$/.test(name)) throw new Error("Unexpected pending migration file.");
+    if (through !== undefined && name.slice(0, 14) > through) continue;
     renameSync(join(pending, name), join(owned.workspace, "supabase/migrations", name));
   }
-  await runCli(owned, ["migration", "up"]);
+  await cli(owned, ["migration", "up"]);
 }
 
 export async function stopTestStack(target) {
@@ -230,10 +233,46 @@ export async function stopTestApp(app) {
   clearTimeout(timer);
 }
 
+export async function startTestMediaWorker(target, env, { signal } = {}) {
+  const owned = readDisposableWorkspace(target.workspace);
+  const options = { cwd: owned.workspace, env, signal };
+  await runTestCommand("npm", ["run", "media:setup"], options);
+  await runTestCommand("npm", ["run", "media:check"], options);
+  const fd = openSync(join(owned.workspace, ".wyp-media-worker.log"), "a", 0o600);
+  const worker = spawn(process.execPath, [join(owned.workspace, "scripts/local-media-worker.mjs"), "worker"],
+    { cwd: owned.workspace, env: applicationEnvironment(env), stdio: ["ignore", "pipe", fd] });
+  closeSync(fd);
+  const abort = () => worker.kill("SIGTERM");
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    await new Promise((done, fail) => {
+      let output = "";
+      const timer = setTimeout(() => fail(new Error("The disposable media validator did not become ready.")), 30_000);
+      const cleanup = () => { clearTimeout(timer); worker.stdout.off("data", ready); worker.off("error", error); worker.off("exit", exited); };
+      const error = () => { cleanup(); fail(new Error("Could not start the disposable media validator.")); };
+      const exited = () => { cleanup(); fail(new Error("The disposable media validator exited before readiness.")); };
+      const ready = (chunk) => {
+        output = (output + chunk).slice(-4096);
+        if (output.includes("[media] Validator ready")) { cleanup(); done(); }
+      };
+      worker.stdout.on("data", ready); worker.once("error", error); worker.once("exit", exited);
+    });
+    worker.stdout.resume();
+    return worker;
+  } catch (error) { await stopTestApp(worker); throw error; }
+  finally { signal?.removeEventListener("abort", abort); }
+}
+
+function assertMediaWorkerRunning(worker) {
+  if (worker && typeof worker === "object" && (worker.exitCode !== null || worker.signalCode !== null))
+    throw new Error("The disposable media validator stopped unexpectedly.");
+}
+
 /** The upgrade check is a required phase before resetting the disposable database. */
 export async function runVerificationPipeline(target, {
   run = runTestCommand, environment = readTestEnvironment, cli = runCli,
-  startApp = startTestApp, stopApp = stopTestApp, signal,
+  startApp = startTestApp, stopApp = stopTestApp,
+  startWorker = startTestMediaWorker, stopWorker = stopTestApp, signal,
 } = {}) {
   const owned = readDisposableWorkspace(target.workspace);
   const env = await environment(owned);
@@ -241,17 +280,27 @@ export async function runVerificationPipeline(target, {
   await run(process.execPath, ["--test", "tests/scripts/*.test.mjs"], options);
   console.log("[verify] Checking preservation of milestone-three accounts and sessions.");
   await run(process.execPath, ["tests/migrations/milestone-4-preservation.test.mjs"], options);
+  console.log("[verify] Checking preservation of milestone-four creator drafts, reviews and published sessions.");
+  await run(process.execPath, ["tests/migrations/milestone-5-preservation.test.mjs"], options);
   // The upgrade script applies the pending migrations in this owned workspace.
   await cli(owned, ["db", "reset", "--yes"], { signal });
-  for (const script of ["db:seed:check", "db:types:check", "test", "test:db", "test:integration", "typecheck", "build"]) {
-    console.log(`[verify] ${script}`);
-    await run("npm", ["run", script], { cwd: owned.workspace, signal, env: script === "build" ? applicationEnvironment(env) : env });
-  }
-  let app;
+  await run(process.execPath, ["scripts/generate-video-fixtures.mjs"], options);
+  let app, worker;
   try {
+    worker = await startWorker(owned, env, { signal });
+    for (const script of ["db:seed:check", "db:types:check", "test", "test:db", "test:integration", "typecheck", "build"]) {
+      assertMediaWorkerRunning(worker);
+      console.log(`[verify] ${script}`);
+      await run("npm", ["run", script], { cwd: owned.workspace, signal, env: script === "build" ? applicationEnvironment(env) : env });
+    }
+    assertMediaWorkerRunning(worker);
     app = await startApp(owned, env, { signal });
     await run("npm", ["run", "test:http"], options);
-  } finally { await stopApp(app); }
+    assertMediaWorkerRunning(worker);
+  } finally {
+    try { if (app) await stopApp(app); }
+    finally { if (worker) await stopWorker(worker); }
+  }
 }
 
 export async function runFullVerification(source = sourceDefault, { keep = false, signal } = {}) {
@@ -274,12 +323,13 @@ export async function runFullVerification(source = sourceDefault, { keep = false
       if (started) { await stopTestStack(target); stopped = true; }
       if (stopped) {
         if (!succeeded) {
-          const log = join(target.workspace, ".wyp-server.log");
-          if (existsSync(log)) {
-            const evidence = join(target.sourceRoot, "test-results", `milestone-4-${target.runId}`);
+          for (const name of [".wyp-server.log", ".wyp-media-worker.log"]) {
+            const log = join(target.workspace, name);
+            if (!existsSync(log)) continue;
+            const evidence = join(target.sourceRoot, "test-results", `milestone-5-${target.runId}`);
             mkdirSync(evidence, { recursive: true });
-            // The app receives no administrator credentials. Keep bounded server diagnostics only.
-            writeFileSync(join(evidence, "server.log"), readFileSync(log, "utf8").slice(-100_000), { mode: 0o600 });
+            // These services must redact credentials; preserve only bounded diagnostics.
+            writeFileSync(join(evidence, name.slice(1)), readFileSync(log, "utf8").slice(-100_000), { mode: 0o600 });
           }
         }
         cleanupTestWorkspace(target);

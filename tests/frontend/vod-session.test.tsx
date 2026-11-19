@@ -160,7 +160,7 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
     expect(instance.bounds.endSeconds).toBe(setup.endSeconds);
     expect(screen.getByRole("link", { name: /Source: TenZ/ })).toHaveAttribute(
       "href",
-      challenge.source!.url,
+      challenge.source?.kind === "youtube" ? challenge.source.url : undefined,
     );
     await user.click(screen.getByRole("button", { name: "Play setup" }));
     await act(async () => {

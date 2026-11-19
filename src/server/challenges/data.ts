@@ -3,7 +3,7 @@ import type {
   AIAnalysis,
   Assessment,
   ChallengeDetail,
-  ChallengeSource,
+  YouTubeChallengeSource,
   ObservedAction,
   YouTubeSegment,
 } from "@/contracts/challenge";
@@ -13,7 +13,7 @@ export type AuthoredChallenge = Omit<
   "options" | "source" | "setup" | "decision"
 > & {
   question: string;
-  source: ChallengeSource;
+  source: YouTubeChallengeSource;
   knownFacts: string[];
   unknowns: string[];
   setup: YouTubeSegment;

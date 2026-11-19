@@ -66,6 +66,8 @@ export function creatorSummary(s = creatorSnapshot()): CreatorScenarioSummary {
 }
 export function creatorPreview(s = creatorSnapshot()): CreatorReviewPreview {
   const c = s.draft.content;
+  if (c.source.kind === "uploaded")
+    throw new Error("creatorPreview expects a YouTube fixture source");
   const videoId = "_yPrykaB2nE";
   const challenge: ChallengeDetail = {
     id: s.id,

@@ -74,6 +74,8 @@ describe("creator command boundaries", () => {
   it("saves incomplete valid content while normalizing source aliases", () => {
     const content = validCreatorContent();
     content.title = "";
+    if (content.source.kind === "uploaded")
+      throw new Error("Expected the YouTube fixture.");
     content.source.url = "https://youtu.be/_yPrykaB2nE?t=90";
     const result = v.parseSaveDraft({
       requestId,
@@ -81,6 +83,8 @@ describe("creator command boundaries", () => {
       content,
     });
     expect(result.content.title).toBe("");
+    if (result.content.source.kind === "uploaded")
+      throw new Error("Parsing changed the source kind.");
     expect(result.content.source.url).toBe(
       "https://www.youtube.com/watch?v=_yPrykaB2nE",
     );

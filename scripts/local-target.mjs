@@ -112,5 +112,5 @@ export function readLocalProject(rootPath) {
 /** Do not allow an inherited provider environment to retarget CLI or application commands. */
 export function cleanChildEnvironment(env = process.env) {
   return Object.fromEntries(Object.entries(env).filter(([key]) =>
-    !/^(SUPABASE_|WYP_TEST_|NEXT_PUBLIC_SUPABASE_|NEXT_PUBLIC_APP_URL$|DATABASE_URL$|PGHOST$|PGPORT$|PGDATABASE$|PGUSER$|PGPASSWORD$)/.test(key)));
+    !/^(SUPABASE_|WYP_TEST_|WYP_MEDIA_|NEXT_PUBLIC_SUPABASE_|NEXT_PUBLIC_APP_URL$|DATABASE_URL$|PGHOST$|PGPORT$|PGDATABASE$|PGUSER$|PGPASSWORD$)/.test(key)));
 }

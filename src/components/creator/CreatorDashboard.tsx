@@ -131,17 +131,22 @@ export function CreatorDashboard({
             scenario.
           </p>
         </div>
-        <button
-          className="button button-primary"
-          disabled={creating}
-          onClick={() => void createDraft()}
-        >
-          {creating
-            ? "Creating…"
-            : createError
-              ? "Retry creating draft"
-              : "New scenario →"}
-        </button>
+        <div className="creator-save-actions">
+          <Link href="/creator/videos" className="button button-secondary">
+            Your videos
+          </Link>
+          <button
+            className="button button-primary"
+            disabled={creating}
+            onClick={() => void createDraft()}
+          >
+            {creating
+              ? "Creating…"
+              : createError
+                ? "Retry creating draft"
+                : "New scenario →"}
+          </button>
+        </div>
       </div>
       {createError && (
         <p role="alert" className="field-error">
@@ -192,7 +197,7 @@ export function CreatorDashboard({
               : "No scenarios in this view yet."}
           </h2>
           <p>
-            Save a YouTube moment privately, add your reasoning, and review it
+            Save a video moment privately, add your reasoning, and review it
             before learners see it.
           </p>
         </section>

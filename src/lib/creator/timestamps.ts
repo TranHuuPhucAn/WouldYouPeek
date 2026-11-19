@@ -23,8 +23,9 @@ export function parseTimestampInput(text: string): TimestampResult {
 }
 export function formatTimestampInput(seconds: number | null): string {
   if (seconds === null) return "";
-  const whole = Math.floor(seconds);
-  const fraction = String(Math.round((seconds - whole) * 1000))
+  const milliseconds = Math.round(seconds * 1000);
+  const whole = Math.floor(milliseconds / 1000);
+  const fraction = String(milliseconds % 1000)
     .padStart(3, "0")
     .replace(/0+$/, "");
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}${fraction ? `.${fraction}` : ""}`;

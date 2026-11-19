@@ -37,8 +37,12 @@ describe("creator draft and publication content", () => {
     const source = structuredClone(vectors.validContent) as CreatorDraftContent;
     source.title = "  A decision  ";
     source.unknowns = [" ", " missing comms "];
+    if (source.source.kind === "uploaded")
+      throw new Error("Expected the YouTube fixture.");
     source.source.url = "https://youtu.be/_yPrykaB2nE?t=10";
     const normalized = normalizeDraftContent(source);
+    if (normalized.source.kind === "uploaded")
+      throw new Error("Normalization changed the source kind.");
     expect(normalized.title).toBe("A decision");
     expect(normalized.unknowns).toEqual(["missing comms"]);
     expect(normalized.source.url).toBe(

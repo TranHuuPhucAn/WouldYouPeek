@@ -2,11 +2,18 @@
 
 import { useState } from "react";
 import type { MediaAsset } from "@/contracts/challenge";
+import type { PlaybackContext } from "@/contracts/video";
+import { UploadedScenarioPlayer } from "./UploadedScenarioPlayer";
 import { YouTubeScenarioPlayer } from "./YouTubeScenarioPlayer";
 
-type Props = { media: MediaAsset; label: string; onComplete?: () => void };
+type Props = {
+  media: MediaAsset;
+  label: string;
+  onComplete?: () => void;
+  context?: PlaybackContext;
+};
 
-export function ScenarioMedia({ media, label, onComplete }: Props) {
+export function ScenarioMedia({ media, label, onComplete, context }: Props) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   function handleMediaError() {
@@ -24,6 +31,20 @@ export function ScenarioMedia({ media, label, onComplete }: Props) {
         mode="setup"
         onComplete={onComplete}
       />
+    );
+
+  if (media.kind === "uploaded-video")
+    return context ? (
+      <UploadedScenarioPlayer
+        setup={media}
+        mode="setup"
+        context={context}
+        onComplete={onComplete}
+      />
+    ) : (
+      <p role="alert">
+        This recording is unavailable. Reload this page to try again.
+      </p>
     );
 
   return (
