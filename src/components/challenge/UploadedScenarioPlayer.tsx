@@ -9,6 +9,7 @@ import {
   validateSegment,
   type PlaybackMode,
 } from "@/lib/video/segment-controller";
+import type { ScenarioPlaybackEvent } from "@/lib/video/playback-events";
 
 type Props = {
   setup: UploadedVideoSegment;
@@ -16,6 +17,10 @@ type Props = {
   mode: PlaybackMode;
   context: PlaybackContext;
   onComplete?: () => void;
+  playbackKey?: string;
+  onPlaybackEvent?: (event: ScenarioPlaybackEvent) => void;
+  autoplay?: boolean;
+  hideCaption?: boolean;
 };
 export function UploadedScenarioPlayer({
   setup,
@@ -23,24 +28,75 @@ export function UploadedScenarioPlayer({
   mode,
   context,
   onComplete,
+  playbackKey = "legacy",
+  onPlaybackEvent,
+  autoplay,
+  hideCaption = false,
 }: Props) {
+  const segment = mode === "reveal" ? reveal : setup;
+  const activationKey = JSON.stringify([
+    playbackKey,
+    mode,
+    setup.assetId,
+    segment?.startSeconds,
+    segment?.endSeconds,
+  ]);
   const element = useRef<HTMLVideoElement>(null);
-  const setVideoElement = useCallback((video: HTMLVideoElement | null) => {
-    if (element.current && element.current !== video) element.current.pause();
-    element.current = video;
-  }, []);
-  const current = useRef({ setup, reveal, mode, onComplete });
-  current.current = { setup, reveal, mode, onComplete };
-  const [positioned, setPositioned] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null);
-  const [volume, setVolume] = useState(1);
-  const running = useRef({ finished: false, positioned: false });
-  const priorRange = useRef("");
+  const current = useRef({
+    setup,
+    reveal,
+    mode,
+    onComplete,
+    playbackKey,
+    onPlaybackEvent,
+    autoplay,
+    activationKey,
+  });
+  current.current = {
+    setup,
+    reveal,
+    mode,
+    onComplete,
+    playbackKey,
+    onPlaybackEvent,
+    autoplay,
+    activationKey,
+  };
+  const running = useRef({
+    key: "",
+    finished: false,
+    positioned: false,
+    started: false,
+  });
+  const generation = useRef(0);
+  const [positioned, setPositioned] = useState(false),
+    [playing, setPlaying] = useState(false),
+    [finished, setFinished] = useState(false),
+    [mediaError, setMediaError] = useState<string | null>(null),
+    [volume, setVolume] = useState(1);
   const desired = useRef({ time: setup.startSeconds, play: false });
   const recovering = useRef(false);
-  const segment = mode === "reveal" ? reveal : setup;
+  const priorIntent = useRef(autoplay);
+  const setVideoElement = useCallback((video: HTMLVideoElement | null) => {
+    if (element.current === video) return;
+    element.current?.pause();
+    generation.current++;
+    running.current.positioned = false;
+    running.current.started = false;
+    element.current = video;
+    setPositioned(false);
+  }, []);
+  function isActive() {
+    return running.current.key === current.current.activationKey;
+  }
+  function emit(type: ScenarioPlaybackEvent["type"]) {
+    if (isActive())
+      current.current.onPlaybackEvent?.({
+        playbackKey: current.current.playbackKey,
+        mode: current.current.mode,
+        type,
+      });
+  }
   const valid =
     !!segment && validateSegment(segment) && segment.assetId === setup.assetId;
   const access = useUploadedPlayback(
@@ -48,16 +104,17 @@ export function UploadedScenarioPlayer({
     valid ? setup.assetId : null,
     () => {
       const video = element.current;
-      if (video && running.current.positioned) {
+      if (video && isActive() && running.current.positioned)
         desired.current = {
-          time: video.currentTime,
+          time: safeTime(video.currentTime),
           play:
             !video.paused &&
             current.current.mode !== "decision" &&
             !running.current.finished,
         };
-      }
+      generation.current++;
       running.current.positioned = false;
+      running.current.started = false;
       setPositioned(false);
       if (video) {
         video.pause();
@@ -65,7 +122,17 @@ export function UploadedScenarioPlayer({
       }
     },
   );
-
+  const sourceKey = `${activationKey}:${access.access?.url ?? ""}`;
+  const currentSource = useRef(sourceKey);
+  currentSource.current = sourceKey;
+  function acceptsEvent(video: HTMLVideoElement) {
+    return (
+      sourceKey === currentSource.current &&
+      element.current === video &&
+      isActive() &&
+      (!video.currentSrc || video.currentSrc === access.access?.url)
+    );
+  }
   function bounds() {
     return current.current.mode === "reveal"
       ? current.current.reveal
@@ -82,12 +149,30 @@ export function UploadedScenarioPlayer({
           Math.min(last, Number.isFinite(time) ? time : active.startSeconds),
         );
   }
+  async function playPositioned(video: HTMLVideoElement) {
+    const token = generation.current,
+      key = current.current.activationKey;
+    try {
+      await video.play();
+    } catch {
+      if (
+        token === generation.current &&
+        key === current.current.activationKey &&
+        video === element.current
+      ) {
+        setPlaying(false);
+        desired.current.play = false;
+        emit("blocked");
+      }
+    }
+  }
   async function play() {
     const video = element.current,
       active = bounds();
     if (
       !video ||
       !active ||
+      !isActive() ||
       current.current.mode === "decision" ||
       access.invalid ||
       access.error ||
@@ -96,17 +181,15 @@ export function UploadedScenarioPlayer({
       return;
     if (running.current.finished) {
       running.current.finished = false;
+      running.current.started = false;
       setFinished(false);
       desired.current = { time: active.startSeconds, play: true };
       positionVideo();
       return;
     }
     if (!running.current.positioned) return;
-    try {
-      await video.play();
-    } catch {
-      setPlaying(false);
-    }
+    desired.current.play = true;
+    await playPositioned(video);
   }
   function pause() {
     element.current?.pause();
@@ -115,7 +198,7 @@ export function UploadedScenarioPlayer({
   }
   function exposePosition() {
     const video = element.current;
-    if (!video) return;
+    if (!video || !isActive() || video.readyState < 1) return;
     const target = safeTime(desired.current.time);
     if (Math.abs(video.currentTime - target) > 0.2) {
       video.currentTime = target;
@@ -128,12 +211,12 @@ export function UploadedScenarioPlayer({
       video.pause();
       setPlaying(false);
     } else if (desired.current.play && !document.hidden)
-      void video.play().catch(() => setPlaying(false));
+      void playPositioned(video);
     recovering.current = false;
   }
   function positionVideo() {
     const video = element.current;
-    if (!video || video.readyState < 1 || !bounds()) return;
+    if (!video || video.readyState < 1 || !bounds() || !isActive()) return;
     video.pause();
     video.style.visibility = "hidden";
     running.current.positioned = false;
@@ -146,23 +229,34 @@ export function UploadedScenarioPlayer({
   function completeSegment() {
     const video = element.current,
       active = bounds();
-    if (!video || !active || running.current.finished) return;
+    if (
+      !video ||
+      !active ||
+      !isActive() ||
+      !running.current.positioned ||
+      running.current.finished ||
+      current.current.mode === "decision" ||
+      video.currentTime < active.endSeconds - PAUSE_MARGIN_SECONDS
+    )
+      return;
     running.current.finished = true;
     setFinished(true);
     video.pause();
     setPlaying(false);
     desired.current.play = false;
+    const completedMode = current.current.mode;
+    emit("complete");
     const safeEnd = active.endSeconds - PAUSE_MARGIN_SECONDS;
     if (video.currentTime > safeEnd) {
       desired.current.time = safeEnd;
       positionVideo();
     }
-    if (current.current.mode === "setup") current.current.onComplete?.();
+    if (completedMode === "setup") current.current.onComplete?.();
   }
   function checkPosition() {
     const video = element.current,
       active = bounds();
-    if (!video || !active || !running.current.positioned) return;
+    if (!video || !active || !isActive() || !running.current.positioned) return;
     const instruction = getPlaybackInstruction({
       mode: current.current.mode,
       segment: active,
@@ -185,29 +279,34 @@ export function UploadedScenarioPlayer({
     }
   }
   useEffect(() => {
-    const next = `${setup.assetId}:${segment?.startSeconds}:${segment?.endSeconds}:${mode}`;
-    if (priorRange.current === next) return;
-    const prior = priorRange.current;
-    priorRange.current = next;
-    running.current.finished = mode === "decision";
+    if (running.current.key === activationKey) return;
+    const prior = running.current.key;
+    generation.current++;
+    running.current = {
+      key: activationKey,
+      finished: mode === "decision",
+      positioned: false,
+      started: false,
+    };
     setFinished(mode === "decision");
     setMediaError(null);
+    setPositioned(false);
+    recovering.current = false;
     desired.current = {
       time:
         mode === "decision"
           ? setup.endSeconds - PAUSE_MARGIN_SECONDS
           : (segment?.startSeconds ?? 0),
-      play: mode !== "decision" && (mode !== "setup" || !!prior),
+      play:
+        mode !== "decision" &&
+        (current.current.autoplay ?? (mode !== "setup" || !!prior)),
     };
     positionVideo();
-  }, [
-    mode,
-    setup.assetId,
-    setup.startSeconds,
-    setup.endSeconds,
-    segment?.startSeconds,
-    segment?.endSeconds,
-  ]);
+  }, [activationKey, mode, setup.endSeconds, segment?.startSeconds]);
+  useEffect(() => {
+    if (priorIntent.current === true && autoplay === false) pause();
+    priorIntent.current = autoplay;
+  }, [autoplay]);
   useEffect(() => {
     const timer = setInterval(checkPosition, 50);
     const hide = () => {
@@ -215,21 +314,35 @@ export function UploadedScenarioPlayer({
     };
     document.addEventListener("visibilitychange", hide);
     return () => {
+      generation.current++;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", hide);
       element.current?.pause();
     };
   }, []);
   useEffect(() => {
-    if (access.error || access.invalid || mediaError) pause();
+    if (access.error || access.invalid || mediaError) {
+      pause();
+      emit("error");
+    }
   }, [access.error, access.invalid, mediaError]);
   function mediaFailed() {
     pause();
+    running.current.positioned = false;
+    running.current.started = false;
     setPositioned(false);
     if (element.current) element.current.style.visibility = "hidden";
     if (!recovering.current && !access.invalid) {
       recovering.current = true;
-      void access.refresh().then(() => element.current?.load());
+      const token = ++generation.current,
+        key = current.current.activationKey;
+      void access.refresh().then(() => {
+        if (
+          token === generation.current &&
+          key === current.current.activationKey
+        )
+          element.current?.load();
+      });
     } else
       setMediaError(
         "The recording could not play. Check your connection and retry playback.",
@@ -268,16 +381,19 @@ export function UploadedScenarioPlayer({
             preload="auto"
             aria-label={segment?.alt ?? setup.alt}
             style={{ visibility: positioned && !error ? "visible" : "hidden" }}
-            onLoadedMetadata={() => {
-              if (element.current) element.current.volume = volume;
+            onLoadedMetadata={(event) => {
+              if (!acceptsEvent(event.currentTarget)) return;
+              event.currentTarget.volume = volume;
               positionVideo();
             }}
-            onSeeked={exposePosition}
-            onSeeking={() => {
-              const video = element.current;
-              if (!video) return;
+            onSeeked={(event) => {
+              if (acceptsEvent(event.currentTarget)) exposePosition();
+            }}
+            onSeeking={(event) => {
+              const video = event.currentTarget;
+              if (!acceptsEvent(video)) return;
               video.style.visibility = "hidden";
-              if (running.current.positioned) {
+              if (running.current.positioned)
                 desired.current = {
                   time: safeTime(video.currentTime),
                   play:
@@ -285,14 +401,23 @@ export function UploadedScenarioPlayer({
                     current.current.mode !== "decision" &&
                     !running.current.finished,
                 };
-              }
               running.current.positioned = false;
               setPositioned(false);
             }}
-            onTimeUpdate={checkPosition}
-            onEnded={completeSegment}
-            onError={mediaFailed}
-            onPlay={() => {
+            onTimeUpdate={(event) => {
+              if (acceptsEvent(event.currentTarget)) checkPosition();
+            }}
+            onEnded={(event) => {
+              if (acceptsEvent(event.currentTarget)) completeSegment();
+            }}
+            onError={(event) => {
+              if (acceptsEvent(event.currentTarget)) mediaFailed();
+            }}
+            onPlay={(event) => {
+              if (!acceptsEvent(event.currentTarget)) {
+                event.currentTarget.pause();
+                return;
+              }
               if (
                 current.current.mode === "decision" ||
                 document.hidden ||
@@ -300,9 +425,17 @@ export function UploadedScenarioPlayer({
                 running.current.finished
               )
                 pause();
-              else setPlaying(true);
+              else {
+                setPlaying(true);
+                if (!running.current.started) {
+                  running.current.started = true;
+                  emit("started");
+                }
+              }
             }}
-            onPause={() => setPlaying(false)}
+            onPause={(event) => {
+              if (acceptsEvent(event.currentTarget)) setPlaying(false);
+            }}
           />
         )}
         {!positioned && !error && (
@@ -321,7 +454,16 @@ export function UploadedScenarioPlayer({
               onClick={() => {
                 setMediaError(null);
                 recovering.current = false;
-                void access.refresh().then(() => element.current?.load());
+                const key = current.current.activationKey,
+                  token = ++generation.current;
+                running.current.started = false;
+                void access.refresh().then(() => {
+                  if (
+                    token === generation.current &&
+                    key === current.current.activationKey
+                  )
+                    element.current?.load();
+                });
               }}
             >
               Retry playback
@@ -364,7 +506,9 @@ export function UploadedScenarioPlayer({
           </label>
         </div>
       )}
-      {segment?.caption && <p className="media-caption">{segment.caption}</p>}
+      {!hideCaption && segment?.caption && (
+        <p className="media-caption">{segment.caption}</p>
+      )}
     </section>
   );
 }

@@ -2968,3 +2968,460 @@ select:focus-visible {
   outline: 3px solid var(--coral);
   outline-offset: 5px;
 }
+
+/* Scenario film room: a stable video-led surface for watch, decide and review. */
+.scenario-player {
+  max-width: 1080px;
+  margin-inline: auto;
+}
+.scenario-heading {
+  padding-bottom: 26px;
+}
+.scenario-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 22px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.scenario-metadata {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+.scenario-heading h1,
+.scenario-heading h2 {
+  font-size: clamp(28px, 4vw, 48px);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+  margin-top: 13px;
+  text-wrap: balance;
+}
+.scenario-heading .playlist-session-context {
+  margin: 13px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.scenario-phases {
+  display: flex;
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+  gap: 36px;
+  align-items: center;
+}
+.scenario-phases li {
+  position: relative;
+  min-width: 100px;
+  padding: 9px 18px;
+  text-align: center;
+  font: 12px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.scenario-phases li:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  right: -26px;
+  top: 8px;
+  color: var(--muted);
+}
+.scenario-phases [aria-current="step"] {
+  background: var(--coral);
+  color: var(--coral-dark);
+  border-color: var(--coral);
+  font-weight: 700;
+}
+.scenario-phases .is-done {
+  color: var(--mint);
+}
+.scenario-player .media-card,
+.saved-scenario-review .media-card {
+  border-color: var(--line);
+  background: var(--panel);
+}
+.scenario-player .media-topline,
+.saved-scenario-review .media-topline {
+  border-color: var(--line);
+  font-size: 11px;
+  padding: 14px 18px;
+}
+.scenario-player .video-controls,
+.scenario-player .media-action,
+.saved-scenario-review .video-controls,
+.saved-scenario-review .media-action {
+  min-height: 78px;
+  padding: 16px 18px;
+}
+.scenario-player .media-caption,
+.saved-scenario-review .media-caption {
+  border-color: var(--line);
+}
+.scenario-context {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+.scenario-situation {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text);
+  max-width: 78ch;
+  white-space: pre-line;
+}
+.scenario-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin: 17px 0 0;
+  gap: 10px;
+  list-style: none;
+}
+.scenario-facts li {
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.scenario-context-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 20px;
+}
+.scenario-context-details summary,
+.debrief-details summary,
+.video-trouble summary {
+  cursor: pointer;
+  padding: 14px 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.scenario-context-details ul,
+.feedback-conditions ul {
+  padding-left: 19px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.scenario-context-details .source-attribution {
+  margin-top: 5px;
+}
+.scenario-watch-note {
+  padding: 35px 0 20px;
+}
+.scenario-watch-note h2,
+.continuation-status h2 {
+  font-size: clamp(22px, 2.5vw, 30px);
+  letter-spacing: -0.035em;
+  margin-top: 12px;
+}
+.scenario-watch-note p,
+.continuation-status p {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.scenario-player .decision-panel {
+  margin-top: 30px;
+}
+.scenario-player .section-heading h2 {
+  font-size: clamp(23px, 3vw, 32px);
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+.scenario-player .option-card {
+  background: var(--panel);
+  padding: 18px 20px;
+  min-height: 64px;
+}
+.scenario-player .option-card.is-selected {
+  background: #28201e;
+  border-width: 2px;
+  padding: 17px 19px;
+}
+.scenario-player .option-label {
+  font-size: 15px;
+}
+.scenario-player .option-number {
+  display: none;
+}
+.scenario-player .radio-mark {
+  order: -1;
+  width: 19px;
+  height: 19px;
+}
+.scenario-player .decision-footer {
+  margin-top: 24px;
+}
+.continuation-status {
+  padding: 28px 0;
+}
+.video-trouble {
+  margin-top: 15px;
+}
+.video-trouble .button,
+.analysis-escape .button {
+  margin-top: 14px;
+}
+.analysis-escape {
+  margin-top: 15px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.decision-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  gap: 26px;
+}
+.decision-comparison > div + div {
+  padding-left: 26px;
+  border-left: 1px solid var(--line);
+}
+.chosen-call {
+  font-size: clamp(17px, 2vw, 22px);
+  line-height: 1.5;
+  margin: 10px 0 14px;
+  letter-spacing: -0.02em;
+}
+.scenario-debrief .assessment {
+  white-space: normal;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.scenario-debrief .assessment.reasonable {
+  color: var(--mint);
+  background: #203024;
+  border-color: #536d57;
+}
+.comparison-label {
+  display: inline-block;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.comparison-note,
+.analysis-credit {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-top: 14px;
+}
+.scenario-debrief .takeaway {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 28px 0 14px;
+}
+.scenario-debrief .takeaway .eyebrow {
+  color: var(--muted);
+}
+.scenario-debrief .takeaway .eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  background: var(--coral);
+  vertical-align: middle;
+  margin-right: 12px;
+}
+.scenario-debrief .takeaway p {
+  font-size: 20px;
+  line-height: 1.55;
+}
+.selected-explanation {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.debrief-details {
+  margin-top: 22px;
+  border: 1px solid var(--line);
+}
+.debrief-details > details + details {
+  border-top: 1px solid var(--line);
+}
+.debrief-details > details > summary {
+  padding: 15px 18px;
+}
+.debrief-details > details > :not(summary) {
+  margin: 0 18px 18px;
+}
+.debrief-details .feedback-conditions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 22px;
+}
+.debrief-details .feedback-conditions :is(h3, h4) {
+  font-size: 13px;
+}
+.debrief-details .outcome-note {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.scenario-review-controls {
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.review-replay-actions,
+.saved-replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.scenario-review-controls > .button-primary {
+  margin-left: auto;
+}
+.review-replay-actions .button[aria-pressed="true"] {
+  border-color: var(--coral);
+}
+.scenario-player .button,
+.saved-scenario-review .button,
+.scenario-player button.text-button,
+.saved-scenario-review button.text-button {
+  min-height: 44px;
+}
+.scenario-recap {
+  max-width: 1080px;
+}
+.scenario-recap .recap-card > summary {
+  min-height: 88px;
+}
+.scenario-recap .debrief-details summary {
+  display: list-item;
+  list-style: disclosure-closed;
+  padding: 15px 18px;
+}
+.scenario-recap .debrief-details details[open] > summary {
+  list-style: disclosure-open;
+}
+.scenario-recap .debrief-details summary::-webkit-details-marker {
+  display: initial;
+}
+.saved-replay-controls {
+  padding-block: 20px;
+}
+.saved-scenario-review .feedback-panel {
+  margin-top: 24px;
+}
+.scenario-recap .recap-detail .chosen-call {
+  font-size: 18px;
+  color: var(--text);
+}
+.scenario-recap .recap-detail .takeaway p {
+  font-size: 18px;
+  color: var(--text);
+}
+.scenario-recap .recap-detail .section-heading h2 {
+  font-size: 25px;
+}
+.creator-preview.scenario-player {
+  max-width: none;
+}
+.creator-preview.scenario-player .scenario-heading {
+  padding-top: 14px;
+}
+@media (max-width: 700px) {
+  .scenario-heading {
+    padding-bottom: 20px;
+  }
+  .scenario-topline {
+    margin-bottom: 20px;
+  }
+  .scenario-phases {
+    gap: 25px;
+    margin-top: 22px;
+  }
+  .scenario-phases li {
+    min-width: 0;
+    flex: 1;
+    padding: 9px 8px;
+    font-size: 10px;
+  }
+  .scenario-phases li:not(:last-child)::after {
+    right: -19px;
+  }
+  .scenario-facts {
+    grid-template-columns: 1fr;
+  }
+  .scenario-context-details {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .scenario-player .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .decision-comparison {
+    grid-template-columns: 1fr;
+    padding: 20px;
+    gap: 20px;
+  }
+  .decision-comparison > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 20px 0 0;
+  }
+  .debrief-details .feedback-conditions {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .scenario-review-controls {
+    align-items: stretch;
+    gap: 18px;
+  }
+  .scenario-review-controls > .button-primary {
+    width: 100%;
+    margin-left: 0;
+  }
+  .review-replay-actions {
+    width: 100%;
+  }
+  .review-replay-actions .button {
+    flex: 1;
+    padding: 12px;
+  }
+  .scenario-recap .recap-card > summary {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 18px;
+  }
+  .scenario-recap .recap-title {
+    min-width: 65%;
+  }
+  .scenario-recap .recap-detail {
+    padding-inline: 16px;
+  }
+  .scenario-recap .feedback-option > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scenario-player *,
+  .scenario-recap * {
+    scroll-behavior: auto;
+    transition: none;
+    animation: none;
+  }
+}

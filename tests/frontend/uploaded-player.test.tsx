@@ -186,3 +186,166 @@ describe("bounded native recording playback", () => {
     expect(screen.queryByLabelText("Player setup")).not.toBeInTheDocument();
   });
 });
+
+it("emits active-range events only after positioning and preserves them across metadata renders", async () => {
+  const events = vi.fn();
+  const view = render(
+    <UploadedScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="reveal"
+      context={{ ...context, phase: "reveal" }}
+      playbackKey="answer:reveal"
+      onPlaybackEvent={events}
+      autoplay
+    />,
+  );
+  const video = screen.getByLabelText(
+    "Player continuation",
+  ) as HTMLVideoElement;
+  video.currentTime = 30;
+  fireEvent.ended(video);
+  expect(events).not.toHaveBeenCalled();
+  ready();
+  await act(async () => {});
+  expect(events).toHaveBeenCalledWith({
+    playbackKey: "answer:reveal",
+    mode: "reveal",
+    type: "started",
+  });
+  video.currentTime = 22;
+  view.rerender(
+    <UploadedScenarioPlayer
+      setup={setup}
+      reveal={{ ...reveal, caption: "Visible analysis" }}
+      mode="reveal"
+      context={{ ...context, phase: "reveal" }}
+      playbackKey="answer:reveal"
+      onPlaybackEvent={events}
+      autoplay
+    />,
+  );
+  expect(video.currentTime).toBe(22);
+  fireEvent.ended(video);
+  expect(events.mock.calls.filter(([e]) => e.type === "complete")).toHaveLength(
+    0,
+  );
+  video.currentTime = 29.8;
+  fireEvent.timeUpdate(video);
+  fireEvent.seeked(video);
+  fireEvent.ended(video);
+  expect(events.mock.calls.filter(([e]) => e.type === "complete")).toHaveLength(
+    1,
+  );
+});
+it("cues reopened review, allows manual play, and rejects a stale play rejection after a new mode", async () => {
+  let reject!: (reason: Error) => void;
+  const events = vi.fn();
+  const view = render(
+    <UploadedScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="reveal"
+      context={{ ...context, phase: "reveal" }}
+      playbackKey="saved:reveal"
+      onPlaybackEvent={events}
+      autoplay={false}
+    />,
+  );
+  const video = ready();
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, failure) => {
+        reject = failure;
+      }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  view.rerender(
+    <UploadedScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="review-setup"
+      context={context}
+      playbackKey="saved:setup"
+      onPlaybackEvent={events}
+      autoplay={false}
+    />,
+  );
+  fireEvent.seeked(video);
+  await act(async () => reject(new Error("old blocked request")));
+  expect(events.mock.calls.filter(([e]) => e.type === "blocked")).toHaveLength(
+    0,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  await act(async () => {});
+  expect(events).toHaveBeenCalledWith({
+    playbackKey: "saved:setup",
+    mode: "review-setup",
+    type: "started",
+  });
+});
+it("preserves safe position during URL renewal and emits started again after a recovered source", async () => {
+  const events = vi.fn();
+  const props = {
+    setup,
+    reveal,
+    mode: "reveal" as const,
+    context: { ...context, phase: "reveal" as const },
+    playbackKey: "saved",
+    onPlaybackEvent: events,
+    autoplay: true,
+  };
+  const view = render(<UploadedScenarioPlayer {...props} />);
+  const video = ready();
+  await act(async () => {});
+  video.currentTime = 24;
+  const beforeReplace = vi.mocked(useUploadedPlayback).mock.calls.at(-1)![2]!;
+  act(() => beforeReplace());
+  access = {
+    ...access,
+    access: { ...access.access!, url: "http://localhost/signed-new" },
+  };
+  view.rerender(<UploadedScenarioPlayer {...props} />);
+  video.currentTime = 0;
+  fireEvent.loadedMetadata(video);
+  fireEvent.seeked(video);
+  await act(async () => {});
+  expect(video.currentTime).toBe(24);
+  expect(events.mock.calls.filter(([e]) => e.type === "started")).toHaveLength(
+    2,
+  );
+  expect(events.mock.calls.filter(([e]) => e.type === "complete")).toHaveLength(
+    0,
+  );
+});
+it("reports a current blocked play and pauses the continuation when saved analysis is explicitly read", async () => {
+  const events = vi.fn();
+  vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(
+    new Error("Autoplay blocked"),
+  );
+  const props = {
+    setup,
+    reveal,
+    mode: "reveal" as const,
+    context: { ...context, phase: "reveal" as const },
+    playbackKey: "active",
+    onPlaybackEvent: events,
+  };
+  const view = render(<UploadedScenarioPlayer {...props} autoplay />);
+  const video = ready();
+  await act(async () => {});
+  expect(events).toHaveBeenCalledWith({
+    playbackKey: "active",
+    mode: "reveal",
+    type: "blocked",
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  await act(async () => {});
+  expect(video.paused).toBe(false);
+  view.rerender(<UploadedScenarioPlayer {...props} autoplay={false} />);
+  expect(video.paused).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  await act(async () => {});
+  expect(video.paused).toBe(false);
+});

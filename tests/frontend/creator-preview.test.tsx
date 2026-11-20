@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ScenarioPreview } from "@/components/creator/ScenarioPreview";
@@ -6,17 +7,29 @@ vi.mock("@/components/challenge/YouTubeScenarioPlayer", () => ({
   YouTubeScenarioPlayer: ({
     mode,
     onComplete,
-  }: {
-    mode: string;
-    onComplete: () => void;
-  }) => (
+    playbackKey,
+    onPlaybackEvent,
+  }: ComponentProps<
+    typeof import("@/components/challenge/YouTubeScenarioPlayer").YouTubeScenarioPlayer
+  >) => (
     <div data-testid="preview-player" data-mode={mode}>
       <button onClick={onComplete}>Reach decision</button>
+      <button
+        onClick={() =>
+          onPlaybackEvent?.({
+            playbackKey: playbackKey!,
+            mode,
+            type: "complete",
+          })
+        }
+      >
+        Finish continuation
+      </button>
     </div>
   ),
 }));
 describe("saved owner preview", () => {
-  it("commits locally, immediately shows analysis below continuation, and makes no learner API call", () => {
+  it("commits locally, waits for continuation before analysis, and makes no learner API call", () => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);
     const p = creatorPreview();
@@ -38,8 +51,15 @@ describe("saved owner preview", () => {
       "reveal",
     );
     expect(
-      screen.getByText("Different choice from the pro"),
+      screen.queryByRole("region", { name: "Answer feedback" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Finish continuation" }),
+    );
+    expect(
+      screen.getByText(/Different choice from the pro/),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Deeper reasoning & limitations"));
     expect(
       screen.getByRole("region", { name: "Creator analysis" }),
     ).toBeInTheDocument();
@@ -58,14 +78,17 @@ describe("saved owner preview", () => {
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: /Lock in/ }));
-    expect(screen.getByText("Same choice as the pro")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Finish continuation" }),
+    );
+    expect(screen.getByText(/Same choice as the pro/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Try another choice/ }));
     expect(screen.getByTestId("preview-player")).toHaveAttribute(
       "data-mode",
       "setup",
     );
     expect(
-      screen.queryByText("Same choice as the pro"),
+      screen.queryByText(/Same choice as the pro/),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reach decision" }));
     expect(

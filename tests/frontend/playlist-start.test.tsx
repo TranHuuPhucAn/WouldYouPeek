@@ -185,12 +185,16 @@ describe("preview-bound playlist starts", () => {
   it("renders twenty recap positions and original public credit", () => {
     const saved = snapshot("completed");
     const completed = Array.from({ length: 20 }, (_, index) => ({
+      ...saved.items[index % 3],
+      id: `saved-item-${index}`,
+      position: index,
       challenge: { ...saved.items[index % 3].challenge, id: `recap-${index}` },
-      answer: saved.items[index % 3].answer!.result,
     }));
     render(
       <SessionRecap
-        completed={completed}
+        items={completed}
+        sessionId={saved.id}
+        viewerId={viewer.id}
         onRestart={vi.fn()}
         title="Saved playlist title"
         playlist={{

@@ -158,6 +158,7 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(instance.bounds.endSeconds).toBe(setup.endSeconds);
+    await user.click(screen.getByText("Source & attribution"));
     expect(screen.getByRole("link", { name: /Source: TenZ/ })).toHaveAttribute(
       "href",
       challenge.source?.kind === "youtube" ? challenge.source.url : undefined,
@@ -189,24 +190,33 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
     }
 
     await user.click(screen.getByRole("button", { name: /Lock in your call/ }));
-    const feedback = await screen.findByRole("region", {
-      name: "Answer feedback",
-    });
     await waitFor(() =>
       expect(instance.bounds.startSeconds).toBe(setup.endSeconds),
     );
+    expect(
+      screen.queryByRole("region", { name: "Answer feedback" }),
+    ).not.toBeInTheDocument();
+    await act(async () => {
+      instance.time = instance.bounds.endSeconds - 0.25;
+      instance.events.onStateChange({ target: instance.player, data: 1 });
+    });
+    const feedback = await screen.findByRole("region", {
+      name: "Answer feedback",
+    });
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(
-      within(feedback).getByRole("heading", {
-        name:
-          index === 0
-            ? "Different choice from the pro"
-            : "Same choice as the pro",
-      }),
+      within(feedback).getByText(
+        index === 0
+          ? /Different choice from the pro/
+          : /Same choice as the pro/,
+      ),
     ).toBeVisible();
     expect(
-      feedback.querySelector(".section-heading .assessment"),
+      feedback.querySelector(".decision-comparison .assessment"),
     ).toHaveTextContent(index === 1 ? "Risky" : "Defensible");
+    await user.click(
+      within(feedback).getByText("Deeper reasoning & limitations"),
+    );
     expect(
       within(feedback).getByRole("region", { name: "AI analysis" }),
     ).toBeVisible();
@@ -216,9 +226,11 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Setup" }));
+    await user.click(screen.getByRole("button", { name: "Watch setup" }));
     expect(instance.bounds.endSeconds).toBe(setup.endSeconds);
-    await user.click(screen.getByRole("button", { name: "Outcome" }));
+    await user.click(
+      screen.getByRole("button", { name: "Watch continuation" }),
+    );
     expect(instance.bounds.startSeconds).toBe(setup.endSeconds);
     expect(provider.instances).toHaveLength(index + 1);
     await user.click(
@@ -233,6 +245,9 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
   expect(document.querySelectorAll("details.recap-card")).toHaveLength(3);
   const firstRecap = screen.getByText(catalogue[0].title).closest("details")!;
   await user.click(within(firstRecap).getByText(catalogue[0].title));
+  await user.click(
+    within(firstRecap).getByText("Deeper reasoning & limitations"),
+  );
   expect(
     within(firstRecap).getByText("AI ANALYSIS · INTERPRETATION"),
   ).toBeVisible();

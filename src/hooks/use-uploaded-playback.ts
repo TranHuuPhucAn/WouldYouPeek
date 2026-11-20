@@ -11,7 +11,15 @@ export function useUploadedPlayback(
   assetId: string | null,
   beforeReplace?: () => void,
 ) {
-  const [access, setAccess] = useState<PlaybackAccess | null>(null);
+  const contextKey = context ? JSON.stringify(context) : "";
+  const capabilityKey = JSON.stringify([contextKey, assetId]);
+  const [capability, setCapability] = useState<{
+    key: string;
+    value: PlaybackAccess;
+  } | null>(null);
+  // A prior item's URL must not paint while its successor is authorizing,
+  // even when both items refer to the same underlying uploaded recording.
+  const access = capability?.key === capabilityKey ? capability.value : null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
@@ -20,7 +28,6 @@ export function useUploadedPlayback(
   replaceRef.current = beforeReplace;
   const accessRef = useRef(access);
   accessRef.current = access;
-  const contextKey = context ? JSON.stringify(context) : "";
   useEffect(() => {
     let active = true;
     let controller: AbortController | null = null;
@@ -29,11 +36,11 @@ export function useUploadedPlayback(
     setInvalid(false);
     setError(null);
     if (!assetId || !contextKey) {
-      setAccess(null);
+      setCapability(null);
       setLoading(false);
       return;
     }
-    if (accessRef.current?.assetId !== assetId) setAccess(null);
+    if (accessRef.current?.assetId !== assetId) setCapability(null);
     async function refresh() {
       if (!active || invalidated || controller) return;
       clearTimeout(timer);
@@ -53,7 +60,7 @@ export function useUploadedPlayback(
             "Playback access expired before it could be used. Retry playback.",
           );
         if (accessRef.current?.url !== next.url) replaceRef.current?.();
-        setAccess(next);
+        setCapability({ key: capabilityKey, value: next });
         timer = setTimeout(
           () => void refresh(),
           Math.max(1000, Date.parse(next.expiresAt) - Date.now() - 15000),
@@ -65,7 +72,7 @@ export function useUploadedPlayback(
           [401, 403].includes(failure.status)
         ) {
           invalidated = true;
-          setAccess(null);
+          setCapability(null);
           setInvalid(true);
           invalidateAccountView();
         }
@@ -85,7 +92,7 @@ export function useUploadedPlayback(
       invalidated = true;
       controller?.abort();
       clearTimeout(timer);
-      setAccess(null);
+      setCapability(null);
       setLoading(false);
       setInvalid(true);
       setError("Your session changed. Sign in again to play this recording.");
@@ -98,7 +105,7 @@ export function useUploadedPlayback(
       clearTimeout(timer);
       window.removeEventListener("wyp:identity-invalidated", invalidate);
     };
-  }, [contextKey, assetId]);
+  }, [contextKey, assetId, capabilityKey]);
   return {
     access,
     loading,

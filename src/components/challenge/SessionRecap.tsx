@@ -1,29 +1,41 @@
+"use client";
+
+import { useState } from "react";
 import type { PlaylistSessionMetadata } from "@/contracts/playlist";
-import { AnalysisNote } from "./AnalysisNote";
+import type { SessionItem } from "@/contracts/session";
 import Link from "next/link";
-import type { CompletedChallenge } from "@/lib/session/session-reducer";
 import { assessmentLabel } from "./FeedbackPanel";
+import { SavedScenarioReview, type SavedReplay } from "./SavedScenarioReview";
 
 export function SessionRecap({
-  completed,
+  items,
+  sessionId,
+  viewerId,
   onRestart,
   pending = false,
   completedAt,
   title,
   playlist,
 }: {
-  completed: CompletedChallenge[];
+  items: SessionItem[];
+  sessionId: string;
+  viewerId: string;
   onRestart: () => void;
   pending?: boolean;
   completedAt?: string | null;
   title?: string;
   playlist?: PlaylistSessionMetadata;
 }) {
-  const hasProScenarios = completed.some(({ answer }) => answer.observedAction);
+  const [replay, setReplay] = useState<SavedReplay | null>(null);
+  const completed = items.filter((item) => item.answer);
+  const hasProScenarios = completed.some(
+    ({ answer }) => answer?.result.observedAction,
+  );
   return (
-    <main className="recap-shell">
+    <main className="recap-shell scenario-recap">
       <span className="eyebrow">
-        <span className="status-dot" /> SESSION COMPLETE
+        <span className="status-dot" />
+        SESSION COMPLETE
       </span>
       <h1>
         {completed.length === 1
@@ -55,91 +67,79 @@ export function SessionRecap({
         </p>
       )}
       <div className="recap-list">
-        {completed.map(({ challenge, answer }, index) => (
-          <details className="recap-card" key={challenge.id}>
-            <summary>
-              <span className="recap-number">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="recap-title">
-                <small>{challenge.topic}</small>
-                {challenge.source && (
-                  <span className="recap-source">
-                    {challenge.source.player} · {challenge.source.map} · Round{" "}
-                    {challenge.source.round}
-                  </span>
-                )}
-                <strong>{challenge.title}</strong>
-                <span>
-                  Your call:{" "}
-                  {
-                    challenge.options.find(
-                      (option) => option.id === answer.selectedOptionId,
-                    )?.label
-                  }
+        {completed.map((item, index) => {
+          const { challenge } = item,
+            answer = item.answer!.result;
+          return (
+            <details
+              className="recap-card"
+              key={item.id}
+              onToggle={(event) => {
+                if (!event.currentTarget.open)
+                  setReplay((active) =>
+                    active?.itemId === item.id ? null : active,
+                  );
+              }}
+            >
+              <summary>
+                <span className="recap-number">
+                  {String(index + 1).padStart(2, "0")}
                 </span>
-                {answer.observedAction &&
-                  typeof answer.matchesPro === "boolean" && (
-                    <span className="recap-comparison">
-                      {answer.matchesPro
-                        ? "Same choice as the pro"
-                        : "Different choice from the pro"}
+                <span className="recap-title">
+                  <small>{challenge.topic}</small>
+                  {challenge.source && (
+                    <span className="recap-source">
+                      {challenge.source.player} · {challenge.source.map} · Round{" "}
+                      {challenge.source.round}
                     </span>
                   )}
-              </span>
-              <span className={`assessment ${answer.selectedAssessment}`}>
-                {assessmentLabel(
-                  answer.selectedAssessment,
-                  !!answer.observedAction,
-                )}
-              </span>
-              <span className="expand-mark" aria-hidden="true">
-                +
-              </span>
-            </summary>
-            <div className="recap-detail">
-              <p className="recap-takeaway">{answer.takeaway}</p>
-              {answer.observedAction && (
-                <p>
-                  <strong>
-                    {challenge.source?.player ?? "The pro"} chose:
-                  </strong>{" "}
-                  {answer.observedAction.description}
-                </p>
-              )}
-              {answer.analysis && <AnalysisNote analysis={answer.analysis} />}
-              {answer.optionFeedback.map((feedback) => (
-                <div key={feedback.optionId}>
-                  <h3>
+                  <strong>{challenge.title}</strong>
+                  <span>
+                    Your call:{" "}
                     {
                       challenge.options.find(
-                        (option) => option.id === feedback.optionId,
+                        (option) => option.id === answer.selectedOptionId,
                       )?.label
-                    }{" "}
-                    <span className={`assessment ${feedback.assessment}`}>
-                      {assessmentLabel(
-                        feedback.assessment,
-                        !!answer.observedAction,
-                      )}
-                    </span>
-                  </h3>
-                  <p>{feedback.explanation}</p>
-                  {feedback.acceptableWhen?.length > 0 && (
-                    <p>
-                      <strong>Defensible when:</strong>{" "}
-                      {feedback.acceptableWhen.join(" ")}
-                    </p>
+                    }
+                  </span>
+                  {answer.observedAction &&
+                    typeof answer.matchesPro === "boolean" && (
+                      <span className="recap-comparison">
+                        {answer.matchesPro
+                          ? "Same choice as the pro"
+                          : "Different choice from the pro"}
+                      </span>
+                    )}
+                </span>
+                <span className={`assessment ${answer.selectedAssessment}`}>
+                  {assessmentLabel(
+                    answer.selectedAssessment,
+                    !!answer.observedAction,
                   )}
-                  {feedback.risks?.length > 0 && (
-                    <p>
-                      <strong>Risks:</strong> {feedback.risks.join(" ")}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </details>
-        ))}
+                </span>
+                <span className="expand-mark" aria-hidden="true">
+                  +
+                </span>
+              </summary>
+              <div className="recap-detail">
+                <SavedScenarioReview
+                  item={item}
+                  sessionId={sessionId}
+                  viewerId={viewerId}
+                  replay={replay?.itemId === item.id ? replay : null}
+                  onReplay={(media) =>
+                    setReplay((previous) => ({
+                      itemId: item.id,
+                      media,
+                      attempt: (previous?.attempt ?? 0) + 1,
+                    }))
+                  }
+                  onClose={() => setReplay(null)}
+                />
+              </div>
+            </details>
+          );
+        })}
       </div>
       <p className="quiet-note">
         {hasProScenarios

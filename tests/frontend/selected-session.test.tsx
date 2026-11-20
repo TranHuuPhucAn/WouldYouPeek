@@ -57,10 +57,9 @@ describe("one-scenario session contracts and presentation", () => {
     const s = selectedSnapshot("completed");
     render(
       <SessionRecap
-        completed={s.items.map((item) => ({
-          challenge: item.challenge,
-          answer: item.answer!.result,
-        }))}
+        items={s.items}
+        sessionId={s.id}
+        viewerId="test-viewer"
         onRestart={vi.fn()}
         title={s.title}
       />,

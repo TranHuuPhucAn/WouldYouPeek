@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ScenarioPreview } from "@/components/creator/ScenarioPreview";
 import { UploadedScenarioPlayer } from "@/components/challenge/UploadedScenarioPlayer";
@@ -74,6 +74,17 @@ it("uses the saved revision's authoring context and reveals only after a choice"
       context: { phase: "reveal" },
       reveal: { assetId: VIDEO_ID },
     },
+  );
+  expect(
+    screen.queryByRole("region", { name: "Answer feedback" }),
+  ).not.toBeInTheDocument();
+  const active = vi.mocked(UploadedScenarioPlayer).mock.calls.at(-1)![0];
+  act(() =>
+    active.onPlaybackEvent?.({
+      playbackKey: active.playbackKey!,
+      mode: "reveal",
+      type: "complete",
+    }),
   );
   expect(
     screen.getByRole("region", { name: "Answer feedback" }),

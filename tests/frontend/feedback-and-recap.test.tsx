@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AnswerResponse, ChallengeDetail } from "@/contracts/challenge";
 import { FeedbackPanel } from "@/components/challenge/FeedbackPanel";
+import { ReviewControls } from "@/components/challenge/ReviewControls";
 import { SessionRecap } from "@/components/challenge/SessionRecap";
 
 const challenge: ChallengeDetail = {
@@ -104,15 +105,21 @@ function renderFeedback(answer = makeAnswer(), detail = challenge) {
   const onShowOutcome = vi.fn();
   const onNext = vi.fn();
   render(
-    <FeedbackPanel
-      challenge={detail}
-      answer={answer}
-      reviewMedia="outcome"
-      finalChallenge
-      onShowSetup={onShowSetup}
-      onShowOutcome={onShowOutcome}
-      onNext={onNext}
-    />,
+    <>
+      <FeedbackPanel challenge={detail} answer={answer} />
+      <ReviewControls
+        analysisVisible
+        status="complete"
+        analysisId="analysis"
+        reviewMedia="outcome"
+        onShowSetup={onShowSetup}
+        onShowOutcome={onShowOutcome}
+        onNext={onNext}
+        onShowAnalysis={vi.fn()}
+        onViewAnalysis={vi.fn()}
+        nextLabel="Finish session"
+      />
+    </>,
   );
   return { onShowSetup, onShowOutcome, onNext };
 }
@@ -121,17 +128,18 @@ describe("conditional pro feedback", () => {
   it("separates a different pro choice from a defensible assessment", async () => {
     const user = userEvent.setup();
     renderFeedback();
-    expect(
-      screen.getByRole("heading", { name: "Different choice from the pro" }),
-    ).toBeVisible();
-    expect(screen.getAllByText("Defensible").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Different choice from the pro/)).toBeVisible();
+    expect(screen.getAllByText(/Defensible/).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/There is no single preferred answer here/),
     ).toBeVisible();
+    await user.click(screen.getByText("Conditions & risks"));
     expect(screen.getByText("A teammate can trade the contact.")).toBeVisible();
+    await user.click(screen.getByText("Other choices"));
     expect(
       screen.getByText("Low health leaves little room for error."),
     ).toBeVisible();
+    await user.click(screen.getByText("Deeper reasoning & limitations"));
     const analysis = screen.getByRole("region", { name: "AI analysis" });
     expect(
       within(analysis).getByText(
@@ -146,13 +154,12 @@ describe("conditional pro feedback", () => {
     ).toBeVisible();
   });
 
-  it("shows a matched choice as risky without presenting the result as correctness", () => {
+  it("shows a matched choice as risky without presenting the result as correctness", async () => {
     renderFeedback(makeAnswer("peek"));
-    expect(
-      screen.getByRole("heading", { name: "Same choice as the pro" }),
-    ).toBeVisible();
-    expect(screen.getAllByText("Risky")).toHaveLength(2);
+    expect(screen.getByText(/Same choice as the pro/)).toBeVisible();
+    expect(screen.getByText("Your decision: Risky")).toBeVisible();
     expect(screen.queryByText(/correct answer/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Recorded outcome"));
     expect(
       screen.getByText(/A successful outcome does not settle the quality/),
     ).toBeVisible();
@@ -180,9 +187,7 @@ describe("conditional pro feedback", () => {
       },
     };
     renderFeedback(answer, demo);
-    expect(
-      screen.getByRole("heading", { name: "Authored continuation" }),
-    ).toBeVisible();
+    expect(screen.getByText("Authored continuation")).toBeVisible();
     expect(screen.queryByText(/choice.*the pro/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "AI analysis" }),
@@ -192,16 +197,17 @@ describe("conditional pro feedback", () => {
   it("keeps setup/outcome review and final-session controls connected", async () => {
     const user = userEvent.setup();
     const controls = renderFeedback();
-    await user.click(screen.getByRole("button", { name: "Setup" }));
-    await user.click(screen.getByRole("button", { name: "Outcome" }));
+    await user.click(screen.getByRole("button", { name: "Watch setup" }));
+    await user.click(
+      screen.getByRole("button", { name: "Watch continuation" }),
+    );
     await user.click(screen.getByRole("button", { name: /Finish session/ }));
     expect(controls.onShowSetup).toHaveBeenCalledOnce();
     expect(controls.onShowOutcome).toHaveBeenCalledOnce();
     expect(controls.onNext).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Outcome" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: "Watch continuation" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });
 
@@ -211,7 +217,20 @@ describe("VOD session recap", () => {
     const onRestart = vi.fn();
     render(
       <SessionRecap
-        completed={[{ challenge, answer: makeAnswer("peek") }]}
+        items={[
+          {
+            id: "saved-item",
+            position: 0,
+            challenge,
+            answer: {
+              id: "saved-answer",
+              answeredAt: "2026-11-21T00:00:00Z",
+              result: makeAnswer("peek"),
+            },
+          },
+        ]}
+        sessionId="saved-session"
+        viewerId="learner"
         onRestart={onRestart}
       />,
     );
@@ -222,6 +241,8 @@ describe("VOD session recap", () => {
       within(card.querySelector("summary")!).getByText("Risky"),
     ).toBeVisible();
     await user.click(screen.getByText(challenge.title));
+    await user.click(within(card).getByText("Deeper reasoning & limitations"));
+    await user.click(within(card).getByText("Conditions & risks"));
     expect(
       within(card).getByText(
         "Being down a player can justify a conditional risk.",
