@@ -21,7 +21,11 @@ export async function startSession(input: unknown) {
   const command = parseStartSession(input);
   return toCreateResponse(
     await (command.target
-      ? repository.startOrResumeSession(command.requestId, command.target)
+      ? repository.startOrResumeSession(
+          command.requestId,
+          command.target,
+          command.expectedPublicationVersion,
+        )
       : repository.startOrResumeSession(command.requestId)),
   );
 }

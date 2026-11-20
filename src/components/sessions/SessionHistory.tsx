@@ -78,6 +78,14 @@ export function SessionHistory({
                 })}
               </h2>
               <p className="history-title">{item.title}</p>
+              {item.playlist && (
+                <p className="quiet-note">
+                  Playlist by {item.playlist.credit.displayName} ·{" "}
+                  {item.playlist.players
+                    .map((player) => player.displayName)
+                    .join(", ")}
+                </p>
+              )}
               <p>
                 {item.answeredCount} of {item.totalCount} decisions saved
               </p>

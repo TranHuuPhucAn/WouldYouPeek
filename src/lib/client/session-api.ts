@@ -10,6 +10,7 @@ import type {
   SessionTarget,
 } from "@/contracts/session";
 import { ApiClientError, readApiResponse } from "./api-response";
+import { parsePlaylistSessionMetadata } from "./playlist-validation";
 import { isScenarioId } from "@/lib/scenario-id";
 import {
   invalidResponse,
@@ -41,6 +42,12 @@ export function parseSessionTarget(value: unknown): SessionTarget {
     Object.keys(value).length === 2
   )
     return { kind: "scenario", scenarioId: value.scenarioId };
+  if (
+    value.kind === "playlist" &&
+    isUuid(value.playlistId) &&
+    Object.keys(value).length === 2
+  )
+    return { kind: "playlist", playlistId: value.playlistId };
   return invalidResponse();
 }
 function requireTitle(value: unknown) {
@@ -65,6 +72,14 @@ export function parseSessionSnapshot(
   const body = value as SessionSnapshot;
   parseSessionTarget(body.target);
   requireTitle(body.title);
+  if (body.target.kind === "playlist") {
+    body.playlist = parsePlaylistSessionMetadata(body.playlist);
+    if (
+      body.items.length > 20 ||
+      body.playlist.players.length > body.items.length
+    )
+      invalidResponse();
+  } else if (body.playlist !== undefined) invalidResponse();
   if (
     body.target.kind === "scenario" &&
     (body.items.length !== 1 ||
@@ -144,6 +159,7 @@ export function validateSessionContinuity(
   if (
     next.id !== previous.id ||
     next.title !== previous.title ||
+    JSON.stringify(next.playlist) !== JSON.stringify(previous.playlist) ||
     JSON.stringify(next.target) !== JSON.stringify(previous.target) ||
     next.items.length !== previous.items.length ||
     next.items.some((item, index) => {
@@ -182,6 +198,12 @@ export function parseSessionSummary(value: unknown): SessionSummary {
     invalidResponse();
   parseSessionTarget(value.target);
   requireTitle(value.title);
+  if ((value.target as SessionTarget).kind === "playlist") {
+    const playlist = parsePlaylistSessionMetadata(value.playlist);
+    value.playlist = playlist;
+    if (value.totalCount > 20 || playlist.players.length > value.totalCount)
+      invalidResponse();
+  } else if (value.playlist !== undefined) invalidResponse();
   if (
     (value.target as SessionTarget).kind === "scenario" &&
     value.totalCount !== 1
@@ -250,12 +272,29 @@ export async function createOrResumeSession(
 ): Promise<CreateSessionResponse> {
   requireCommand(input.requestId);
   if (input.target !== undefined) parseSessionTarget(input.target);
+  if (
+    input.target?.kind === "playlist"
+      ? !isUuid(input.expectedPublicationVersion)
+      : input.expectedPublicationVersion !== undefined
+  )
+    throw new ApiClientError(
+      "INVALID_REQUEST",
+      "Refresh the playlist preview before starting.",
+      400,
+    );
   const value = await request("/api/sessions", signal, input);
   if (!isRecord(value) || typeof value.created !== "boolean") invalidResponse();
   const result = { ...mutation(value), created: value.created };
   if (
     input.target &&
     JSON.stringify(input.target) !== JSON.stringify(result.session.target)
+  )
+    invalidResponse();
+  if (
+    input.target?.kind === "playlist" &&
+    result.created &&
+    result.session.playlist?.publicationVersion !==
+      input.expectedPublicationVersion
   )
     invalidResponse();
   return result;

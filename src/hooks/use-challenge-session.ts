@@ -183,6 +183,10 @@ export function useChallengeSession(
   }
   async function createNextSession() {
     if (request.current || state.phase !== "complete" || !valid.current) return;
+    if (state.snapshot.target.kind === "playlist") {
+      router.push(`/library/playlists/${state.snapshot.target.playlistId}`);
+      return;
+    }
     const controller = new AbortController();
     request.current = controller;
     startId.current ??= crypto.randomUUID();
@@ -204,7 +208,7 @@ export function useChallengeSession(
               ? "This scenario is no longer available for new sessions. Your saved history is still here. Choose another in the library."
               : error instanceof ApiClientError &&
                   error.code === "ACTIVE_SESSION_EXISTS"
-                ? "Another session is active. Open Play to resume it before starting again."
+                ? "Another session is active. Open Library to resume it before starting again."
                 : "Your new session couldn’t open. Please try again.",
           unresolved: false,
         });

@@ -1,4 +1,6 @@
 import { requirePageAccount } from "@/app/protected-page";
+import { getCreatorProfile } from "@/server/account/creator-profile/service";
+import { CreatorProfileForm } from "@/components/account/CreatorProfileForm";
 import { AccountPanel } from "@/components/account/AccountPanel";
 export default async function AccountPage({
   searchParams,
@@ -7,6 +9,7 @@ export default async function AccountPage({
 }) {
   const viewer = await requirePageAccount("/account");
   const query = await searchParams;
+  const profile = viewer.role === "creator" ? await getCreatorProfile() : null;
   return (
     <main className="page-shell">
       <div className="page-heading">
@@ -17,6 +20,13 @@ export default async function AccountPage({
         )}
       </div>
       <AccountPanel key={viewer.id} viewer={viewer} />
+      {profile && (
+        <CreatorProfileForm
+          key={viewer.id}
+          initial={profile}
+          viewerId={viewer.id}
+        />
+      )}
     </main>
   );
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync, symlinkSync, unlinkSync, mkdirSync, renameSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { prepareTestWorkspace, refreshTestSources, cleanupTestWorkspace, assertDockerOwnership, applicationEnvironment, runVerificationPipeline, applyPendingMigrations, LAST_M4_MIGRATION, LAST_M5_MIGRATION } from "../../scripts/local-test-stack.mjs";
+import { prepareTestWorkspace, refreshTestSources, cleanupTestWorkspace, assertDockerOwnership, applicationEnvironment, runVerificationPipeline, applyPendingMigrations, LAST_M4_MIGRATION, LAST_M5_MIGRATION, LAST_M6_MIGRATION } from "../../scripts/local-test-stack.mjs";
 import { assertDisposableTarget, readDisposableWorkspace, readLocalProject, OWNER_FILE } from "../../scripts/local-target.mjs";
 import { fixtureProject, fixtureEnvironment } from "./helpers.mjs";
 
@@ -119,12 +119,14 @@ test("the app receives public configuration without test administrator credentia
   assert.equal(env.WYP_MEDIA_VALIDATOR_TOKEN, undefined);
 });
 
-test("migration phases preserve the true M4 and M5 boundaries before applying M6", async (t) => {
+test("migration phases preserve the true M4, M5 and M6 boundaries before applying playlists", async (t) => {
   const root = fixtureProject(t);
   const mediaMigration = "20261120000100_video_assets.sql";
   writeFileSync(join(root, "supabase/migrations", mediaMigration), "-- media\n");
   const libraryMigration = "20261120000400_player_catalogue.sql";
   writeFileSync(join(root, "supabase/migrations", libraryMigration), "-- library\n");
+  const playlistMigration = "20261121000100_creator_playlists.sql";
+  writeFileSync(join(root, "supabase/migrations", playlistMigration), "-- playlists\n");
   const target = prepareTestWorkspace(root), calls = [];
   const cli = async (owned, args) => { assert.equal(owned.projectId, target.projectId); calls.push(args); };
   await applyPendingMigrations(target, { through: LAST_M4_MIGRATION, cli });
@@ -136,10 +138,15 @@ test("migration phases preserve the true M4 and M5 boundaries before applying M6
   assert.equal(existsSync(join(target.workspace, ".wyp-pending-migrations", mediaMigration)), false);
   assert.equal(existsSync(join(target.workspace, "supabase/migrations", libraryMigration)), false);
   assert.equal(existsSync(join(target.workspace, ".wyp-pending-migrations", libraryMigration)), true);
-  await applyPendingMigrations(target, { cli });
+  await applyPendingMigrations(target, { through: LAST_M6_MIGRATION, cli });
   assert.equal(existsSync(join(target.workspace, "supabase/migrations", libraryMigration)), true);
   assert.equal(existsSync(join(target.workspace, ".wyp-pending-migrations", libraryMigration)), false);
-  assert.deepEqual(calls, [["migration", "up"], ["migration", "up"], ["migration", "up"]]);
+  assert.equal(existsSync(join(target.workspace, "supabase/migrations", playlistMigration)), false);
+  assert.equal(existsSync(join(target.workspace, ".wyp-pending-migrations", playlistMigration)), true);
+  await applyPendingMigrations(target, { cli });
+  assert.equal(existsSync(join(target.workspace, "supabase/migrations", playlistMigration)), true);
+  assert.equal(existsSync(join(target.workspace, ".wyp-pending-migrations", playlistMigration)), false);
+  assert.deepEqual(calls, [["migration", "up"], ["migration", "up"], ["migration", "up"], ["migration", "up"]]);
   await assert.rejects(applyPendingMigrations(target, { through: "invalid", cli }), /boundary/);
 });
 
@@ -150,7 +157,8 @@ function pipelineFakes(target, { failOn } = {}) {
     environment: async () => fixtureEnvironment(target),
     run: async (command, args) => step(args.includes("tests/migrations/milestone-4-preservation.test.mjs") ? "upgrade"
       : args.includes("tests/migrations/milestone-5-preservation.test.mjs") ? "media-upgrade"
-      : args.includes("tests/migrations/milestone-6-preservation.test.mjs") ? "library-upgrade" : args[1] ?? args[0]),
+      : args.includes("tests/migrations/milestone-6-preservation.test.mjs") ? "library-upgrade"
+      : args.includes("tests/migrations/milestone-7-preservation.test.mjs") ? "playlist-upgrade" : args[1] ?? args[0]),
     cli: async (owned, args) => { assert.equal(owned.projectId, target.projectId); step(args.join(" ")); },
     startApp: async () => { step("start-app"); return "owned-process"; },
     stopApp: async (app) => { assert.equal(app, "owned-process"); step("stop-app"); },
@@ -172,7 +180,8 @@ test("full verification includes upgrade before clean install and every required
   assert.ok(fake.calls.indexOf("upgrade") < fake.calls.indexOf("db reset --yes"));
   assert.ok(fake.calls.indexOf("upgrade") < fake.calls.indexOf("media-upgrade"));
   assert.ok(fake.calls.indexOf("media-upgrade") < fake.calls.indexOf("library-upgrade"));
-  assert.ok(fake.calls.indexOf("library-upgrade") < fake.calls.indexOf("db reset --yes"));
+  assert.ok(fake.calls.indexOf("library-upgrade") < fake.calls.indexOf("playlist-upgrade"));
+  assert.ok(fake.calls.indexOf("playlist-upgrade") < fake.calls.indexOf("db reset --yes"));
   assert.ok(fake.calls.indexOf("scripts/generate-video-fixtures.mjs") < fake.calls.indexOf("start-worker"));
   for (const phase of ["db:seed:check", "db:types:check", "test", "test:db", "test:integration", "typecheck", "build", "test:http"]) assert.ok(fake.calls.includes(phase), phase);
   assert.deepEqual(fake.calls.slice(-2), ["stop-app", "stop-worker"]);
@@ -196,6 +205,15 @@ test("failed library preservation prevents reset and later passing suites", asyn
   const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "library-upgrade" });
   await assert.rejects(runVerificationPipeline(target, fake.options), /failure: library-upgrade/);
   assert.ok(fake.calls.includes("media-upgrade"));
+  assert.equal(fake.calls.includes("db reset --yes"), false);
+  assert.equal(fake.calls.includes("start-worker"), false);
+  assert.equal(fake.calls.includes("build"), false);
+});
+
+test("failed playlist preservation cannot be hidden by reset or passing suites", async (t) => {
+  const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "playlist-upgrade" });
+  await assert.rejects(runVerificationPipeline(target, fake.options), /failure: playlist-upgrade/);
+  assert.ok(fake.calls.includes("library-upgrade"));
   assert.equal(fake.calls.includes("db reset --yes"), false);
   assert.equal(fake.calls.includes("start-worker"), false);
   assert.equal(fake.calls.includes("build"), false);

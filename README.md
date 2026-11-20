@@ -2,7 +2,7 @@
 
 A Valorant decision-practice app for advanced players. Watch a professional player’s POV, make a choice at a paused moment, then watch the continuation and read conditional analysis. The demo contains three approved moments from TenZ’s ranked stream on Bind.
 
-Matching the pro and making a defensible decision are separate outcomes. Creators can author, review and publish their own scenarios. Explanations distinguish creator-written or AI-assisted analysis; the original demo retains its AI-authored attribution. Observable facts and missing context remain separate from interpretations.
+Matching the pro and making a defensible decision are separate outcomes. Creators can author, review and publish their own scenarios and assemble them into ordered playlists. Explanations distinguish creator-written or AI-assisted analysis; the original demo retains its AI-authored attribution. Observable facts and missing context remain separate from interpretations.
 
 ## Run locally
 
@@ -30,9 +30,13 @@ This process checks uploaded file format, size, duration and codecs using `ffpro
 
 Open **Library** to browse existing scenarios grouped by player, search player names, and view a player's scenarios. The three original TenZ moments are available individually. Guests can view published metadata and YouTube setup clips; playing requires a verified account. Private uploaded videos require verified access even on preview pages.
 
-Choose **Sign in to play** on a scenario, then register with an email and a password of 12–128 characters including uppercase, lowercase and a number. Open the confirmation email in the [local email inbox](http://127.0.0.1:54324). Verification returns you to the selected scenario; resend keeps that destination too. These local emails are captured; no real email is sent. Password-reset messages use the same inbox.
+Switch to **Playlists** to browse ordered collections, search included player names, or view playlists containing a selected player. A mixed-player collection always plays its full sequence. Its detail page shows the ordered scenario metadata and public creator credit; videos play after starting the saved session. The curated TenZ starter groups the three original moments under a Would You Peek editorial credit.
+
+Choose **Sign in to play** on a scenario or playlist, then register with an email and a password of 12–128 characters including uppercase, lowercase and a number. Open the confirmation email in the [local email inbox](http://127.0.0.1:54324). Verification returns you to the selected detail; resend keeps that destination too. These local emails are captured; no real email is sent. Password-reset messages use the same inbox.
 
 After verification, start a scenario. Watch setup, choose an action, and submit. The answer is saved before the pro’s continuation and analysis appear. **Finish session** completes the review. Library offers **Continue your session** when you have unfinished practice, and History retains completed sessions. Refreshing an unanswered scenario restarts setup; refreshing a saved answer restores review. Unsubmitted selections and video time are not persisted. Existing three-scenario sessions still resume and advance normally.
+
+A playlist uses the same saved flow with **Next scenario** between items and **Finish session** at the end. Only one session is active at a time. Starting the same playlist resumes its saved version; a different target offers the current session instead of replacing progress. If a playlist changes after its preview loads, refresh the preview before starting a new run. Practising a completed playlist again returns to its current preview; old history retains the original order, versions and credit.
 
 Under **Account**, any verified learner can enable creator access. Creators retain learner access. Open **Creator studio** to create a private draft, choose a YouTube source or an owned uploaded recording, write context, choices and analysis, and explicitly save. Incomplete drafts can be saved. Preview uses only the saved draft and does not create a learner session.
 
@@ -46,7 +50,13 @@ When the draft is complete, preview it, review the source and explanations, and 
 
 Editing a published scenario leaves its previous version available until a new reviewed version is published. Content changes invalidate the review. **Unpublish** removes the scenario from discovery and new starts; existing sessions and history retain their original version. Republishing requires another review. Creator review is self-review, not independent moderation.
 
-If upgrading an existing local installation, preserve your accounts and scenarios by applying only the pending migrations. Restart the project’s Supabase services to enable its newly configured Storage service; stopping retains local data:
+To create a playlist, open **Creator → Playlists**, enter a title and optional description, and select up to 20 distinct scenarios you own and have published. Mixed players are allowed. Use **Move up** and **Move down** to set the order, then explicitly save. Empty/incomplete drafts remain private. A playlist references existing scenario versions and never duplicates uploaded video bytes.
+
+Set a public creator name under **Account** before reviewing a playlist. Names are 2–50 characters and are never derived from account emails. Review requires a title of 1–120 characters and 1–20 scenarios; descriptions allow up to 1,000 characters. Review the saved selections, sequence and credit, record the checklist, then publish. Later draft edits stay private until republished. Each publication freezes its title, order, source versions, included players and credit; a later name change affects future publications only.
+
+New scenario versions do not silently update playlists: choose **Update to latest** in the playlist draft when desired. Withdrawing any included scenario blocks affected playlist publications from discovery and new starts. Restoring that scenario alone does not restore those playlists; review and publish the collection again, retaining or updating its selected versions. Playlist **Unpublish** also stops new starts. Existing saved sessions remain available throughout. Creator review is self-review; creator labels do not imply endorsement by the featured pro.
+
+If upgrading an existing local installation, preserve your accounts and scenarios by applying only the pending migrations. Restart the project’s Supabase services to load the current local service and email configuration; stopping retains local data:
 
 ```sh
 npm ci
@@ -78,7 +88,7 @@ npm run test:ci
 
 Keep Docker running. The full command creates an ignored `.wyp-test-work/<run-id>/` source copy and a uniquely named disposable Supabase project. It uses API port 55321, database 55322, inbox 55324 and an app at `http://localhost:3100`. These ports must be free. The different app hostname also isolates browser auth cookies from your development app at `127.0.0.1:3000`.
 
-The runner first verifies additive upgrades from milestone three to four, four to five, and five to six, preserving accounts, creator drafts, review digests, immutable versions, uploaded bytes and references, saved sessions and command receipts. It then resets only its disposable database, generates small original video fixtures, starts its scoped media validator, and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data/Storage API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app/validator and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, video library, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
+The runner first verifies additive upgrades from milestone three to four, four to five, five to six, and six to seven, preserving accounts, creator drafts, review digests, player mappings, immutable versions, uploaded bytes and references, saved sessions and command receipts. The M7 check also proves the curated playlist is added without reseeding existing data. It then resets only its disposable database, generates small original video fixtures, starts its scoped media validator, and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data/Storage API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app/validator and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, video library, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
 
 `npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `npm run test:scripts` checks isolation, cleanup and pipeline failure handling without Docker. Database, integration and HTTP suites refuse the normal development project and hosted targets; run them through `test:ci` so publication fixtures remain isolated. Test administrator credentials are never passed to the web app.
 
@@ -105,6 +115,8 @@ The app uses Next.js App Router, React, TypeScript, Supabase Auth, Postgres and 
 - `src/contracts/`: shared preview, account, authoring, library and saved-session contracts.
 - `src/components/creator/`, `src/hooks/use-scenario-editor.ts`, `src/lib/creator/`: explicit-save editor, saved preview, review and publication controls, shared content validation and editor state.
 - `src/server/creator/`, `src/app/api/creator/`: owner-scoped drafts, review records, publication and withdrawal commands.
+- `src/server/creator-playlists/`, `src/server/playlists/`, `src/lib/playlists/`: owned playlist authoring, immutable publication metadata, safe discovery and shared content/order helpers.
+- `src/server/account/creator-profile/`: separately saved public creator credit with revision and retry checks.
 - `src/server/video/`, `src/app/api/creator/videos/`, `src/app/api/media/playback/`: resumable upload reservations, reference-safe deletion and context-authorized playback access.
 - `src/worker/media/`, `scripts/local-media-worker.mjs`: local metadata validation under a narrowly scoped credential; no publishing or learner-answer privileges.
 - `src/app/library/`, `src/components/library/`, `src/server/library/`, `src/server/players/`: public player groups, safe published previews and verified selected-scenario starts.
@@ -115,11 +127,14 @@ The app uses Next.js App Router, React, TypeScript, Supabase Auth, Postgres and 
 - `src/components/challenge/`: bounded YouTube/uploaded players, choices, advanced analysis and recap.
 - `supabase/migrations/`: profiles, versioned scenarios, sessions, immutable attempts, private answer keys and command receipts, RLS and narrowly granted functions.
 - `supabase/fixtures/demo-scenarios.json`: the canonical authored dataset. `scripts/render-demo-seed.mjs` generates `supabase/seed.sql`; runtime repositories read the database.
+- `supabase/fixtures/curated-playlist.json`: stable editorial starter identity, metadata and references; migration and seed initialization verify the same manifest without rewriting historical content.
 - `tests/backend/`, `tests/frontend/`, `tests/integration/`, `supabase/tests/database/`: complementary unit, component, real-service and permission/transaction tests.
 
 Guests can browse published player groups and setup-only scenario previews. Verified accounts can play and read their own history. Public responses exclude questions, choices, outcomes, private drafts, account details and private video URLs. Creator enrollment affects only the current account and grants no access to others' private drafts or learner records. Private answer keys cannot be read directly through the public Data API. Session and authoring functions use separate restricted non-login roles that do not own application tables or bypass row-level security. A trigger-only role synchronizes trusted email confirmation into a protected profile column; runtime roles need no direct auth-table access.
 
 The player catalogue maps immutable scenario versions to stable player records. Only current published versions contribute to groups and counts; historical attribution is preserved for saved sessions. Player names use Unicode normalization, collapsed whitespace and ASCII case folding, without fuzzy matching different spellings. The curated TenZ scenarios retain their original IDs and AI-analysis attribution. Old `/demo` links redirect to TenZ; `/play` resumes the caller's active session or opens Library, without creating a session.
+
+Playlist filters use their frozen player membership. A player remains reachable through a playlist even when no current standalone scenario names them. Public playlist data contains ordered metadata only, with no questions, answers, media credentials or account identifiers. Withdrawal generations prevent a restored source from silently reactivating an older playlist publication or stale review.
 
 Each session pins immutable scenario versions. Answers and review checkpoints commit together. One account has at most one active session. Commands carry a request UUID and expected revision; retrying an identical command returns the current canonical snapshot of its original session, even after completion. Reusing the UUID with different input fails. Losing a response or encountering a stale tab triggers reconciliation rather than another attempt.
 
@@ -132,6 +147,7 @@ Each session pins immutable scenario versions. Answers and review checkpoints co
 | `POST /api/challenges/[id]/answer`                     | Retired: guests receive 401; signed-in callers receive 409 `SESSION_REQUIRED`.  |
 | `GET /api/account`                                     | Current account and capabilities.                                               |
 | `POST /api/account/creator`                            | Verified self-enrollment; empty JSON object.                                    |
+| `GET/PUT /api/account/creator-profile`                 | Verified creator's own public name/revision; writes include request ID and expected revision. |
 | `GET /api/creator/scenarios?status=all&cursor=...`      | Verified creator's own draft/publication summaries.                            |
 | `POST /api/creator/scenarios`                         | `{ requestId }`; create a private draft.                                       |
 | `GET /api/creator/scenarios/[id]`                     | Owner's current saved draft and publication state.                             |
@@ -140,6 +156,13 @@ Each session pins immutable scenario versions. Answers and review checkpoints co
 | `POST /api/creator/scenarios/[id]/review`             | `{ requestId, expectedRevision, checklist }`; record self-review.              |
 | `POST /api/creator/scenarios/[id]/publish`            | `{ requestId, expectedRevision, reviewId }`; publish atomically.               |
 | `POST /api/creator/scenarios/[id]/unpublish`          | `{ requestId, expectedRevision }`; delist new starts.                          |
+| `GET/POST /api/creator/playlists`                    | Own paginated playlist summaries / create a private draft with `{ requestId }`. |
+| `GET/PUT /api/creator/playlists/[id]`                 | Own saved playlist / save `{ requestId, expectedRevision, content }`.         |
+| `GET /api/creator/playlists/[id]/review?revision=...` | Owner-only saved metadata and public-credit revision for review.             |
+| `POST /api/creator/playlists/[id]/review`             | `{ requestId, expectedRevision, profileRevision, checklist }`; record exact collection review. |
+| `POST /api/creator/playlists/[id]/publish`            | `{ requestId, expectedRevision, reviewId }`; publish an immutable collection. |
+| `POST /api/creator/playlists/[id]/unpublish`          | Revision/idempotency command; stop new discovery and starts.                  |
+| `GET /api/creator/playlist-scenarios?query=...&cursor=...` | Own current published scenario metadata and versions for selection.       |
 | `GET /api/creator/videos`                            | Owner's reusable uploads, limits and validator availability.                 |
 | `POST /api/creator/videos`                           | Reserve an owned upload with a request UUID and file identity.                |
 | `GET /api/creator/videos/requests/[requestId]`        | Reconcile an interrupted upload reservation.                                 |
@@ -152,7 +175,9 @@ Each session pins immutable scenario versions. Answers and review checkpoints co
 | `GET /api/library/players?query=...&cursor=...`        | Public player groups, published counts and up to three previews per group.    |
 | `GET /api/library/scenarios?playerId=...&cursor=...` | Public published previews, optionally filtered by player, without answers.    |
 | `GET /api/library/scenarios/[id]`                    | One published setup-only preview.                                             |
-| `POST /api/sessions`                                   | `{ requestId, target }`; `target` is `{ kind: 'demo' }` or `{ kind: 'scenario', scenarioId }`. Omitting it retains the demo behavior. |
+| `GET /api/library/playlists?query=...&playerId=...&cursor=...` | Public available playlist cards, filtered by included players.             |
+| `GET /api/library/playlists/[id]`                    | Current immutable playlist metadata and complete ordered item list.          |
+| `POST /api/sessions`                                   | `{ requestId, target }`; targets are demo, scenario or playlist. Playlist targets `{ kind: 'playlist', playlistId }` additionally require `expectedPublicationVersion`. Omitting the target retains the demo behavior. |
 | `GET /api/sessions?cursor=...`                         | Own paginated history.                                                          |
 | `GET /api/sessions/[sessionId]`                        | Own canonical saved session.                                                    |
 | `POST /api/sessions/[sessionId]/items/[itemId]/answer` | `{ optionId, requestId, expectedRevision }`; atomically save answer and review. |
@@ -187,4 +212,4 @@ The seven `artifacts/vod-review/scenario-*.jpg` images preserve visual source ev
 9. **Milestone nine:** clearer scenario presentation and training UX.
 10. **Milestone ten:** feature-review checkpoint before hosted launch, real account email, backups and operational checks. The first hosted release uses YouTube; uploads stay local initially.
 
-Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/library`. GitHub pushes and merges remain with the repository owner. Each later milestone needs its own approved plan. At milestone ten, review possible additional features before proceeding with launch. Hosted deployment and production email remain separate work. Automatic extraction is not part of the current roadmap.
+Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/playlists`. GitHub pushes and merges remain with the repository owner. Each later milestone needs its own approved plan. At milestone ten, review possible additional features before proceeding with launch. Hosted deployment and production email remain separate work. Automatic extraction is not part of the current roadmap.

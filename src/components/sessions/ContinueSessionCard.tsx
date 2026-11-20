@@ -10,6 +10,11 @@ export function ContinueSessionCard({ session }: { session: SessionSummary }) {
       <div>
         <span className="eyebrow">CONTINUE YOUR SESSION</span>
         <h2>{session.title}</h2>
+        {session.playlist && (
+          <p className="quiet-note">
+            Playlist by {session.playlist.credit.displayName}
+          </p>
+        )}
         <p>
           {session.answeredCount} of {session.totalCount} decisions saved.
         </p>

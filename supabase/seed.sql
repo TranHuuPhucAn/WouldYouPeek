@@ -60,4 +60,11 @@ begin
 end;
 $seed$;
 
+-- The migration helper is deliberately not exposed through PostgREST.
+do $starter$ begin
+  if to_regprocedure('private.ensure_curated_starter_playlist()') is null then return; end if;
+  perform private.ensure_curated_starter_playlist();
+  if not exists (select 1 from public.playlists p join private.playlist_versions v on v.id=p.current_version where p.id='7ecf3523-18cb-5cbe-a307-5b5cd43d1836'::uuid and p.kind='editorial' and p.creator_id is null and v.id='2e061c34-3f9c-58cd-8923-926b353662fc'::uuid and v.content='{"title":"TenZ — Three decisions on Bind","description":"Three curated moments from TenZ’s Bind POV. Make your call, watch the action, then compare the analysis.","items":[{"scenarioId":"bind-clove-utility-window","scenarioVersion":"vod-1"},{"scenarioId":"bind-clove-smoke-contest","scenarioVersion":"vod-1"},{"scenarioId":"bind-clove-advantage-reset","scenarioVersion":"vod-1"}]}'::jsonb and v.credit='{"kind":"editorial","displayName":"Would You Peek"}'::jsonb) then raise exception 'Curated starter differs from the canonical manifest.'; end if;
+end $starter$;
+
 commit;
