@@ -1,17 +1,16 @@
 import "server-only";
-import { requireVerifiedUser } from "@/server/auth/guards";
 import { ApiError } from "@/server/http";
-import { parseLibraryCursor, parseLibraryScenarioId } from "./validation";
+import { parseLibraryFilters, parseLibraryScenarioId } from "./validation";
 import { toLibraryList, toLibraryPreview } from "./projections";
 import * as repository from "./repository";
-export async function getLibrary(cursor?: string | null) {
-  await requireVerifiedUser();
+export async function getLibrary(
+  filters: { playerId?: unknown; cursor?: unknown } = {},
+) {
   return toLibraryList(
-    await repository.listPublishedScenarios(parseLibraryCursor(cursor)),
+    await repository.listPublishedScenarios(parseLibraryFilters(filters)),
   );
 }
 export async function getLibraryScenario(rawId: string) {
-  await requireVerifiedUser();
   const id = parseLibraryScenarioId(rawId),
     data = await repository.findPublishedScenario(id);
   if (data === null)

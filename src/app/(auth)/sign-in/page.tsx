@@ -22,7 +22,10 @@ export default async function SignInPage({
         </p>
         <SignInForm returnTo={returnTo} />
         <p className="auth-switch">
-          New to the lab? <Link href="/sign-up">Create an account</Link>
+          New to the lab?{" "}
+          <Link href={`/sign-up?returnTo=${encodeURIComponent(returnTo)}`}>
+            Create an account
+          </Link>
         </p>
       </section>
     </main>

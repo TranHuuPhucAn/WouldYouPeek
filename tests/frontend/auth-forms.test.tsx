@@ -68,12 +68,20 @@ it("shows generic reset response without revealing account existence", async () 
 });
 it("supports verification resend", async () => {
   const user = userEvent.setup();
-  render(<ResendVerificationForm />);
+  render(
+    <ResendVerificationForm returnTo="/library/tenz-bind-clove-utility-before-contact" />,
+  );
   await user.type(screen.getByLabelText("Email"), "learner@example.test");
   await user.click(
     screen.getByRole("button", { name: "Resend verification email" }),
   );
   expect(await screen.findByRole("status")).toHaveTextContent("fresh link");
+  expect(
+    vi
+      .mocked(actions.resendVerificationAction)
+      .mock.calls.at(-1)?.[1]
+      .get("returnTo"),
+  ).toBe("/library/tenz-bind-clove-utility-before-contact");
 });
 it("disables repeated submissions during recovery", async () => {
   let resolve!: (value: { status: "success"; message: string }) => void;
@@ -89,5 +97,21 @@ it("disables repeated submissions during recovery", async () => {
   resolve({ status: "success", message: "Updated" });
   await waitFor(() =>
     expect(screen.getByRole("status")).toHaveTextContent("Updated"),
+  );
+});
+
+it("keeps the selected scenario in verification links and Library as the default", () => {
+  const view = render(
+    <SignInForm returnTo="/library/tenz-bind-clove-utility-before-contact" />,
+  );
+  const href = screen
+    .getByRole("link", { name: "Resend verification" })
+    .getAttribute("href")!;
+  expect(new URL(href, "http://localhost").searchParams.get("returnTo")).toBe(
+    "/library/tenz-bind-clove-utility-before-contact",
+  );
+  view.rerender(<SignInForm />);
+  expect(document.querySelector('input[name="returnTo"]')).toHaveValue(
+    "/library",
   );
 });

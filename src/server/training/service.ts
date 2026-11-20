@@ -1,4 +1,5 @@
 import "server-only";
+import { ApiError } from "@/server/http";
 import { requireVerifiedUser } from "@/server/auth/guards";
 import * as repository from "./repository";
 import {
@@ -11,6 +12,7 @@ import {
 import {
   toCreateResponse,
   toSessionSnapshot,
+  toSessionSummary,
   toHistoryResponse,
   toMutationResponse,
 } from "./projections";
@@ -55,4 +57,18 @@ export async function advanceSession(sessionId: string, input: unknown) {
       parseAdvanceCommand(input),
     ),
   );
+}
+
+export async function getActiveSessionSummary() {
+  await requireVerifiedUser();
+  const data = await repository.findActiveSessionSummary();
+  if (data === null) return null;
+  const summary = toSessionSummary(data);
+  if (summary.status !== "in_progress") {
+    throw new ApiError(
+      "STORAGE_UNAVAILABLE",
+      "Saved training could not be loaded safely.",
+    );
+  }
+  return summary;
 }

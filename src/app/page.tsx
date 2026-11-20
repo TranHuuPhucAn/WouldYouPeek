@@ -24,16 +24,22 @@ export default async function HomePage() {
               <br className="desktop-break" /> Make the next move yourself.
             </p>
             <p className="hero-support">
-              Watch real gameplay, decide at the pause, then see what TenZ did.
-              Explore the timing, risks, and alternatives behind three moments
-              on Bind.
+              Watch real gameplay, decide at the pause, then see what the player
+              did. Start with three TenZ moments on Bind, or explore published
+              creator scenarios.
             </p>
             <div className="hero-actions">
-              <Link href="/demo" className="button button-primary button-large">
-                Watch demo <span aria-hidden="true">↗</span>
+              <Link
+                href="/library"
+                className="button button-primary button-large"
+              >
+                Browse scenarios <span aria-hidden="true">↗</span>
               </Link>
-              <Link href="/play" className="text-button">
-                {viewer ? "Open practice →" : "Sign in to play →"}
+              <Link
+                href={viewer ? "/history" : "/sign-in?returnTo=%2Flibrary"}
+                className="text-button"
+              >
+                {viewer ? "View saved sessions →" : "Sign in to play →"}
               </Link>
             </div>
             <p className="demo-disclosure">
@@ -44,12 +50,12 @@ export default async function HomePage() {
           </div>
           <div className="hero-visual">
             <div className="visual-topline">
-              <span className="mono">YOUR SESSION</span>
+              <span className="mono">START WITH TENZ</span>
               <span className="tag-outline">TENZ · CLOVE · BIND</span>
             </div>
             <div className="vod-session-preview">
               <div className="preview-session-heading">
-                <span className="eyebrow">THREE MOMENTS. ONE POV.</span>
+                <span className="eyebrow">THREE SCENARIOS. ONE POV.</span>
                 <p>
                   Read the round.
                   <br />

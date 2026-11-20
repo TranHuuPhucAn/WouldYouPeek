@@ -67,3 +67,10 @@ export async function advanceSession(
   if (error) databaseError(error);
   return data;
 }
+
+export async function findActiveSessionSummary() {
+  const client = await createServerSupabaseClient();
+  const { data, error } = await client.rpc("get_active_training_session");
+  if (error) databaseError(error);
+  return data;
+}

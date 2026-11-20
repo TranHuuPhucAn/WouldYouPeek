@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { signInAction } from "@/app/(auth)/actions";
 import { AuthForm } from "./AuthForm";
-export function SignInForm({ returnTo = "/play" }: { returnTo?: string }) {
+export function SignInForm({ returnTo = "/library" }: { returnTo?: string }) {
   return (
     <>
       <AuthForm
@@ -13,7 +13,9 @@ export function SignInForm({ returnTo = "/play" }: { returnTo?: string }) {
       />
       <p className="auth-links">
         <Link href="/forgot-password">Forgot password?</Link>
-        <Link href="/check-email">Resend verification</Link>
+        <Link href={`/check-email?returnTo=${encodeURIComponent(returnTo)}`}>
+          Resend verification
+        </Link>
       </p>
     </>
   );

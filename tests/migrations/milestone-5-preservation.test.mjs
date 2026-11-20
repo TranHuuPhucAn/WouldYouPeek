@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { assertDisposableTarget, cleanChildEnvironment } from "../../scripts/local-target.mjs";
-import { applyPendingMigrations, assertDockerOwnership, LAST_M4_MIGRATION } from "../../scripts/local-test-stack.mjs";
+import { applyPendingMigrations, assertDockerOwnership, LAST_M4_MIGRATION, LAST_M5_MIGRATION } from "../../scripts/local-test-stack.mjs";
 
 function sql(target, statement) {
   assertDockerOwnership(target);
@@ -128,7 +128,7 @@ export async function assertM4Preserved(target, before, baseline, env) {
 export async function runMediaMigrationPreservation(env = process.env) {
   const target = assertDisposableTarget(env);
   const baseline = await createM4Baseline(target, env), before = snapshotM4Records(target);
-  await applyPendingMigrations(target);
+  await applyPendingMigrations(target, { through: LAST_M5_MIGRATION });
   await assertM4Preserved(target, before, baseline, env);
   console.log("Media upgrade preservation passed: accounts, YouTube content/review digests, versions, receipts and saved sessions survived.");
 }

@@ -10,6 +10,7 @@ import type {
   CreatorSourceAttribution,
   ValidationIssue,
 } from "@/contracts/creator";
+import { PlayerNameField } from "./PlayerNameField";
 import { SelectField, TextField } from "./EditorFields";
 import { parseYouTubeSource } from "@/lib/creator/content";
 export function SourceFields({
@@ -252,11 +253,15 @@ export function SourceFields({
         </>
       )}
       <div className="creator-field-grid">
+        <PlayerNameField
+          value={source.player}
+          onChange={(value) => updateSourceField("player", value)}
+          issues={issues}
+        />
         {(
           [
             ["title", "Source video title"],
             ["uploader", "Channel / uploader"],
-            ["player", "Player"],
             ["map", "Map"],
             ["agent", "Agent"],
             ["score", "Score before the round"],

@@ -8,7 +8,7 @@ vi.mock("@/server/auth/guards", () => ({ requireVerifiedUser: mocks.guard }));
 vi.mock("@/server/library/repository", () => mocks);
 import { getLibrary, getLibraryScenario } from "@/server/library/service";
 import { toLibraryPreview } from "@/server/library/projections";
-import { ApiError } from "@/server/http";
+import { TENZ_PLAYER_ID } from "@/contracts/player";
 import { snapshot } from "./helpers/session";
 import { creatorScenarioId } from "./helpers/creator";
 function preview() {
@@ -16,6 +16,8 @@ function preview() {
     ...snapshot().items[0].challenge,
     id: creatorScenarioId,
     provenance: "creator",
+    editorialOrigin: "creator",
+    player: { id: TENZ_PLAYER_ID, displayName: "TenZ" },
     publishedAt: "2026-11-18T00:00:00Z",
   };
 }
@@ -23,7 +25,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.guard.mockResolvedValue({ id: "learner" });
 });
-describe("verified published library", () => {
+describe("public published library", () => {
   it("never exposes analysis/choices/private ownership in previews", async () => {
     const raw = {
       ...preview(),
@@ -45,14 +47,16 @@ describe("verified published library", () => {
     mocks.findPublishedScenario.mockResolvedValue(raw);
     expect(await getLibraryScenario(creatorScenarioId)).toEqual(result);
   });
-  it("requires verification and retains unavailable semantics", async () => {
-    mocks.guard.mockRejectedValueOnce(
-      new ApiError("EMAIL_NOT_VERIFIED", "Verify."),
-    );
-    await expect(getLibrary()).rejects.toMatchObject({
-      code: "EMAIL_NOT_VERIFIED",
+  it("allows guests and retains unavailable semantics", async () => {
+    mocks.listPublishedScenarios.mockResolvedValue({
+      scenarios: [],
+      nextCursor: null,
     });
-    expect(mocks.listPublishedScenarios).not.toHaveBeenCalled();
+    await expect(getLibrary()).resolves.toEqual({
+      scenarios: [],
+      nextCursor: null,
+    });
+    expect(mocks.guard).not.toHaveBeenCalled();
     mocks.findPublishedScenario.mockResolvedValue(null);
     await expect(getLibraryScenario(creatorScenarioId)).rejects.toMatchObject({
       code: "SCENARIO_UNAVAILABLE",
@@ -64,9 +68,11 @@ describe("verified published library", () => {
       nextCursor: null,
     });
     expect(await getLibrary()).toEqual({ scenarios: [], nextCursor: null });
-    await expect(getLibrary("broken-cursor")).rejects.toMatchObject({
-      code: "INVALID_REQUEST",
-    });
+    await expect(getLibrary({ cursor: "broken-cursor" })).rejects.toMatchObject(
+      {
+        code: "INVALID_REQUEST",
+      },
+    );
     mocks.findPublishedScenario.mockResolvedValue({
       ...preview(),
       id: "foreign",

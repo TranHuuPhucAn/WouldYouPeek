@@ -26,7 +26,9 @@ describe("email confirmation callback", () => {
         "http://localhost/auth/confirm?type=signup&token_hash=secret&next=//evil.test",
       ),
     );
-    expect(response.headers.get("location")).toBe("http://127.0.0.1:3000/play");
+    expect(response.headers.get("location")).toBe(
+      "http://127.0.0.1:3000/library",
+    );
   });
   it.each(["type=invite&token_hash=secret", "type=signup", ""])(
     "denies unsupported/incomplete links %s",
@@ -46,7 +48,37 @@ describe("email confirmation callback", () => {
       ),
     );
     expect(response.headers.get("location")).toBe(
-      "http://127.0.0.1:3000/auth/error",
+      "http://127.0.0.1:3000/auth/error?returnTo=%2Flibrary",
+    );
+  });
+  it("preserves a chosen scenario on success and expired-link recovery", async () => {
+    const next = "/library/bind-clove-utility-window";
+    const url = `http://localhost/auth/confirm?type=signup&token_hash=secret&next=${encodeURIComponent(next)}`;
+    expect((await GET(new Request(url))).headers.get("location")).toBe(
+      `http://127.0.0.1:3000${next}`,
+    );
+    verify.mockRejectedValue(new Error("expired secret"));
+    const failure = new URL(
+      (await GET(new Request(url))).headers.get("location")!,
+    );
+    expect(failure.pathname).toBe("/auth/error");
+    expect(failure.searchParams.get("returnTo")).toBe(next);
+    expect(failure.toString()).not.toContain("secret");
+  });
+  it("rejects ambiguous token/type values and discards ambiguous next", async () => {
+    await GET(
+      new Request(
+        "http://localhost/auth/confirm?type=signup&type=recovery&token_hash=secret",
+      ),
+    );
+    expect(verify).not.toHaveBeenCalled();
+    const result = await GET(
+      new Request(
+        "http://localhost/auth/confirm?type=signup&token_hash=secret&next=/account&next=//evil",
+      ),
+    );
+    expect(result.headers.get("location")).toBe(
+      "http://127.0.0.1:3000/library",
     );
   });
 });

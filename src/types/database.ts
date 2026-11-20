@@ -2,7 +2,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  
+
   "public": {
           Tables: {
             "attempts": {
@@ -25,6 +25,20 @@ isOneToOne: false
       referencedColumns: ["id","session_id","user_id"]
     }
                   ]
+                },"players": {
+                  Row: {
+                    "created_at": string,"display_name": string,"id": string,"key_digest": string | null,"normalized_key": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"display_name": string,"id"?: string,"key_digest"?: never,"normalized_key": string
+                  }
+                  Update: {
+                    "created_at"?: string,"display_name"?: string,"id"?: string,"key_digest"?: never,"normalized_key"?: string
+                  }
+                  Relationships: [
+
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"creator_enabled_at": string | null,"email_verified_at": string | null,"role": string,"user_id": string
@@ -37,7 +51,7 @@ isOneToOne: false
                     "created_at"?: string,"creator_enabled_at"?: string | null,"email_verified_at"?: string | null,"role"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"scenario_versions": {
                   Row: {
@@ -167,6 +181,9 @@ isOneToOne: false
 "finish_creator_video_upload_session":
 { Args: { "p_asset_id": string,"p_fence": string,"p_upload_url": string }; Returns: Json
                            },
+"get_active_training_session":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "get_creator_review_preview":
 { Args: { "p_revision": number,"p_scenario_id": string }; Returns: Json
                            },
@@ -181,6 +198,9 @@ isOneToOne: false
                            },
 "get_creator_video_upload_session":
 { Args: { "p_asset_id": string }; Returns: Json
+                           },
+"get_library_player":
+{ Args: { "p_player_id": string }; Returns: Json
                            },
 "get_library_preview":
 { Args: { "p_scenario_id": string }; Returns: Json
@@ -197,8 +217,11 @@ isOneToOne: false
 "list_creator_videos":
 { Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
                            },
+"list_library_players":
+{ Args: { "p_cursor"?: string,"p_limit"?: number,"p_query"?: string }; Returns: Json
+                           },
 "list_library_previews":
-{ Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
+{ Args: { "p_cursor"?: string,"p_limit"?: number,"p_player_id"?: string }; Returns: Json
                            },
 "list_scenario_previews":
 { Args: Record<PropertyKey, never>; Returns: Json
@@ -357,7 +380,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            
+
           }
         }
 } as const

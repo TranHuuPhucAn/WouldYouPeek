@@ -12,7 +12,7 @@ import * as library from "@/lib/client/library-api";
 import * as session from "@/lib/client/session-api";
 import { ApiClientError } from "@/lib/client/api-response";
 import { libraryEntry, creatorId, commandId } from "./creator-fixtures";
-import { sessionSummary, snapshot } from "./session-fixtures";
+import { sessionSummary, snapshot, viewer } from "./session-fixtures";
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/lib/client/library-api", () => ({ listLibraryScenarios: vi.fn() }));
@@ -29,11 +29,11 @@ beforeEach(() => {
   vi.mocked(library.listLibraryScenarios).mockReset();
 });
 describe("published library", () => {
-  it("offers the original demo when empty", () => {
+  it("offers all players when a player collection is empty", () => {
     render(<ScenarioLibrary initial={{ scenarios: [], nextCursor: null }} />);
     expect(
-      screen.getByRole("link", { name: "Open demo practice →" }),
-    ).toHaveAttribute("href", "/play");
+      screen.getByRole("link", { name: "Browse all players →" }),
+    ).toHaveAttribute("href", "/library");
   });
   it("shows attribution without outcomes and deduplicates pagination", async () => {
     const next = {
@@ -63,11 +63,11 @@ describe("published library", () => {
       screen.getAllByRole("link", { name: libraryEntry().title }),
     ).toHaveLength(1);
     expect(library.listLibraryScenarios).toHaveBeenCalledWith(
-      "next",
+      { cursor: "next", playerId: undefined },
       expect.any(AbortSignal),
     );
   });
-  it("ignores late pagination after sign-out and hides entries", async () => {
+  it("keeps the public catalogue available after identity changes", async () => {
     let resolve!: (
       v: Awaited<ReturnType<typeof library.listLibraryScenarios>>,
     ) => void;
@@ -86,8 +86,7 @@ describe("published library", () => {
     await act(async () =>
       resolve({ scenarios: [libraryEntry()], nextCursor: null }),
     );
-    expect(screen.queryByText(libraryEntry().title)).not.toBeInTheDocument();
-    expect(screen.getByText(/Refreshing the library/)).toBeInTheDocument();
+    expect(screen.getByText(libraryEntry().title)).toBeInTheDocument();
   });
 });
 describe("selected scenario starts", () => {
@@ -95,7 +94,7 @@ describe("selected scenario starts", () => {
     vi.mocked(session.createOrResumeSession).mockRejectedValueOnce(
       new Error("Lost reply"),
     );
-    render(<ScenarioStart scenarioId={creatorId} />);
+    render(<ScenarioStart scenarioId={creatorId} viewer={viewer} />);
     fireEvent.click(screen.getByRole("button", { name: "Start scenario →" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Retry starting scenario" }),
@@ -116,7 +115,7 @@ describe("selected scenario starts", () => {
         activeSession: sessionSummary(),
       }),
     );
-    render(<ScenarioStart scenarioId={creatorId} />);
+    render(<ScenarioStart scenarioId={creatorId} viewer={viewer} />);
     fireEvent.click(screen.getByRole("button", { name: "Start scenario →" }));
     expect(
       await screen.findByRole("link", { name: "Resume current session →" }),
@@ -131,7 +130,7 @@ describe("selected scenario starts", () => {
     vi.mocked(session.createOrResumeSession).mockRejectedValue(
       new ApiClientError("SCENARIO_UNAVAILABLE", "Withdrawn", 404),
     );
-    render(<ScenarioStart scenarioId={creatorId} />);
+    render(<ScenarioStart scenarioId={creatorId} viewer={viewer} />);
     fireEvent.click(screen.getByRole("button", { name: "Start scenario →" }));
     await screen.findByText(/no longer available for new sessions/);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
@@ -146,7 +145,9 @@ describe("selected scenario starts", () => {
     vi.mocked(session.createOrResumeSession).mockImplementation(
       () => new Promise((r) => (resolve = r)),
     );
-    const view = render(<ScenarioStart scenarioId={creatorId} />);
+    const view = render(
+      <ScenarioStart scenarioId={creatorId} viewer={viewer} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Start scenario →" }));
     fireEvent.click(screen.getByRole("button", { name: "Opening…" }));
     expect(session.createOrResumeSession).toHaveBeenCalledTimes(1);
@@ -160,3 +161,18 @@ describe("selected scenario starts", () => {
     ).toBe(true);
   });
 });
+
+it.each([null, { ...viewer, emailVerified: false }])(
+  "requires verified sign-in before starting a public scenario",
+  (account) => {
+    render(<ScenarioStart scenarioId={creatorId} viewer={account} />);
+    const link = screen.getByRole("link", {
+      name: account ? /Verify email to play/ : /Sign in to play/,
+    });
+    const url = new URL(link.getAttribute("href")!, "http://localhost");
+    expect(url.pathname).toBe(account ? "/check-email" : "/sign-in");
+    expect(url.searchParams.get("returnTo")).toBe(`/library/${creatorId}`);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(session.createOrResumeSession).not.toHaveBeenCalled();
+  },
+);

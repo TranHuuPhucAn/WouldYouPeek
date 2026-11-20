@@ -156,6 +156,8 @@ export function libraryEntry(): LibraryScenarioPreview {
     context,
     source,
     setup,
+    player: { id: "76af0a04-4751-4d26-9233-183a252e124b", displayName: "TenZ" },
+    editorialOrigin: "creator",
     provenance: "creator",
     publishedAt: when,
   };

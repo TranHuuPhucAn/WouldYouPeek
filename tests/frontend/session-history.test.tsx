@@ -12,7 +12,7 @@ it("shows the first-session empty state", () => {
   render(
     <SessionHistory initialHistory={{ sessions: [], nextCursor: null }} />,
   );
-  expect(screen.getByRole("link", { name: /Start playing/ })).toBeVisible();
+  expect(screen.getByRole("link", { name: /Browse scenarios/ })).toBeVisible();
 });
 it("merges paginated history without duplicate sessions or accuracy labels", async () => {
   vi.mocked(listSessions).mockResolvedValueOnce({

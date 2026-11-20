@@ -55,7 +55,7 @@ describe("auth action adapters", () => {
         idle,
         form({ email: "a@b.com", password: "secret", returnTo: "//evil" }),
       ),
-    ).rejects.toThrow("REDIRECT:/play");
+    ).rejects.toThrow("REDIRECT:/library");
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
   });
   it("ignores signup role metadata and uses check email destination", async () => {
@@ -69,8 +69,38 @@ describe("auth action adapters", () => {
           role: "creator",
         }),
       ),
-    ).rejects.toThrow("REDIRECT:/check-email");
+    ).rejects.toThrow("REDIRECT:/check-email?returnTo=%2Flibrary");
     expect(mocks.signUp.mock.calls[0][0]).not.toHaveProperty("role");
+  });
+  it("retains the selected scenario through signup and verification resend", async () => {
+    const returnTo = "/library/bind-clove-utility-window";
+    await expect(
+      signUpAction(
+        idle,
+        form({
+          email: "a@b.com",
+          password: "Password12345",
+          confirmPassword: "Password12345",
+          returnTo,
+        }),
+      ),
+    ).rejects.toThrow(
+      `REDIRECT:/check-email?returnTo=${encodeURIComponent(returnTo)}`,
+    );
+    expect(mocks.signUp).toHaveBeenCalledWith(expect.any(Object), returnTo);
+    await resendVerificationAction(idle, form({ email: "a@b.com", returnTo }));
+    expect(mocks.resendVerification).toHaveBeenCalledWith(
+      { email: "a@b.com" },
+      returnTo,
+    );
+    await resendVerificationAction(
+      idle,
+      form({ email: "a@b.com", returnTo: "//evil" }),
+    );
+    expect(mocks.resendVerification).toHaveBeenLastCalledWith(
+      { email: "a@b.com" },
+      "/library",
+    );
   });
   it("returns generic reset and resend messaging", async () => {
     expect(

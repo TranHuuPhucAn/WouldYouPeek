@@ -1651,6 +1651,7 @@ fieldset:disabled input {
   flex-wrap: wrap;
 }
 .source-attribution {
+  overflow-wrap: anywhere;
   margin-top: 22px;
   padding: 18px 0;
   border-top: 1px solid var(--line);
@@ -1737,6 +1738,8 @@ fieldset:disabled input {
   min-height: 70vh;
 }
 .page-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin-bottom: 38px;
   max-width: 780px;
 }
@@ -2397,6 +2400,7 @@ select:focus-visible {
   overflow-wrap: anywhere;
 }
 .library-card > p {
+  overflow-wrap: anywhere;
   color: var(--muted);
   line-height: 1.65;
 }
@@ -2425,6 +2429,9 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
   gap: 32px;
   align-items: start;
+}
+.library-detail-grid > section {
+  min-width: 0;
 }
 .scenario-start {
   display: grid;
@@ -2608,4 +2615,108 @@ select:focus-visible {
 
 .video-upload {
   overflow-wrap: anywhere;
+}
+
+/* The public catalogue stays grouped by the player in each recording. */
+.site-nav a[aria-current="page"] {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--mint);
+  text-underline-offset: 7px;
+}
+.library-card h3 {
+  font-size: 27px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.library-search {
+  margin: 32px 0;
+}
+.library-search label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.library-search > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.library-search input {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 520px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 16px;
+  font: inherit;
+}
+.library-filter-heading {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+  color: var(--muted);
+  margin-bottom: 26px;
+}
+.player-section {
+  margin-bottom: 44px;
+}
+.player-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  overflow-wrap: anywhere;
+}
+.player-section-heading > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.player-section-heading h2 {
+  font-size: 30px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.player-section-heading p {
+  color: var(--muted);
+}
+.continue-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+.continue-session h2 {
+  font-size: 23px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.continue-session p,
+.library-media-gate p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+.library-media-gate {
+  display: grid;
+  gap: 24px;
+  min-height: 300px;
+  align-content: center;
+}
+@media (max-width: 650px) {
+  .player-section-heading {
+    align-items: flex-start;
+  }
+  .continue-session .button {
+    width: 100%;
+  }
+  .library-search input {
+    max-width: none;
+    width: 100%;
+  }
 }

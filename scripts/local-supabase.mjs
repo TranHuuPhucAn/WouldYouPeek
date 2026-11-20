@@ -72,7 +72,7 @@ export function runLocalCommand(command, {
     case "types":
     case "types-check": {
       status();
-      const types = run(["gen", "types", "--lang", "typescript", "--schema", "public"]);
+      const types = run(["gen", "types", "--lang", "typescript", "--schema", "public"]).replace(/[ \t]+$/gm, "");
       if (!types.includes("export type Database")) throw new Error("Type generation did not return a database schema.");
       const file = resolve(root, "src/types/database.ts");
       if (command === "types-check") {

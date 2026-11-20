@@ -147,9 +147,6 @@ export function SessionRecap({
         <Link href="/library" className="button button-secondary">
           Scenario library
         </Link>
-        <Link href="/play" className="text-button">
-          Open current practice
-        </Link>
         <Link href="/history" className="button button-secondary">
           Session history
         </Link>

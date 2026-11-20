@@ -73,7 +73,7 @@ describe("caller-scoped creator and library RPC adapters", () => {
       "unpublish_creator_scenario",
       expect.objectContaining({ p_expected_revision: 4 }),
     );
-    await library.listPublishedScenarios(null);
+    await library.listPublishedScenarios({ playerId: null, cursor: null });
     expect(mocks.rpc).toHaveBeenLastCalledWith("list_library_previews", {
       p_limit: 20,
     });
@@ -94,7 +94,9 @@ describe("caller-scoped creator and library RPC adapters", () => {
       data: null,
       error: { message: "database password: secret" },
     });
-    await expect(library.listPublishedScenarios(null)).rejects.toMatchObject({
+    await expect(
+      library.listPublishedScenarios({ playerId: null, cursor: null }),
+    ).rejects.toMatchObject({
       code: "STORAGE_UNAVAILABLE",
     });
   });
