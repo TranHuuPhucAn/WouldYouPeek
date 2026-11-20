@@ -13,11 +13,22 @@ describe("captured verification email through the actual callback", () => {
   const users: { id: string }[] = [];
   afterAll(async () => cleanupTestUsers(users));
 
-  it.each([false, true])(
-    "keeps selected scenario and establishes verified cookies (resend=%s)",
-    async (resend) => {
+  it.each([
+    { resend: false, destination: "/library/bind-clove-smoke-contest" },
+    { resend: true, destination: "/library/bind-clove-smoke-contest" },
+    {
+      resend: false,
+      destination: "/library/playlists/7ecf3523-18cb-5cbe-a307-5b5cd43d1836",
+    },
+    {
+      resend: true,
+      destination:
+        "/creator/playlists/7ecf3523-18cb-5cbe-a307-5b5cd43d1836/review",
+    },
+  ])(
+    "keeps $destination and establishes verified cookies (resend=$resend)",
+    async ({ resend, destination }) => {
       const origin = appOrigin();
-      const destination = "/library/bind-clove-smoke-contest";
       const callback = (next: string) => {
         const url = new URL("/auth/confirm", origin);
         url.searchParams.set("next", next);

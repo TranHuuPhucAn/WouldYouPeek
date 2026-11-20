@@ -1,4 +1,5 @@
 import "server-only";
+import { parsePlaylistSessionMetadata } from "@/lib/client/playlist-validation";
 import { isScenarioId } from "@/lib/scenario-id";
 import type {
   ApiErrorCode,
@@ -8,6 +9,11 @@ import type {
 import type { SessionSummary } from "@/contracts/session";
 
 const ERROR_STATUS: Record<ApiErrorCode, number> = {
+  PLAYLIST_NOT_FOUND: 404,
+  PLAYLIST_UNAVAILABLE: 404,
+  PLAYLIST_CONFLICT: 409,
+  PLAYLIST_CHANGED: 409,
+  CREATOR_PROFILE_CONFLICT: 409,
   INVALID_JSON: 400,
   INVALID_REQUEST: 400,
   INVALID_OPTION: 400,
@@ -137,9 +143,16 @@ export function safeErrorDetails(
       !target ||
       typeof target !== "object" ||
       (target.kind !== "demo" &&
-        (target.kind !== "scenario" ||
-          typeof target.scenarioId !== "string" ||
-          !isScenarioId(target.scenarioId)))
+        !(
+          target.kind === "scenario" &&
+          typeof target.scenarioId === "string" &&
+          isScenarioId(target.scenarioId)
+        ) &&
+        !(
+          target.kind === "playlist" &&
+          typeof target.playlistId === "string" &&
+          uuid.test(target.playlistId)
+        ))
     )
       return;
     if (
@@ -159,6 +172,15 @@ export function safeErrorDetails(
       !Number.isFinite(Date.parse(v.updatedAt))
     )
       return;
+    let playlist;
+    if (target.kind === "playlist") {
+      try {
+        playlist = parsePlaylistSessionMetadata(v.playlist);
+        if (Number(v.totalCount) > 20) return;
+      } catch {
+        return;
+      }
+    }
     return {
       activeSession: {
         id: v.id,
@@ -166,7 +188,10 @@ export function safeErrorDetails(
         target:
           target.kind === "demo"
             ? { kind: "demo" }
-            : { kind: "scenario", scenarioId: target.scenarioId as string },
+            : target.kind === "playlist"
+              ? { kind: "playlist", playlistId: target.playlistId as string }
+              : { kind: "scenario", scenarioId: target.scenarioId as string },
+        ...(playlist ? { playlist } : {}),
         status: "in_progress",
         answeredCount: v.answeredCount as number,
         totalCount: v.totalCount as number,
@@ -263,6 +288,14 @@ export function databaseError(error: {
   details?: string;
 }): never {
   const messages: Partial<Record<ApiErrorCode, string>> = {
+    PLAYLIST_NOT_FOUND: "This playlist could not be found.",
+    PLAYLIST_UNAVAILABLE: "This playlist is not available for a new session.",
+    PLAYLIST_CONFLICT:
+      "This playlist has changed. Load the latest saved draft.",
+    PLAYLIST_CHANGED:
+      "This playlist was republished. Reload it before starting.",
+    CREATOR_PROFILE_CONFLICT:
+      "Your creator name has changed. Reload it before continuing.",
     AUTH_REQUIRED: "Sign in to continue.",
     EMAIL_NOT_VERIFIED: "Verify your email before continuing.",
     CREATOR_REQUIRED: "Enable creator access first.",
@@ -277,12 +310,11 @@ export function databaseError(error: {
     SCENARIO_NOT_FOUND: "This scenario could not be found.",
     SCENARIO_CONFLICT:
       "This scenario has changed. Load the latest saved draft.",
-    DRAFT_NOT_READY:
-      "Complete the indicated fields before reviewing this scenario.",
+    DRAFT_NOT_READY: "Complete the indicated fields before reviewing.",
     REVIEW_REQUIRED: "Review the current saved draft before publishing.",
     SCENARIO_UNAVAILABLE: "This scenario is not available for a new session.",
     ACTIVE_SESSION_EXISTS:
-      "Finish your current session before starting a different scenario.",
+      "Finish your current session before starting different training.",
     PAYLOAD_TOO_LARGE: "This request is too large.",
     VIDEO_NOT_FOUND: "This video could not be found.",
     VIDEO_CONFLICT: "This video has changed. Reload it to continue.",

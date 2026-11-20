@@ -70,6 +70,7 @@ export function ChallengePlayer({
             pending={state.pending}
             completedAt={state.snapshot.completedAt}
             title={state.snapshot.title}
+            playlist={state.snapshot.playlist}
           />
         </>
       ) : (
@@ -79,7 +80,11 @@ export function ChallengePlayer({
               ← Home
             </Link>
             <div
-              className="session-progress"
+              className={
+                state.snapshot.playlist
+                  ? "session-progress playlist-progress"
+                  : "session-progress"
+              }
               aria-label={`Scenario ${state.currentIndex + 1} of ${state.catalogue.length || 3}`}
             >
               <span className="mono">
@@ -96,6 +101,12 @@ export function ChallengePlayer({
               </div>
             </div>
           </div>
+          {state.snapshot.playlist && (
+            <p className="playlist-session-context">
+              {state.snapshot.title}{" "}
+              <span>· By {state.snapshot.playlist.credit.displayName}</span>
+            </p>
+          )}
           {state.phase === "auth-required" ? (
             <div className="status-panel">
               <h1>Sign in to continue.</h1>

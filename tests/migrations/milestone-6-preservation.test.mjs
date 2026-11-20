@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { assertDisposableTarget, cleanChildEnvironment } from "../../scripts/local-target.mjs";
 import {
-  applyPendingMigrations, assertDockerOwnership, LAST_M5_MIGRATION,
+  applyPendingMigrations, assertDockerOwnership, LAST_M5_MIGRATION, LAST_M6_MIGRATION,
   runTestCommand, startTestMediaWorker, stopTestApp,
 } from "../../scripts/local-test-stack.mjs";
 
@@ -313,7 +313,7 @@ export async function runLibraryMigrationPreservation(env = process.env) {
     if (worker) await stopTestApp(worker);
   }
   const before = snapshotM5Records(target);
-  await applyPendingMigrations(target);
+  await applyPendingMigrations(target, { through: LAST_M6_MIGRATION });
   await assertM5Preserved(target, before, baseline, env);
   console.log("Library upgrade preservation passed: accounts, full immutable rows, reviews, real upload bytes/references, legacy demo/single sessions, answers and receipts survived; guest catalogue and individual curated starts work.");
 }

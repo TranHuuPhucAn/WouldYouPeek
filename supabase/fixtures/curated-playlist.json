@@ -1,0 +1,24 @@
+{
+  "id": "7ecf3523-18cb-5cbe-a307-5b5cd43d1836",
+  "publicationVersion": "2e061c34-3f9c-58cd-8923-926b353662fc",
+  "title": "TenZ — Three decisions on Bind",
+  "description": "Three curated moments from TenZ’s Bind POV. Make your call, watch the action, then compare the analysis.",
+  "credit": {
+    "kind": "editorial",
+    "displayName": "Would You Peek"
+  },
+  "items": [
+    {
+      "scenarioId": "bind-clove-utility-window",
+      "scenarioVersion": "vod-1"
+    },
+    {
+      "scenarioId": "bind-clove-smoke-contest",
+      "scenarioVersion": "vod-1"
+    },
+    {
+      "scenarioId": "bind-clove-advantage-reset",
+      "scenarioVersion": "vod-1"
+    }
+  ]
+}

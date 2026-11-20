@@ -1,3 +1,4 @@
+import type { PlaylistSessionMetadata } from "@/contracts/playlist";
 import { AnalysisNote } from "./AnalysisNote";
 import Link from "next/link";
 import type { CompletedChallenge } from "@/lib/session/session-reducer";
@@ -9,12 +10,14 @@ export function SessionRecap({
   pending = false,
   completedAt,
   title,
+  playlist,
 }: {
   completed: CompletedChallenge[];
   onRestart: () => void;
   pending?: boolean;
   completedAt?: string | null;
   title?: string;
+  playlist?: PlaylistSessionMetadata;
 }) {
   const hasProScenarios = completed.some(({ answer }) => answer.observedAction);
   return (
@@ -32,6 +35,12 @@ export function SessionRecap({
         <span className="accent-text">More perspective.</span>
       </h1>
       {title && <p className="quiet-note">{title}</p>}
+      {playlist && (
+        <p className="quiet-note">
+          Playlist by {playlist.credit.displayName} ·{" "}
+          {playlist.players.map((player) => player.displayName).join(", ")}
+        </p>
+      )}
       <p className="recap-intro">
         Good decisions start with noticing the details. Take a moment to revisit
         yours.
@@ -49,7 +58,9 @@ export function SessionRecap({
         {completed.map(({ challenge, answer }, index) => (
           <details className="recap-card" key={challenge.id}>
             <summary>
-              <span className="recap-number">0{index + 1}</span>
+              <span className="recap-number">
+                {String(index + 1).padStart(2, "0")}
+              </span>
               <span className="recap-title">
                 <small>{challenge.topic}</small>
                 {challenge.source && (
@@ -141,7 +152,11 @@ export function SessionRecap({
           onClick={onRestart}
           disabled={pending}
         >
-          {pending ? "Opening…" : "Play again"}{" "}
+          {pending
+            ? "Opening…"
+            : playlist
+              ? "View latest playlist"
+              : "Play again"}{" "}
           <span aria-hidden="true">↺</span>
         </button>
         <Link href="/library" className="button button-secondary">

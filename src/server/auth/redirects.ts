@@ -12,6 +12,8 @@ const entryPaths = new Set([
   "/account",
   "/creator",
   "/creator/videos",
+  "/creator/playlists",
+  "/library/playlists",
   "/demo",
 ]);
 function isReturnPath(value: unknown): value is string {
@@ -24,12 +26,16 @@ function isReturnPath(value: unknown): value is string {
     return (
       !["players", "playlists"].includes(parts[2]) && isScenarioId(parts[2])
     );
-  if (parts.length === 4 && parts[1] === "library" && parts[2] === "players")
+  if (
+    parts.length === 4 &&
+    parts[1] === "library" &&
+    ["players", "playlists"].includes(parts[2])
+  )
     return uuid.test(parts[3]);
   return (
     (parts.length === 4 || (parts.length === 5 && parts[4] === "review")) &&
     parts[1] === "creator" &&
-    parts[2] === "scenarios" &&
+    ["scenarios", "playlists"].includes(parts[2]) &&
     uuid.test(parts[3])
   );
 }

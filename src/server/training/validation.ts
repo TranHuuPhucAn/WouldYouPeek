@@ -45,33 +45,49 @@ function revision(value: unknown): number {
   return value;
 }
 export function parseStartSession(value: unknown): StartSessionRequest {
-  const hasTarget = Boolean(
-    value && typeof value === "object" && Object.hasOwn(value, "target"),
-  );
+  const raw =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  if (!Object.hasOwn(raw, "target")) {
+    const input = object(value, ["requestId"]);
+    return { requestId: parseUuid(input.requestId) };
+  }
+  const target = parseSessionTarget(raw.target);
   const input = object(
     value,
-    hasTarget ? ["requestId", "target"] : ["requestId"],
+    target.kind === "playlist"
+      ? ["requestId", "target", "expectedPublicationVersion"]
+      : ["requestId", "target"],
   );
-  return {
-    requestId: parseUuid(input.requestId),
-    ...(hasTarget ? { target: parseSessionTarget(input.target) } : {}),
-  };
+  const requestId = parseUuid(input.requestId);
+  if (target.kind === "playlist")
+    return {
+      requestId,
+      target,
+      expectedPublicationVersion: parseUuid(
+        input.expectedPublicationVersion,
+      ).toLowerCase(),
+    };
+  return { requestId, target };
 }
 export function parseSessionTarget(value: unknown): SessionTarget {
-  if (
-    value &&
-    typeof value === "object" &&
-    "kind" in value &&
-    value.kind === "demo"
-  ) {
-    object(value, ["kind"]);
-    return { kind: "demo" };
+  if (value && typeof value === "object" && "kind" in value) {
+    if (value.kind === "demo") {
+      object(value, ["kind"]);
+      return { kind: "demo" };
+    }
+    if (value.kind === "playlist") {
+      const target = object(value, ["kind", "playlistId"]);
+      return {
+        kind: "playlist",
+        playlistId: parseUuid(target.playlistId).toLowerCase(),
+      };
+    }
   }
   const target = object(value, ["kind", "scenarioId"]);
-  if (target.kind !== "scenario")
-    throw new ApiError("INVALID_REQUEST", "Choose a supported session target.");
-  if (!isScenarioId(target.scenarioId))
-    throw new ApiError("INVALID_REQUEST", "Choose a valid scenario.");
+  if (target.kind !== "scenario" || !isScenarioId(target.scenarioId))
+    throw new ApiError("INVALID_REQUEST", "Choose a valid session target.");
   return {
     kind: "scenario",
     scenarioId: normalizeScenarioId(target.scenarioId),

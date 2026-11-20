@@ -39,6 +39,20 @@ isOneToOne: false
                   Relationships: [
 
                   ]
+                },"playlists": {
+                  Row: {
+                    "created_at": string,"creator_id": string | null,"current_version": string | null,"first_published_at": string | null,"id": string,"is_published": boolean,"kind": string,"published_at": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"creator_id"?: string | null,"current_version"?: string | null,"first_published_at"?: string | null,"id"?: string,"is_published"?: boolean,"kind": string,"published_at"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"creator_id"?: string | null,"current_version"?: string | null,"first_published_at"?: string | null,"id"?: string,"is_published"?: boolean,"kind"?: string,"published_at"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"creator_enabled_at": string | null,"email_verified_at": string | null,"role": string,"user_id": string
@@ -121,17 +135,23 @@ isOneToOne: false
                   ]
                 },"training_sessions": {
                   Row: {
-                    "completed_at": string | null,"created_at": string,"current_index": number | null,"id": string,"phase": string,"revision": number,"target_kind": string,"target_scenario_id": string | null,"target_title": string,"updated_at": string,"user_id": string
+                    "completed_at": string | null,"created_at": string,"current_index": number | null,"id": string,"phase": string,"revision": number,"target_kind": string,"target_playlist_id": string | null,"target_playlist_metadata": Json | null,"target_playlist_version_id": string | null,"target_scenario_id": string | null,"target_title": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"target_kind"?: string,"target_scenario_id"?: string | null,"target_title"?: string,"updated_at"?: string,"user_id": string
+                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"target_kind"?: string,"target_playlist_id"?: string | null,"target_playlist_metadata"?: Json | null,"target_playlist_version_id"?: string | null,"target_scenario_id"?: string | null,"target_title"?: string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"target_kind"?: string,"target_scenario_id"?: string | null,"target_title"?: string,"updated_at"?: string,"user_id"?: string
+                    "completed_at"?: string | null,"created_at"?: string,"current_index"?: number | null,"id"?: string,"phase"?: string,"revision"?: number,"target_kind"?: string,"target_playlist_id"?: string | null,"target_playlist_metadata"?: Json | null,"target_playlist_version_id"?: string | null,"target_scenario_id"?: string | null,"target_title"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "training_sessions_target_playlist_id_fkey"
+      columns: ["target_playlist_id"]
+isOneToOne: false
+      referencedRelation: "playlists"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "training_sessions_target_scenario_id_fkey"
       columns: ["target_scenario_id"]
 isOneToOne: false
@@ -163,6 +183,9 @@ isOneToOne: false
 "complete_video_validation":
 { Args: { "p_asset_id": string,"p_fence": string,"p_metadata": Json,"p_object_version": string }; Returns: boolean
                            },
+"create_creator_playlist":
+{ Args: { "p_request_id": string }; Returns: Json
+                           },
 "create_creator_scenario":
 { Args: { "p_request_id": string }; Returns: Json
                            },
@@ -184,6 +207,15 @@ isOneToOne: false
 "get_active_training_session":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"get_creator_playlist":
+{ Args: { "p_playlist_id": string }; Returns: Json
+                           },
+"get_creator_playlist_review_preview":
+{ Args: { "p_playlist_id": string,"p_revision": number }; Returns: Json
+                           },
+"get_creator_profile":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "get_creator_review_preview":
 { Args: { "p_revision": number,"p_scenario_id": string }; Returns: Json
                            },
@@ -202,6 +234,9 @@ isOneToOne: false
 "get_library_player":
 { Args: { "p_player_id": string }; Returns: Json
                            },
+"get_library_playlist":
+{ Args: { "p_playlist_id": string }; Returns: Json
+                           },
 "get_library_preview":
 { Args: { "p_scenario_id": string }; Returns: Json
                            },
@@ -210,6 +245,12 @@ isOneToOne: false
                            },
 "get_training_session":
 { Args: { "p_session_id": string }; Returns: Json
+                           },
+"list_creator_playlist_scenarios":
+{ Args: { "p_cursor"?: string,"p_limit"?: number,"p_query"?: string }; Returns: Json
+                           },
+"list_creator_playlists":
+{ Args: { "p_cursor"?: string,"p_limit"?: number,"p_status"?: string }; Returns: Json
                            },
 "list_creator_scenarios":
 { Args: { "p_cursor"?: string,"p_limit"?: number,"p_status"?: string }; Returns: Json
@@ -220,6 +261,9 @@ isOneToOne: false
 "list_library_players":
 { Args: { "p_cursor"?: string,"p_limit"?: number,"p_query"?: string }; Returns: Json
                            },
+"list_library_playlists":
+{ Args: { "p_cursor"?: string,"p_limit"?: number,"p_player_id"?: string,"p_query"?: string }; Returns: Json
+                           },
 "list_library_previews":
 { Args: { "p_cursor"?: string,"p_limit"?: number,"p_player_id"?: string }; Returns: Json
                            },
@@ -228,6 +272,9 @@ isOneToOne: false
                            },
 "list_training_sessions":
 { Args: { "p_cursor"?: string,"p_limit"?: number }; Returns: Json
+                           },
+"publish_creator_playlist":
+{ Args: { "p_expected_revision": number,"p_playlist_id": string,"p_request_id": string,"p_review_id": string }; Returns: Json
                            },
 "publish_creator_scenario":
 { Args: { "p_expected_revision": number,"p_request_id": string,"p_review_id": string,"p_scenario_id": string }; Returns: Json
@@ -244,11 +291,23 @@ isOneToOne: false
 "retry_creator_video_validation":
 { Args: { "p_asset_id": string,"p_expected_revision": number,"p_request_id": string }; Returns: Json
                            },
+"review_creator_playlist":
+{ Args: { "p_checklist": Json,"p_expected_revision": number,"p_playlist_id": string,"p_profile_revision": number,"p_request_id": string }; Returns: Json
+                           },
 "review_creator_scenario":
 { Args: { "p_checklist": Json,"p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json
                            },
+"save_creator_playlist":
+{ Args: { "p_content": Json,"p_expected_revision": number,"p_playlist_id": string,"p_request_id": string }; Returns: Json
+                           },
+"save_creator_profile":
+{ Args: { "p_display_name": string,"p_expected_revision": number,"p_request_id": string }; Returns: Json
+                           },
 "save_creator_scenario":
 { Args: { "p_content": Json,"p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json
+                           },
+"start_playlist_training_session":
+{ Args: { "p_expected_publication_version": string,"p_playlist_id": string,"p_request_id": string }; Returns: Json
                            },
 "start_selected_training_session":
 { Args: { "p_request_id": string,"p_target": Json }; Returns: Json
@@ -258,6 +317,9 @@ isOneToOne: false
                            },
 "submit_session_answer":
 { Args: { "p_expected_revision": number,"p_item_id": string,"p_option_id": string,"p_request_id": string,"p_session_id": string }; Returns: Json
+                           },
+"unpublish_creator_playlist":
+{ Args: { "p_expected_revision": number,"p_playlist_id": string,"p_request_id": string }; Returns: Json
                            },
 "unpublish_creator_scenario":
 { Args: { "p_expected_revision": number,"p_request_id": string,"p_scenario_id": string }; Returns: Json

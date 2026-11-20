@@ -14,6 +14,7 @@ import {
   parseAnswerResponse,
   validateAnswerForChallenge,
 } from "@/lib/client/challenge-validation";
+import { parsePlaylistSessionMetadata } from "@/lib/client/playlist-validation";
 import { ApiError } from "@/server/http";
 import { UUID_PATTERN, parseSessionTarget } from "./validation";
 
@@ -62,6 +63,13 @@ function sessionMetadata(input: Record<string, unknown>) {
       input.title.length > 300
     )
       invalid();
+    if (target.kind === "playlist")
+      return {
+        target,
+        title: input.title,
+        playlist: parsePlaylistSessionMetadata(input.playlist),
+      };
+    if (input.playlist !== undefined) invalid();
     return { target, title: input.title };
   } catch {
     return invalid();
@@ -227,6 +235,12 @@ export function toSessionSnapshot(value: unknown): SessionSnapshot {
     (items.length !== 1 || items[0].challenge.id !== metadata.target.scenarioId)
   )
     invalid();
+  if (
+    metadata.target.kind === "playlist" &&
+    (items.length > 20 ||
+      new Set(items.map((item) => item.challenge.id)).size !== items.length)
+  )
+    invalid();
   const phase = input.phase;
   if (phase !== "setup" && phase !== "review" && phase !== "completed")
     invalid();
@@ -280,9 +294,11 @@ export function toSessionSummary(value: unknown): SessionSummary {
   )
     invalid();
   if (input.status === "completed" && answeredCount !== totalCount) invalid();
+  const metadata = sessionMetadata(input);
+  if (metadata.target.kind === "playlist" && totalCount > 20) invalid();
   return {
     id: id(input.id),
-    ...sessionMetadata(input),
+    ...metadata,
     status: input.status as SessionSummary["status"],
     answeredCount,
     totalCount,

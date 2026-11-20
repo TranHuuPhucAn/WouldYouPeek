@@ -1,6 +1,9 @@
 import type { AnswerResponse, ChallengeDetail } from "./challenge";
+import type { PlaylistSessionMetadata } from "./playlist";
 export type SessionTarget =
-  { kind: "demo" } | { kind: "scenario"; scenarioId: string };
+  | { kind: "demo" }
+  | { kind: "scenario"; scenarioId: string }
+  | { kind: "playlist"; playlistId: string };
 
 export type SavedAnswer = {
   id: string;
@@ -17,6 +20,7 @@ export type SessionSnapshot = {
   id: string;
   target: SessionTarget;
   title: string;
+  playlist?: PlaylistSessionMetadata;
   status: "in_progress" | "completed";
   phase: "setup" | "review" | "completed";
   revision: number;
@@ -37,6 +41,7 @@ export type SessionSummary = {
   id: string;
   target: SessionTarget;
   title: string;
+  playlist?: PlaylistSessionMetadata;
   status: "in_progress" | "completed";
   answeredCount: number;
   totalCount: number;
@@ -48,7 +53,17 @@ export type SessionHistoryResponse = {
   sessions: SessionSummary[];
   nextCursor: string | null;
 };
-export type StartSessionRequest = { requestId: string; target?: SessionTarget };
+export type StartSessionRequest =
+  | {
+      requestId: string;
+      target?: Exclude<SessionTarget, { kind: "playlist" }>;
+      expectedPublicationVersion?: never;
+    }
+  | {
+      requestId: string;
+      target: Extract<SessionTarget, { kind: "playlist" }>;
+      expectedPublicationVersion: string;
+    };
 export type AnswerSessionRequest = {
   optionId: string;
   requestId: string;

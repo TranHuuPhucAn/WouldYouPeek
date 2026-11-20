@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LibrarySectionNav } from "@/components/library/LibrarySectionNav";
 import { getCurrentAccount } from "@/server/auth/guards";
 import { getPlayers } from "@/server/players/service";
 import { getActiveSessionSummary } from "@/server/training/service";
@@ -27,6 +28,7 @@ export default async function LibraryPage({
           analysis.
         </p>
       </div>
+      <LibrarySectionNav view="scenarios" />
       {saved.status === "fulfilled" && saved.value && (
         <ContinueSessionCard session={saved.value} />
       )}

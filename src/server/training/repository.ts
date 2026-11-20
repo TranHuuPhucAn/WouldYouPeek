@@ -9,14 +9,24 @@ import type {
 export async function startOrResumeSession(
   requestId: string,
   target?: SessionTarget,
+  expectedPublicationVersion?: string,
 ) {
   const client = await createServerSupabaseClient();
-  const { data, error } = target
-    ? await client.rpc("start_selected_training_session", {
-        p_request_id: requestId,
-        p_target: target,
-      })
-    : await client.rpc("start_training_session", { p_request_id: requestId });
+  const { data, error } =
+    target?.kind === "playlist"
+      ? await client.rpc("start_playlist_training_session", {
+          p_request_id: requestId,
+          p_playlist_id: target.playlistId,
+          p_expected_publication_version: expectedPublicationVersion!,
+        })
+      : target
+        ? await client.rpc("start_selected_training_session", {
+            p_request_id: requestId,
+            p_target: target,
+          })
+        : await client.rpc("start_training_session", {
+            p_request_id: requestId,
+          });
   if (error) databaseError(error);
   return data;
 }
