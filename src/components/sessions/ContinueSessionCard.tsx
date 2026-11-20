@@ -1,7 +1,13 @@
 import Link from "next/link";
 import type { SessionSummary } from "@/contracts/session";
 
-export function ContinueSessionCard({ session }: { session: SessionSummary }) {
+export function ContinueSessionCard({
+  session,
+  prefetch,
+}: {
+  session: SessionSummary;
+  prefetch?: boolean;
+}) {
   return (
     <section
       className="surface-card continue-session"
@@ -19,7 +25,11 @@ export function ContinueSessionCard({ session }: { session: SessionSummary }) {
           {session.answeredCount} of {session.totalCount} decisions saved.
         </p>
       </div>
-      <Link href={`/play/${session.id}`} className="button button-primary">
+      <Link
+        href={`/play/${session.id}`}
+        prefetch={prefetch}
+        className="button button-primary"
+      >
         Resume session →
       </Link>
     </section>

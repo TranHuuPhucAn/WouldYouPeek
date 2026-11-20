@@ -9,6 +9,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { PlaylistLibrary } from "@/components/library/PlaylistLibrary";
 import { PlaylistDashboard } from "@/components/creator/PlaylistDashboard";
 import { SessionHistory } from "@/components/sessions/SessionHistory";
+import { PlaylistCard } from "@/components/library/PlaylistCard";
 import * as publicApi from "@/lib/client/playlist-api";
 import * as ownerApi from "@/lib/client/creator-playlist-api";
 import {
@@ -31,6 +32,25 @@ vi.mock("@/components/auth/AuthStateSync", () => ({
 }));
 beforeEach(() => vi.clearAllMocks());
 describe("playlist discovery and owner dashboard", () => {
+  it("keeps Library card headings at H2 while allowing Home's H3 and prefetch opt-out", () => {
+    const playlist = preview();
+    const view = render(<PlaylistCard playlist={playlist} />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: playlist.title }),
+    ).toBeVisible();
+    view.rerender(
+      <PlaylistCard playlist={playlist} headingLevel={3} prefetch={false} />,
+    );
+    expect(
+      screen.getByRole("heading", { level: 3, name: playlist.title }),
+    ).toBeVisible();
+    expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: playlist.title })).toHaveAttribute(
+      "href",
+      `/library/playlists/${playlist.id}`,
+    );
+    expect(screen.getByText(`By ${playlist.credit.displayName}`)).toBeVisible();
+  });
   it("keeps a mixed collection complete through an exact player filter and deduplicates pagination", async () => {
     const item = preview();
     const next = {
