@@ -1,4 +1,5 @@
 import "server-only";
+import { isScenarioId } from "@/lib/scenario-id";
 import type {
   ApiErrorCode,
   ApiErrorResponse,
@@ -138,7 +139,7 @@ export function safeErrorDetails(
       (target.kind !== "demo" &&
         (target.kind !== "scenario" ||
           typeof target.scenarioId !== "string" ||
-          !uuid.test(target.scenarioId)))
+          !isScenarioId(target.scenarioId)))
     )
       return;
     if (

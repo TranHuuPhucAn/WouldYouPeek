@@ -32,15 +32,16 @@ export async function signUpAction(
   _previous: AuthFormState,
   data: FormData,
 ): Promise<AuthFormState> {
+  const returnTo = safeReturnTo(data.get("returnTo"));
   try {
     await auth.signUp(
       fields(data, ["email", "password", "confirmPassword"]),
-      safeReturnTo(data.get("returnTo")),
+      returnTo,
     );
   } catch (error) {
     return failure(error);
   }
-  redirect("/check-email");
+  redirect(`/check-email?returnTo=${encodeURIComponent(returnTo)}`);
 }
 export async function signInAction(
   _previous: AuthFormState,
@@ -74,7 +75,10 @@ export async function resendVerificationAction(
   data: FormData,
 ): Promise<AuthFormState> {
   try {
-    await auth.resendVerification(fields(data, ["email"]));
+    await auth.resendVerification(
+      fields(data, ["email"]),
+      safeReturnTo(data.get("returnTo")),
+    );
     return {
       status: "success",
       message:

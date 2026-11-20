@@ -1,4 +1,5 @@
 import "server-only";
+import { isScenarioId, normalizeScenarioId } from "@/lib/scenario-id";
 import { ApiError } from "@/server/http";
 import type {
   StartSessionRequest,
@@ -69,9 +70,11 @@ export function parseSessionTarget(value: unknown): SessionTarget {
   const target = object(value, ["kind", "scenarioId"]);
   if (target.kind !== "scenario")
     throw new ApiError("INVALID_REQUEST", "Choose a supported session target.");
+  if (!isScenarioId(target.scenarioId))
+    throw new ApiError("INVALID_REQUEST", "Choose a valid scenario.");
   return {
     kind: "scenario",
-    scenarioId: parseUuid(target.scenarioId).toLowerCase(),
+    scenarioId: normalizeScenarioId(target.scenarioId),
   };
 }
 export function parseAnswerCommand(value: unknown): AnswerSessionRequest {

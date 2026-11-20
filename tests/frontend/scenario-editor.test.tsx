@@ -280,7 +280,7 @@ it("confirms a source change, clears only timing and media descriptions, and kee
   fireEvent.change(screen.getByLabelText("YouTube URL"), {
     target: { value: "https://youtu.be/abcdefghijk" },
   });
-  fireEvent.change(screen.getByLabelText("Player"), {
+  fireEvent.change(screen.getByLabelText("Player in the recording"), {
     target: { value: "Updated player credit" },
   });
   fireEvent.change(screen.getByLabelText("Decision question"), {
@@ -293,7 +293,9 @@ it("confirms a source change, clears only timing and media descriptions, and kee
   );
   expect(mediaFieldValues()).toEqual(timingLabels.map(() => ""));
   expect(screen.getByLabelText("Setup starts")).toHaveFocus();
-  expect(screen.getByLabelText("Player")).toHaveValue("Updated player credit");
+  expect(screen.getByLabelText("Player in the recording")).toHaveValue(
+    "Updated player credit",
+  );
   expect(screen.getByLabelText("Decision question")).toHaveValue(
     "Updated question while deciding",
   );

@@ -8,15 +8,20 @@ export async function GET(request: Request) {
   const query = new URL(request.url).searchParams;
   const type = query.get("type");
   const tokenHash = query.get("token_hash");
-  let destination = "/auth/error";
+  const returnTo = safeReturnTo(
+    query.getAll("next").length === 1 ? query.get("next") : null,
+  );
+  let destination = `/auth/error?returnTo=${encodeURIComponent(returnTo)}`;
   let providerHeaders: Headers | undefined;
-  if ((type === "signup" || type === "recovery") && tokenHash) {
+  if (
+    (type === "signup" || type === "recovery") &&
+    tokenHash &&
+    query.getAll("type").length === 1 &&
+    query.getAll("token_hash").length === 1
+  ) {
     try {
       providerHeaders = await verifyEmailToken(tokenHash, type);
-      destination =
-        type === "recovery"
-          ? "/reset-password"
-          : safeReturnTo(query.get("next"));
+      destination = type === "recovery" ? "/reset-password" : returnTo;
     } catch {
       /* Never include one-time tokens or provider errors in the destination. */
     }

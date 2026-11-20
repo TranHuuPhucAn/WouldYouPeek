@@ -28,9 +28,11 @@ npm run media:worker
 
 This process checks uploaded file format, size, duration and codecs using `ffprobe`. It does not identify gameplay moments or generate questions. `media:setup` writes an ignored, restricted `.env.media-worker.json` credential valid for eight hours; rerun it and restart the worker when it expires. `npm run media:check` checks local prerequisites. The web app never receives the validator credential. YouTube scenarios continue working while the validator is stopped; new uploads wait for validation.
 
-Use **Watch demo** as a guest to view setup clips. Choose **Join the lab**, register with an email and a password of 12–128 characters including uppercase, lowercase and a number, then open the confirmation email in the [local email inbox](http://127.0.0.1:54324). These local emails are captured; no real email is sent. Password-reset and verification-resend messages use the same inbox.
+Open **Library** to browse existing scenarios grouped by player, search player names, and view a player's scenarios. The three original TenZ moments are available individually. Guests can view published metadata and YouTube setup clips; playing requires a verified account. Private uploaded videos require verified access even on preview pages.
 
-After verification, start a session. Watch setup, choose an action, and submit. The answer is saved before the pro’s continuation and analysis appear. **Next scenario** advances the saved checkpoint; **Finish session** completes the final review. History retains completed sessions. Refreshing an unanswered scenario restarts setup; refreshing a saved answer restores review. Unsubmitted selections and video time are not persisted.
+Choose **Sign in to play** on a scenario, then register with an email and a password of 12–128 characters including uppercase, lowercase and a number. Open the confirmation email in the [local email inbox](http://127.0.0.1:54324). Verification returns you to the selected scenario; resend keeps that destination too. These local emails are captured; no real email is sent. Password-reset messages use the same inbox.
+
+After verification, start a scenario. Watch setup, choose an action, and submit. The answer is saved before the pro’s continuation and analysis appear. **Finish session** completes the review. Library offers **Continue your session** when you have unfinished practice, and History retains completed sessions. Refreshing an unanswered scenario restarts setup; refreshing a saved answer restores review. Unsubmitted selections and video time are not persisted. Existing three-scenario sessions still resume and advance normally.
 
 Under **Account**, any verified learner can enable creator access. Creators retain learner access. Open **Creator studio** to create a private draft, choose a YouTube source or an owned uploaded recording, write context, choices and analysis, and explicitly save. Incomplete drafts can be saved. Preview uses only the saved draft and does not create a learner session.
 
@@ -40,7 +42,7 @@ Cancelling an unfinished upload prevents it from becoming a usable recording. St
 
 In the scenario editor, watch and seek through either source, then use **Set setup start**, **Set decision pause**, and **Set continuation end**, or enter precise timestamps. You choose every moment; there is no automatic extraction. Marking changes the working draft until you save. Replacing a source asks for confirmation and clears its old timing marks and media descriptions. One uploaded recording can support several scenarios without duplicating its bytes.
 
-When the draft is complete, preview it, review the source and explanations, and record the checklist. **Publish** makes that exact reviewed content available in the verified learner **Library**. Learners can start one library scenario at a time or keep playing the three-scenario demo. If another session is active, resume it explicitly before starting a different target.
+When the draft is complete, preview it, review the source and explanations, and record the checklist. **Publish** makes that exact reviewed content visible in **Library**, under the source player's name. The editor suggests existing player names; case and whitespace variants share one player group. Drafts do not create public player entries. Learners start one scenario at a time. If another session is active, resume it explicitly before starting a different target.
 
 Editing a published scenario leaves its previous version available until a new reviewed version is published. Content changes invalidate the review. **Unpublish** removes the scenario from discovery and new starts; existing sessions and history retain their original version. Republishing requires another review. Creator review is self-review, not independent moderation.
 
@@ -76,7 +78,7 @@ npm run test:ci
 
 Keep Docker running. The full command creates an ignored `.wyp-test-work/<run-id>/` source copy and a uniquely named disposable Supabase project. It uses API port 55321, database 55322, inbox 55324 and an app at `http://localhost:3100`. These ports must be free. The different app hostname also isolates browser auth cookies from your development app at `127.0.0.1:3000`.
 
-The runner first verifies additive upgrades from milestone three to four, then four to five, preserving accounts, creator drafts, review digests, published versions and saved sessions. It then resets only its disposable database, generates small original video fixtures, starts its scoped media validator, and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data/Storage API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app/validator and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, video library, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
+The runner first verifies additive upgrades from milestone three to four, four to five, and five to six, preserving accounts, creator drafts, review digests, immutable versions, uploaded bytes and references, saved sessions and command receipts. It then resets only its disposable database, generates small original video fixtures, starts its scoped media validator, and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data/Storage API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app/validator and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, video library, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
 
 `npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `npm run test:scripts` checks isolation, cleanup and pipeline failure handling without Docker. Database, integration and HTTP suites refuse the normal development project and hosted targets; run them through `test:ci` so publication fixtures remain isolated. Test administrator credentials are never passed to the web app.
 
@@ -105,7 +107,8 @@ The app uses Next.js App Router, React, TypeScript, Supabase Auth, Postgres and 
 - `src/server/creator/`, `src/app/api/creator/`: owner-scoped drafts, review records, publication and withdrawal commands.
 - `src/server/video/`, `src/app/api/creator/videos/`, `src/app/api/media/playback/`: resumable upload reservations, reference-safe deletion and context-authorized playback access.
 - `src/worker/media/`, `scripts/local-media-worker.mjs`: local metadata validation under a narrowly scoped credential; no publishing or learner-answer privileges.
-- `src/app/library/`, `src/components/library/`, `src/server/library/`: verified-only published previews and selected-scenario starts.
+- `src/app/library/`, `src/components/library/`, `src/server/library/`, `src/server/players/`: public player groups, safe published previews and verified selected-scenario starts.
+- `src/lib/players/`, `src/lib/scenario-id.ts`: consistent player identity normalization and curated-slug/creator-UUID scenario identifiers.
 - `src/server/auth/`, `src/app/(auth)/`, `src/lib/supabase/`: validation, auth actions, confirmation/recovery callbacks, verified identity and cookie refresh.
 - `src/server/training/` and `src/app/api/sessions/`: canonical session reads and atomic start, answer and advance commands.
 - `src/lib/client/`, `src/lib/session/`, `src/hooks/use-challenge-session.ts`: validated responses, durable checkpoint hydration, retry reconciliation and auth-change cancellation.
@@ -114,7 +117,9 @@ The app uses Next.js App Router, React, TypeScript, Supabase Auth, Postgres and 
 - `supabase/fixtures/demo-scenarios.json`: the canonical authored dataset. `scripts/render-demo-seed.mjs` generates `supabase/seed.sql`; runtime repositories read the database.
 - `tests/backend/`, `tests/frontend/`, `tests/integration/`, `supabase/tests/database/`: complementary unit, component, real-service and permission/transaction tests.
 
-Guests can read demo setup-only previews. Verified accounts can browse the library, play and read their own history. Creator enrollment affects only the current account and grants no access to others' private drafts or learner records. Private answer keys cannot be read directly through the public Data API. Session and authoring functions use separate restricted non-login roles that do not own application tables or bypass row-level security. A trigger-only role synchronizes trusted email confirmation into a protected profile column; runtime roles need no direct auth-table access.
+Guests can browse published player groups and setup-only scenario previews. Verified accounts can play and read their own history. Public responses exclude questions, choices, outcomes, private drafts, account details and private video URLs. Creator enrollment affects only the current account and grants no access to others' private drafts or learner records. Private answer keys cannot be read directly through the public Data API. Session and authoring functions use separate restricted non-login roles that do not own application tables or bypass row-level security. A trigger-only role synchronizes trusted email confirmation into a protected profile column; runtime roles need no direct auth-table access.
+
+The player catalogue maps immutable scenario versions to stable player records. Only current published versions contribute to groups and counts; historical attribution is preserved for saved sessions. Player names use Unicode normalization, collapsed whitespace and ASCII case folding, without fuzzy matching different spellings. The curated TenZ scenarios retain their original IDs and AI-analysis attribution. Old `/demo` links redirect to TenZ; `/play` resumes the caller's active session or opens Library, without creating a session.
 
 Each session pins immutable scenario versions. Answers and review checkpoints commit together. One account has at most one active session. Commands carry a request UUID and expected revision; retrying an identical command returns the current canonical snapshot of its original session, even after completion. Reusing the UUID with different input fails. Losing a response or encountering a stale tab triggers reconciliation rather than another attempt.
 
@@ -144,7 +149,8 @@ Each session pins immutable scenario versions. Answers and review checkpoints co
 | `POST /api/creator/videos/[id]/retry-validation`     | Retry an eligible temporary validation failure.                              |
 | `POST /api/creator/videos/[id]/delete`               | Remove an unreferenced source and confirm Storage deletion.                  |
 | `POST /api/media/playback`                           | Authorize source, saved creator scenario, library or pinned-session playback. |
-| `GET /api/library/scenarios?cursor=...`               | Verified-only published creator previews, without answers.                    |
+| `GET /api/library/players?query=...&cursor=...`        | Public player groups, published counts and up to three previews per group.    |
+| `GET /api/library/scenarios?playerId=...&cursor=...` | Public published previews, optionally filtered by player, without answers.    |
 | `GET /api/library/scenarios/[id]`                    | One published setup-only preview.                                             |
 | `POST /api/sessions`                                   | `{ requestId, target }`; `target` is `{ kind: 'demo' }` or `{ kind: 'scenario', scenarioId }`. Omitting it retains the demo behavior. |
 | `GET /api/sessions?cursor=...`                         | Own paginated history.                                                          |
@@ -175,6 +181,10 @@ The seven `artifacts/vod-review/scenario-*.jpg` images preserve visual source ev
 3. **Milestone three:** verified accounts, learner/creator access, persistent versioned sessions and history.
 4. **Milestone four:** creator scenario submission, editing, review and publishing.
 5. **Milestone five:** reusable uploaded videos, manual scenario timing for YouTube and uploads, and uploaded learner playback through the existing review/publication workflow.
-6. **Proposed launch milestone:** hosted deployment, real verification/reset email, backups and operational checks. Library expansion and analytics can follow separately.
+6. **Milestone six:** public player-based Library, individually playable curated scenarios, saved-session resume and simpler navigation.
+7. **Milestone seven:** creator playlists, including mixed-player collections and ordered, resumable training sessions.
+8. **Milestone eight:** a redesigned home page.
+9. **Milestone nine:** clearer scenario presentation and training UX.
+10. **Milestone ten:** feature-review checkpoint before hosted launch, real account email, backups and operational checks. The first hosted release uses YouTube; uploads stay local initially.
 
-Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/creator-media`. GitHub pushes and merges remain with the repository owner. Hosted deployment and production email remain separate work. Automatic extraction is not part of the current roadmap.
+Work branches target `dev`; tested releases move from `dev` to `main`. This milestone is built on `feat/library`. GitHub pushes and merges remain with the repository owner. Each later milestone needs its own approved plan. At milestone ten, review possible additional features before proceeding with launch. Hosted deployment and production email remain separate work. Automatic extraction is not part of the current roadmap.

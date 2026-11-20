@@ -94,7 +94,7 @@ describe("creator publication and selected learning through real Next HTTP route
       403,
     );
     expect((await api(null, "/api/library/scenarios")).response.status).toBe(
-      401,
+      200,
     );
     const created = await api<CreatorMutationResponse>(
       creator,
@@ -263,6 +263,18 @@ describe("creator publication and selected learning through real Next HTTP route
     expect(published.response.status).toBe(200);
     scenario = published.data.scenario;
     expect(scenario.publication.currentVersion).toBe("creator-2");
+    const publicCurrent = await api<LibraryScenarioPreview>(
+      null,
+      `/api/library/scenarios/${scenario.id}`,
+    );
+    expect(publicCurrent.response.status).toBe(200);
+    expect(publicCurrent.data).toMatchObject({
+      id: scenario.id,
+      title: scenario.draft.content.title,
+      editorialOrigin: "creator",
+      provenance: "ai-assisted",
+    });
+    expect(publicCurrent.data.player.displayName).toBe("TenZ");
     expect(
       (await api<SessionSnapshot>(learner, `/api/sessions/${session.id}`)).data
         .items[0].challenge.question,
@@ -288,6 +300,10 @@ describe("creator publication and selected learning through real Next HTTP route
     expect(withdrawn.response.status).toBe(200);
     scenario = withdrawn.data.scenario;
     expect(scenario.review).toBeNull();
+    expect(
+      (await api(null, `/api/library/scenarios/${scenario.id}`)).response
+        .status,
+    ).toBe(404);
     expect(
       (await api(learner, `/api/library/scenarios/${scenario.id}`)).response
         .status,

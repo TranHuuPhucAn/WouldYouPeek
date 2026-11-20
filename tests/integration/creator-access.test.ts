@@ -42,7 +42,7 @@ describe("creator ownership through actual Auth and Data API", () => {
         })
       ).error,
     ).not.toBeNull();
-    expect((await anonymous.rpc("list_library_previews")).error).not.toBeNull();
+    expect((await anonymous.rpc("list_library_previews")).error).toBeNull();
     expect(
       (
         await learner.client.rpc("create_creator_scenario", {

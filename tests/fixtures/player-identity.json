@@ -1,0 +1,47 @@
+[
+  {
+    "input": "  TenZ  ",
+    "displayName": "TenZ",
+    "key": "tenz"
+  },
+  {
+    "input": "ＴｅｎＺ",
+    "displayName": "TenZ",
+    "key": "tenz"
+  },
+  {
+    "input": "TenZ \t Pro",
+    "displayName": "TenZ Pro",
+    "key": "tenz pro"
+  },
+  {
+    "input": "ÉLITE",
+    "displayName": "ÉLITE",
+    "key": "Élite"
+  },
+  {
+    "input": "İ PLAYER",
+    "displayName": "İ PLAYER",
+    "key": "İ player"
+  },
+  {
+    "input": "é",
+    "displayName": "é",
+    "key": "é"
+  },
+  {
+    "input": " ab ",
+    "displayName": "a b",
+    "key": "a b"
+  },
+  {
+    "input": "ﬃ",
+    "displayName": "ffi",
+    "key": "ffi"
+  },
+  {
+    "input": "a﻿",
+    "displayName": "a﻿",
+    "key": "a﻿"
+  }
+]

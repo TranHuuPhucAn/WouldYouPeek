@@ -97,12 +97,19 @@ describe("request scoped Supabase SSR adapters", () => {
     );
     expect(response.headers.get("expires")).toBe("0");
   });
-  it("allows public previews and signed-in protected pages", async () => {
-    expect(
-      (
-        await refreshAuthSession(new NextRequest("http://localhost/demo"))
-      ).headers.get("location"),
-    ).toBeNull();
+  it("allows public catalogue and compatibility routes without authentication", async () => {
+    for (const path of [
+      "/demo",
+      "/play",
+      "/library",
+      "/library/players/tenz",
+      "/library/scenario",
+    ]) {
+      const response = await refreshAuthSession(
+        new NextRequest(`http://localhost${path}`),
+      );
+      expect(response.headers.get("location")).toBeNull();
+    }
     mocks.claims.mockResolvedValue({ data: { claims: { sub: "u" } } });
     expect(
       (

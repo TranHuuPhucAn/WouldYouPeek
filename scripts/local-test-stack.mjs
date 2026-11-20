@@ -12,6 +12,7 @@ import { cleanChildEnvironment, localUrl, OWNER_FILE, readDisposableWorkspace, T
 const sourceDefault = fileURLToPath(new URL("../", import.meta.url));
 export const LAST_M3_MIGRATION = "20261117000500";
 export const LAST_M4_MIGRATION = "20261118000400";
+export const LAST_M5_MIGRATION = "20261120000300";
 const sourceEntries = ["src", "tests", "scripts", "public", "supabase", "docs", "README.md",
   "package.json", "package-lock.json", "next.config.ts", "postcss.config.mjs", "tsconfig.json", "vitest.config.ts", ".env.example"];
 
@@ -282,6 +283,8 @@ export async function runVerificationPipeline(target, {
   await run(process.execPath, ["tests/migrations/milestone-4-preservation.test.mjs"], options);
   console.log("[verify] Checking preservation of milestone-four creator drafts, reviews and published sessions.");
   await run(process.execPath, ["tests/migrations/milestone-5-preservation.test.mjs"], options);
+  console.log("[verify] Checking preservation of milestone-five uploads, immutable content and saved sessions.");
+  await run(process.execPath, ["tests/migrations/milestone-6-preservation.test.mjs"], options);
   // The upgrade script applies the pending migrations in this owned workspace.
   await cli(owned, ["db", "reset", "--yes"], { signal });
   await run(process.execPath, ["scripts/generate-video-fixtures.mjs"], options);
@@ -326,7 +329,7 @@ export async function runFullVerification(source = sourceDefault, { keep = false
           for (const name of [".wyp-server.log", ".wyp-media-worker.log"]) {
             const log = join(target.workspace, name);
             if (!existsSync(log)) continue;
-            const evidence = join(target.sourceRoot, "test-results", `milestone-5-${target.runId}`);
+            const evidence = join(target.sourceRoot, "test-results", `milestone-6-${target.runId}`);
             mkdirSync(evidence, { recursive: true });
             // These services must redact credentials; preserve only bounded diagnostics.
             writeFileSync(join(evidence, name.slice(1)), readFileSync(log, "utf8").slice(-100_000), { mode: 0o600 });

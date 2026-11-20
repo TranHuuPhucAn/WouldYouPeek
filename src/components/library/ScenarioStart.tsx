@@ -2,11 +2,18 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { AccountUser } from "@/contracts/auth";
 import type { SessionSummary } from "@/contracts/session";
 import { createOrResumeSession } from "@/lib/client/session-api";
 import { ApiClientError } from "@/lib/client/api-response";
 import { invalidateAccountView } from "@/components/auth/AuthStateSync";
-export function ScenarioStart({ scenarioId }: { scenarioId: string }) {
+export function ScenarioStart({
+  scenarioId,
+  viewer,
+}: {
+  scenarioId: string;
+  viewer: AccountUser | null;
+}) {
   const router = useRouter(),
     requestId = useRef<string | null>(null),
     request = useRef<AbortController | null>(null),
@@ -14,13 +21,15 @@ export function ScenarioStart({ scenarioId }: { scenarioId: string }) {
   const [pending, setPending] = useState(false),
     [error, setError] = useState<string | null>(null),
     [active, setActive] = useState<SessionSummary | null>(null),
-    [unavailable, setUnavailable] = useState(false);
+    [unavailable, setUnavailable] = useState(false),
+    [identityChanged, setIdentityChanged] = useState(false);
   useEffect(() => {
     valid.current = true;
     const invalidate = () => {
       valid.current = false;
       request.current?.abort();
       setActive(null);
+      setIdentityChanged(true);
     };
     window.addEventListener("wyp:identity-invalidated", invalidate);
     return () => {
@@ -30,7 +39,7 @@ export function ScenarioStart({ scenarioId }: { scenarioId: string }) {
     };
   }, [scenarioId]);
   async function startScenario() {
-    if (request.current || !valid.current) return;
+    if (request.current || !valid.current || !viewer?.emailVerified) return;
     const controller = new AbortController();
     request.current = controller;
     requestId.current ??= crypto.randomUUID();
@@ -93,18 +102,30 @@ export function ScenarioStart({ scenarioId }: { scenarioId: string }) {
         One scenario. Commit your choice, watch the continuation, then question
         the analysis.
       </p>
-      {!active && !unavailable && (
-        <button
+      {identityChanged ? (
+        <p role="status">Your sign-in changed. Refreshing…</p>
+      ) : !viewer?.emailVerified ? (
+        <Link
           className="button button-primary"
-          disabled={pending}
-          onClick={() => void startScenario()}
+          href={`${viewer ? "/check-email" : "/sign-in"}?returnTo=${encodeURIComponent(`/library/${scenarioId}`)}`}
         >
-          {pending
-            ? "Opening…"
-            : error
-              ? "Retry starting scenario"
-              : "Start scenario →"}
-        </button>
+          {viewer ? "Verify email to play →" : "Sign in to play →"}
+        </Link>
+      ) : (
+        !active &&
+        !unavailable && (
+          <button
+            className="button button-primary"
+            disabled={pending}
+            onClick={() => void startScenario()}
+          >
+            {pending
+              ? "Opening…"
+              : error
+                ? "Retry starting scenario"
+                : "Start scenario →"}
+          </button>
+        )
       )}
       {error && (
         <p className="field-error" role="alert">
@@ -123,8 +144,8 @@ export function ScenarioStart({ scenarioId }: { scenarioId: string }) {
         </>
       )}
       {error && !active && !unavailable && (
-        <Link href="/play" className="text-button">
-          Open current practice
+        <Link href="/history" className="text-button">
+          View saved sessions
         </Link>
       )}
       <Link href="/library" className="text-button">

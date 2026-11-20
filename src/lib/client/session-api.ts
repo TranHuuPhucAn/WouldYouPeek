@@ -10,6 +10,7 @@ import type {
   SessionTarget,
 } from "@/contracts/session";
 import { ApiClientError, readApiResponse } from "./api-response";
+import { isScenarioId } from "@/lib/scenario-id";
 import {
   invalidResponse,
   isRecord,
@@ -36,7 +37,7 @@ export function parseSessionTarget(value: unknown): SessionTarget {
     return { kind: "demo" };
   if (
     value.kind === "scenario" &&
-    isUuid(value.scenarioId) &&
+    isScenarioId(value.scenarioId) &&
     Object.keys(value).length === 2
   )
     return { kind: "scenario", scenarioId: value.scenarioId };

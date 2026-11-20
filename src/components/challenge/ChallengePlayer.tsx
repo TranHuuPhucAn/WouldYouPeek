@@ -272,7 +272,8 @@ export function ChallengePlayer({
       <footer className="site-footer">
         <span>MAKE THE CALL. THEN LEARN WHY.</span>
         <span>
-          Would You Peek? <span className="footer-dot">·</span> POV Demo
+          Would You Peek? <span className="footer-dot">·</span> Player POV
+          practice
         </span>
       </footer>
     </div>

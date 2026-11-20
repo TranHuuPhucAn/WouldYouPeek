@@ -44,11 +44,31 @@ describe("session command input", () => {
       },
     });
   });
+  it("accepts curated scenario slugs only in the scenario target", () => {
+    const target = {
+      kind: "scenario",
+      scenarioId: "bind-clove-utility-window",
+    };
+    expect(parseStartSession({ requestId: uuid, target })).toEqual({
+      requestId: uuid,
+      target,
+    });
+    expect(() =>
+      parseStartSession({ requestId: "bind-clove-utility-window", target }),
+    ).toThrow();
+    expect(() =>
+      parseAdvanceCommand({
+        requestId: uuid,
+        fromItemId: target.scenarioId,
+        expectedRevision: 1,
+      }),
+    ).toThrow();
+  });
   it.each([
     null,
     { kind: "demo", scenarioId: uuid },
     { kind: "scenario" },
-    { kind: "scenario", scenarioId: "legacy-demo-slug" },
+    { kind: "scenario", scenarioId: "../legacy-demo-slug" },
     { kind: "scenario", scenarioId: uuid, ownerId: uuid },
     { kind: "playlist" },
   ])("rejects malformed selected target %j", (target) =>

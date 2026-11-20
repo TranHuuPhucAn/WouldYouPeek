@@ -23,7 +23,10 @@ export default async function SignUpPage({
         </p>
         <SignUpForm returnTo={returnTo} />
         <p className="auth-switch">
-          Already have an account? <Link href="/sign-in">Sign in</Link>
+          Already have an account?{" "}
+          <Link href={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`}>
+            Sign in
+          </Link>
         </p>
       </section>
     </main>

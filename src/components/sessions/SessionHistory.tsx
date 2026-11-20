@@ -57,8 +57,8 @@ export function SessionHistory({
       <section className="surface-card">
         <h2>Your first session starts here.</h2>
         <p>Saved decisions and completed debriefs will appear here.</p>
-        <Link href="/play" className="button button-primary">
-          Start playing →
+        <Link href="/library" className="button button-primary">
+          Browse scenarios →
         </Link>
       </section>
     );

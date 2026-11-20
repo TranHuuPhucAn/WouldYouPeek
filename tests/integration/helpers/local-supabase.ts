@@ -64,6 +64,7 @@ export function createLocalTestClient(
 export async function readEmailLink(
   email: string,
   kind: "signup" | "recovery",
+  expectedNext?: string,
 ): Promise<URL> {
   const { mailUrl } = getLocalTestConfig();
   const deadline = Date.now() + 20_000;
@@ -107,7 +108,9 @@ export async function readEmailLink(
         if (
           url.pathname === "/auth/confirm" &&
           url.searchParams.get("type") === kind &&
-          url.searchParams.has("token_hash")
+          url.searchParams.has("token_hash") &&
+          (expectedNext === undefined ||
+            url.searchParams.get("next") === expectedNext)
         )
           return url;
       }

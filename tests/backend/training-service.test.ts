@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   guard: vi.fn(),
+  findActiveSessionSummary: vi.fn(),
   startOrResumeSession: vi.fn(),
   findSession: vi.fn(),
   listSessions: vi.fn(),
@@ -95,5 +96,33 @@ describe("training service boundaries", () => {
       nextCursor: null,
     });
     expect(mocks.listSessions).toHaveBeenCalledWith(null);
+  });
+  it("loads only a verified active summary and does not start a session", async () => {
+    mocks.findActiveSessionSummary.mockResolvedValue(null);
+    expect(await service.getActiveSessionSummary()).toBeNull();
+    expect(mocks.startOrResumeSession).not.toHaveBeenCalled();
+    const session = snapshot();
+    const summary = {
+      id: session.id,
+      status: "in_progress",
+      answeredCount: 0,
+      totalCount: 1,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      completedAt: null,
+      target: { kind: "scenario", scenarioId: "bind-clove-utility-window" },
+      title: "Saved scenario",
+    };
+    mocks.findActiveSessionSummary.mockResolvedValue({
+      ...summary,
+      answerKey: "private",
+    });
+    expect(await service.getActiveSessionSummary()).toEqual(summary);
+    mocks.guard.mockRejectedValue(new ApiError("EMAIL_NOT_VERIFIED", "Verify"));
+    mocks.findActiveSessionSummary.mockClear();
+    await expect(service.getActiveSessionSummary()).rejects.toMatchObject({
+      code: "EMAIL_NOT_VERIFIED",
+    });
+    expect(mocks.findActiveSessionSummary).not.toHaveBeenCalled();
   });
 });

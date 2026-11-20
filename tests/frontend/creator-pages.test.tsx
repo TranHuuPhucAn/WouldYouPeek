@@ -7,9 +7,8 @@ import { listVideos } from "@/server/video/service";
 import { videoList } from "./video-fixtures";
 import EditorPage from "@/app/creator/scenarios/[id]/page";
 import ReviewPage from "@/app/creator/scenarios/[id]/review/page";
-import LibraryPage from "@/app/library/page";
 import LibraryDetailPage from "@/app/library/[scenarioId]/page";
-import { requireVerifiedUser } from "@/server/auth/guards";
+import { getCurrentAccount, requireVerifiedUser } from "@/server/auth/guards";
 import * as creator from "@/server/creator/service";
 import * as library from "@/server/library/service";
 import { ApiError } from "@/server/http";
@@ -30,7 +29,10 @@ vi.mock("next/navigation", () => ({
   },
   useRouter: () => ({ push: vi.fn() }),
 }));
-vi.mock("@/server/auth/guards", () => ({ requireVerifiedUser: vi.fn() }));
+vi.mock("@/server/auth/guards", () => ({
+  requireVerifiedUser: vi.fn(),
+  getCurrentAccount: vi.fn(),
+}));
 vi.mock("@/server/video/service", () => ({ listVideos: vi.fn() }));
 vi.mock("@/components/creator/VideoLibrary", () => ({
   VideoLibrary: () => <div>Private owner recordings</div>,
@@ -74,6 +76,7 @@ vi.mock("@/components/challenge/ScenarioMedia", () => ({
   ScenarioMedia: () => <div>Safe setup only</div>,
 }));
 beforeEach(() => {
+  vi.mocked(getCurrentAccount).mockReset().mockResolvedValue(null);
   vi.mocked(listVideos).mockReset().mockResolvedValue(videoList());
   vi.mocked(requireVerifiedUser)
     .mockReset()
@@ -99,19 +102,6 @@ beforeEach(() => {
     .mockResolvedValue(libraryEntry());
 });
 describe("server page authorization and safe load boundaries", () => {
-  it.each([
-    ["AUTH_REQUIRED", "REDIRECT:/sign-in?returnTo=%2Flibrary"],
-    ["EMAIL_NOT_VERIFIED", "REDIRECT:/check-email"],
-  ] as const)(
-    "redirects %s before loading the library",
-    async (code, destination) => {
-      vi.mocked(requireVerifiedUser).mockRejectedValue(
-        new ApiError(code, "No access"),
-      );
-      await expect(LibraryPage()).rejects.toThrow(destination);
-      expect(library.getLibrary).not.toHaveBeenCalled();
-    },
-  );
   it("requires creator role for direct editor/review URLs but offers learner opt-in at creator home", async () => {
     vi.mocked(requireVerifiedUser).mockResolvedValue(viewer);
     render(await CreatorPage());

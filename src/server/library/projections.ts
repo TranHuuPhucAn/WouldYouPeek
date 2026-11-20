@@ -4,6 +4,8 @@ import type {
   LibraryScenarioPreview,
 } from "@/contracts/library";
 import { ApiError } from "@/server/http";
+import { toPlayerSummary } from "@/server/players/summary";
+import { isScenarioId } from "@/lib/scenario-id";
 import { toChallengePreview } from "@/server/training/projections";
 function invalid(): never {
   throw new ApiError(
@@ -18,16 +20,25 @@ function record(v: unknown): Record<string, unknown> {
 export function toLibraryPreview(value: unknown): LibraryScenarioPreview {
   const v = record(value);
   if (
-    (v.provenance !== "creator" && v.provenance !== "ai-assisted") ||
-    typeof v.publishedAt !== "string" ||
-    v.publishedAt.length > 50 ||
-    !Number.isFinite(Date.parse(v.publishedAt))
+    !isScenarioId(v.id) ||
+    !["ai", "creator", "ai-assisted"].includes(String(v.provenance)) ||
+    (v.editorialOrigin !== "curated" && v.editorialOrigin !== "creator") ||
+    (v.editorialOrigin === "creator" && v.provenance === "ai") ||
+    !(
+      v.publishedAt === null ||
+      (typeof v.publishedAt === "string" &&
+        v.publishedAt.length <= 50 &&
+        Number.isFinite(Date.parse(v.publishedAt)))
+    )
   )
     invalid();
   return {
     ...toChallengePreview(value),
-    provenance: v.provenance,
-    publishedAt: v.publishedAt,
+    player: toPlayerSummary(v.player),
+    editorialOrigin:
+      v.editorialOrigin as LibraryScenarioPreview["editorialOrigin"],
+    provenance: v.provenance as LibraryScenarioPreview["provenance"],
+    publishedAt: v.publishedAt as string | null,
   };
 }
 export function toLibraryList(value: unknown): LibraryListResponse {

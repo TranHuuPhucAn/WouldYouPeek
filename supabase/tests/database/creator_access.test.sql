@@ -16,7 +16,7 @@ select ok(not has_table_privilege('authenticated','public.scenarios','INSERT'),'
 select ok(not has_table_privilege('wyp_creator_rpc','private.scenario_reviews','UPDATE'),'review evidence cannot be updated by authoring role');
 select ok(not has_table_privilege('wyp_creator_rpc','private.creator_commands','DELETE'),'authoring role cannot delete receipts');
 select ok(not has_function_privilege('anon','public.create_creator_scenario(uuid)','EXECUTE'),'anonymous cannot create drafts');
-select ok(not has_function_privilege('anon','public.list_library_previews(text,integer)','EXECUTE'),'guest library RPC is not granted');
+select ok(has_function_privilege('anon','public.list_library_previews(text,integer,uuid)','EXECUTE'),'guests receive the safe library RPC');
 select ok(not has_function_privilege('authenticated','private.project_creator_publication(text,text,jsonb)','EXECUTE'),'caller cannot invoke the private answer projection');
 select ok(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proowner='wyp_creator_rpc'::regrole and (p.proconfig is null or not ('search_path=""'=any(p.proconfig)))),'every creator function pins an empty search path');
 select ok(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proowner='wyp_creator_rpc'::regrole and n.nspname='private' and (has_function_privilege('anon',p.oid,'EXECUTE') or has_function_privilege('authenticated',p.oid,'EXECUTE'))),'private creator helpers have no client execute grants');
@@ -36,7 +36,7 @@ select is((select value->'scenario'->>'revision' from access_state where name='c
 select is((select value->'scenario'->'publication'->>'state' from access_state where name='created'),'never_published','new draft is private');
 select is((public.create_creator_scenario('41000000-0000-4000-8000-000000000010'))->>'replayed','true','create command replay returns its original draft');
 select is(jsonb_array_length(public.list_creator_scenarios()->'scenarios'),1,'replayed create does not create a second draft');
-select is(jsonb_array_length(public.list_library_previews()->'scenarios'),0,'private draft absent from library');
+select is(jsonb_array_length(public.list_library_previews()->'scenarios'),3,'only the three curated scenarios appear; private draft absent from library');
 select throws_like($$select * from private.scenario_drafts$$,'%permission denied%','creator cannot directly inspect private draft tables');
 select throws_like($$select * from private.scenario_answer_keys$$,'%permission denied%','creator cannot directly inspect answer keys');
 select throws_ok($$select public.get_creator_scenario('bind-clove-utility-window')$$,'P0001','SCENARIO_NOT_FOUND','system demo is not an owned creator draft');
@@ -59,9 +59,9 @@ select throws_ok(format('select public.save_creator_scenario(%L,%L,0,%L::jsonb)'
 select throws_ok(format('select public.get_creator_review_preview(%L,0)',value->'scenario'->>'id'),'P0001','SCENARIO_NOT_FOUND','foreign preview cannot reveal answers') from access_state where name='created';
 select set_config('request.jwt.claims','{"sub":"41000000-0000-4000-8000-000000000003","role":"authenticated"}',true);
 select throws_ok('select public.list_creator_scenarios()','P0001','EMAIL_NOT_VERIFIED','unverified account cannot read creator content');
-select throws_ok('select public.list_library_previews()','P0001','EMAIL_NOT_VERIFIED','unverified account cannot read library');
+select lives_ok('select public.list_library_previews()','unverified account can browse safe library metadata');
 select set_config('request.jwt.claims','{"role":"authenticated"}',true);
-select throws_ok('select public.list_library_previews()','P0001','AUTH_REQUIRED','missing identity is rejected');
+select lives_ok('select public.list_library_previews()','catalogue browsing does not require an identity');
 reset role;
 update auth.users set email_confirmed_at=null where id='41000000-0000-4000-8000-000000000001';
 set local role authenticated;

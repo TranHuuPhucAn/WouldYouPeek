@@ -1,5 +1,13 @@
 import Link from "next/link";
-export default function AuthErrorPage() {
+import { safeReturnTo } from "@/server/auth/redirects";
+export default async function AuthErrorPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ returnTo?: string | string[] }>;
+}) {
+  const returnTo = encodeURIComponent(
+    safeReturnTo((await searchParams)?.returnTo),
+  );
   return (
     <main className="auth-shell">
       <section className="auth-card">
@@ -10,13 +18,16 @@ export default function AuthErrorPage() {
           continue.
         </p>
         <div className="stack-actions">
-          <Link href="/check-email" className="button button-primary">
+          <Link
+            href={`/check-email?returnTo=${returnTo}`}
+            className="button button-primary"
+          >
             Resend verification
           </Link>
           <Link href="/forgot-password" className="button button-secondary">
             Request a password reset
           </Link>
-          <Link href="/sign-in" className="text-button">
+          <Link href={`/sign-in?returnTo=${returnTo}`} className="text-button">
             Back to sign in
           </Link>
         </div>

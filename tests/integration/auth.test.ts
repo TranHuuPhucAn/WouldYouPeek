@@ -40,6 +40,7 @@ describe("real local authentication and captured email", () => {
       (await client.auth.signInWithPassword(credentials)).error?.code,
     ).toBe("email_not_confirmed");
     const confirmation = await readEmailLink(credentials.email, "signup");
+    expect(confirmation.searchParams.get("next")).toBe("/library");
     const token = confirmation.searchParams.get("token_hash")!;
     const verified = await client.auth.verifyOtp({
       type: "signup",
@@ -87,4 +88,35 @@ describe("real local authentication and captured email", () => {
     expect((await client.auth.signOut({ scope: "local" })).error).toBeNull();
     expect((await client.auth.getSession()).data.session).toBeNull();
   }, 60_000);
+
+  it("keeps the selected scenario in a real captured verification email", async () => {
+    const credentials = newTestCredentials();
+    const client = createLocalTestClient();
+    const destination = "/library/bind-clove-smoke-contest";
+    const callback = new URL(
+      "/auth/confirm",
+      process.env.SUPABASE_TEST_APP_URL,
+    );
+    callback.searchParams.set("next", destination);
+    const signup = await client.auth.signUp({
+      ...credentials,
+      options: { emailRedirectTo: callback.toString() },
+    });
+    expect(signup.error).toBeNull();
+    expect(signup.data.user?.id).toBeTruthy();
+    users.push({ id: signup.data.user!.id });
+    const confirmation = await readEmailLink(credentials.email, "signup");
+    expect(confirmation.origin).toBe(callback.origin);
+    expect(confirmation.pathname).toBe("/auth/confirm");
+    expect(confirmation.searchParams.get("next")).toBe(destination);
+    expect(confirmation.searchParams.getAll("token_hash")).toHaveLength(1);
+    expect(
+      (
+        await client.auth.verifyOtp({
+          type: "signup",
+          token_hash: confirmation.searchParams.get("token_hash")!,
+        })
+      ).error,
+    ).toBeNull();
+  }, 30_000);
 });
