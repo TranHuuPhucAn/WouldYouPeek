@@ -1,8 +1,10 @@
-import { AnalysisNote } from "./AnalysisNote";
+import type { Ref } from "react";
+import { AnalysisNote, analysisLabel } from "./AnalysisNote";
 import type {
   AnswerResponse,
   Assessment,
   ChallengeDetail,
+  OptionFeedback,
 } from "@/contracts/challenge";
 
 export function assessmentLabel(assessment: Assessment, isProScenario = true) {
@@ -13,162 +15,193 @@ export function assessmentLabel(assessment: Assessment, isProScenario = true) {
     risky: "Risky",
   }[assessment];
 }
-
-type Props = {
-  challenge: ChallengeDetail;
-  answer: AnswerResponse;
-  reviewMedia: "setup" | "outcome";
-  finalChallenge: boolean;
-  onShowSetup: () => void;
-  onShowOutcome: () => void;
-  onNext: () => void;
-  pending?: boolean;
-  nextLabel?: string;
-};
-
+function Conditions({
+  feedback,
+  headingLevel = 4,
+}: {
+  feedback: OptionFeedback;
+  headingLevel?: 3 | 4;
+}) {
+  const Heading = headingLevel === 3 ? "h3" : "h4";
+  return (
+    <div className="feedback-conditions">
+      {!!feedback.acceptableWhen?.length && (
+        <section>
+          <Heading>Defensible when</Heading>
+          <ul>
+            {feedback.acceptableWhen.map((condition) => (
+              <li key={condition}>{condition}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {!!feedback.risks?.length && (
+        <section>
+          <Heading>Risks to account for</Heading>
+          <ul>
+            {feedback.risks.map((risk) => (
+              <li key={risk}>{risk}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
 export function FeedbackPanel({
   challenge,
   answer,
-  reviewMedia,
-  finalChallenge,
-  onShowSetup,
-  onShowOutcome,
-  onNext,
-  pending = false,
-  nextLabel,
-}: Props) {
+  headingId,
+  headingRef,
+}: {
+  challenge: ChallengeDetail;
+  answer: AnswerResponse;
+  headingId?: string;
+  headingRef?: Ref<HTMLHeadingElement>;
+}) {
   const selected = challenge.options.find(
     (option) => option.id === answer.selectedOptionId,
   );
+  const selectedFeedback = answer.optionFeedback.find(
+    (option) => option.optionId === answer.selectedOptionId,
+  );
+  const others = answer.optionFeedback.filter(
+    (option) => option.optionId !== answer.selectedOptionId,
+  );
   const hasComparison =
-    answer.observedAction !== undefined &&
-    typeof answer.matchesPro === "boolean";
+    !!answer.observedAction && typeof answer.matchesPro === "boolean";
   const player = challenge.source?.player ?? "the pro";
+  const observed = challenge.options.find(
+    (option) => option.id === answer.observedAction?.optionId,
+  );
+  const headline =
+    hasComparison &&
+    !answer.matchesPro &&
+    answer.selectedAssessment === "reasonable"
+      ? "Different call. Still defensible."
+      : "Here’s the reasoning.";
   return (
-    <section className="feedback-panel" aria-label="Answer feedback">
+    <section
+      className="feedback-panel scenario-debrief"
+      aria-label="Answer feedback"
+    >
       <div className="section-heading">
         <div>
           <span className="eyebrow">THE DEBRIEF</span>
-          <h2>Here’s the reasoning.</h2>
+          <h2 id={headingId} ref={headingRef} tabIndex={-1}>
+            {headline}
+          </h2>
         </div>
-        <span className={`assessment ${answer.selectedAssessment}`}>
-          {assessmentLabel(answer.selectedAssessment, hasComparison)}
-        </span>
       </div>
-      <p className="selected-answer">
-        Your call: <strong>{selected?.label}</strong>
-      </p>
-      {hasComparison && (
-        <div className="pro-comparison">
-          <span className="eyebrow">OBSERVED CHOICE</span>
-          <h3>
-            {answer.matchesPro
-              ? "Same choice as the pro"
-              : "Different choice from the pro"}
-          </h3>
-          <p>
-            <strong>{player}:</strong> {answer.observedAction!.description}
-          </p>
-          <small>
-            The comparison records what happened. Your assessment depends on the
-            information and risks at the pause.
-          </small>
+      <div className="decision-comparison">
+        <div>
+          <span className="eyebrow">YOUR CALL</span>
+          <p className="chosen-call">{selected?.label}</p>
+          <span className={`assessment ${answer.selectedAssessment}`}>
+            Your decision:{" "}
+            {assessmentLabel(answer.selectedAssessment, hasComparison)}
+          </span>
         </div>
+        {hasComparison && (
+          <div>
+            <span className="eyebrow">OBSERVED CHOICE</span>
+            <p className="chosen-call">
+              {observed?.label ?? answer.observedAction!.description}
+            </p>
+            <span className="comparison-label">
+              {answer.matchesPro
+                ? "Same choice as the pro"
+                : "Different choice from the pro"}{" "}
+              · {player}
+            </span>
+          </div>
+        )}
+      </div>
+      {hasComparison && (
+        <p className="comparison-note">
+          The comparison records what happened. Your assessment depends on the
+          information and risks at the pause.
+        </p>
       )}
-      {answer.analysis && <AnalysisNote analysis={answer.analysis} />}
-      {hasComparison && answer.recommendedOptionIds.length === 0 && (
+      <div className="takeaway">
+        <span className="eyebrow">THE TAKEAWAY</span>
+        <p>{answer.takeaway}</p>
+      </div>
+      {selectedFeedback && (
+        <p className="selected-explanation">{selectedFeedback.explanation}</p>
+      )}
+      {hasComparison && !answer.recommendedOptionIds.length && (
         <p className="conditional-note">
           There is no single preferred answer here. Compare the conditions that
           make each choice defensible.
         </p>
       )}
-      <div className="takeaway">
-        <span className="eyebrow">TAKE THIS INTO YOUR NEXT ROUND</span>
-        <p>{answer.takeaway}</p>
-      </div>
-      <div className="option-feedback">
-        {answer.optionFeedback.map((feedback) => (
-          <article key={feedback.optionId} className="feedback-option">
-            <div>
-              <h3>
-                {
-                  challenge.options.find(
-                    (option) => option.id === feedback.optionId,
-                  )?.label
-                }
-              </h3>
-              <span className={`assessment ${feedback.assessment}`}>
-                {assessmentLabel(feedback.assessment, hasComparison)}
-              </span>
+      <div className="debrief-details">
+        {selectedFeedback &&
+          (!!selectedFeedback.acceptableWhen?.length ||
+            !!selectedFeedback.risks?.length) && (
+            <details>
+              <summary>Conditions &amp; risks</summary>
+              <Conditions feedback={selectedFeedback} headingLevel={3} />
+            </details>
+          )}
+        {!!others.length && (
+          <details>
+            <summary>Other choices</summary>
+            <div className="option-feedback">
+              {others.map((feedback) => (
+                <article key={feedback.optionId} className="feedback-option">
+                  <div>
+                    <h3>
+                      {
+                        challenge.options.find(
+                          (option) => option.id === feedback.optionId,
+                        )?.label
+                      }
+                    </h3>
+                    <span className={`assessment ${feedback.assessment}`}>
+                      {assessmentLabel(feedback.assessment, hasComparison)}
+                    </span>
+                  </div>
+                  <p>{feedback.explanation}</p>
+                  <Conditions feedback={feedback} />
+                </article>
+              ))}
             </div>
-            <p>{feedback.explanation}</p>
-            {(feedback.acceptableWhen?.length > 0 ||
-              feedback.risks?.length > 0) && (
-              <div className="feedback-conditions">
-                {feedback.acceptableWhen?.length > 0 && (
-                  <section>
-                    <h4>Defensible when</h4>
-                    <ul>
-                      {feedback.acceptableWhen.map((condition) => (
-                        <li key={condition}>{condition}</li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-                {feedback.risks?.length > 0 && (
-                  <section>
-                    <h4>Risks to account for</h4>
-                    <ul>
-                      {feedback.risks.map((risk) => (
-                        <li key={risk}>{risk}</li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-              </div>
+          </details>
+        )}
+        {answer.analysis && (
+          <details>
+            <summary>Deeper reasoning &amp; limitations</summary>
+            <AnalysisNote analysis={answer.analysis} />
+          </details>
+        )}
+        <details>
+          <summary>
+            {challenge.mediaStatus === "demo"
+              ? "Authored continuation"
+              : "Recorded outcome"}
+          </summary>
+          <div className="outcome-note">
+            {answer.observedAction && (
+              <p>
+                <strong>{player}:</strong> {answer.observedAction.description}
+              </p>
             )}
-          </article>
-        ))}
+            <p>{answer.outcomeText}</p>
+            <small>
+              A successful outcome does not settle the quality of the decision.
+              Assess the choice using what was known before it.
+            </small>
+          </div>
+        </details>
       </div>
-      <div className="outcome-note">
-        <h3>
-          {challenge.mediaStatus === "demo"
-            ? "Authored continuation"
-            : "Recorded outcome"}
-        </h3>
-        <p>{answer.outcomeText}</p>
-        <small>
-          A successful outcome does not settle the quality of the decision.
-          Assess the choice using what was known before it.
-        </small>
-      </div>
-      <div className="review-controls">
-        <div className="segmented-control" aria-label="Review media">
-          <button aria-pressed={reviewMedia === "setup"} onClick={onShowSetup}>
-            Setup
-          </button>
-          <button
-            aria-pressed={reviewMedia === "outcome"}
-            onClick={onShowOutcome}
-          >
-            Outcome
-          </button>
-        </div>
-        <button
-          className="button button-primary"
-          onClick={onNext}
-          disabled={pending}
-        >
-          {pending
-            ? "Saving…"
-            : nextLabel
-              ? nextLabel
-              : finalChallenge
-                ? "Finish session"
-                : "Next scenario"}
-          <span aria-hidden="true">→</span>
-        </button>
-      </div>
+      {answer.analysis && (
+        <p className="analysis-credit">
+          {analysisLabel(answer.analysis.author)} · Interpretation.{" "}
+          {answer.analysis.notice}
+        </p>
+      )}
     </section>
   );
 }

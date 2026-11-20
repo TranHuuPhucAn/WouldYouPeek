@@ -314,3 +314,127 @@ describe("persistent YouTube scenario playback", () => {
     expect(screen.getByRole("button", { name: "Play setup" })).toBeEnabled();
   });
 });
+
+it("emits scoped continuation events once and does not restart when feedback metadata changes", async () => {
+  const events = vi.fn();
+  const view = render(
+    <YouTubeScenarioPlayer
+      setup={setup}
+      reveal={{ ...reveal, caption: undefined, alt: "Neutral" }}
+      mode="reveal"
+      playbackKey="answer:reveal:1"
+      onPlaybackEvent={events}
+      autoplay
+      hideCaption
+    />,
+  );
+  const instance = await ready();
+  state(instance, 1, 1714);
+  expect(events).toHaveBeenCalledWith({
+    playbackKey: "answer:reveal:1",
+    mode: "reveal",
+    type: "started",
+  });
+  view.rerender(
+    <YouTubeScenarioPlayer
+      setup={setup}
+      reveal={{ ...reveal, caption: "Analysis now available" }}
+      mode="reveal"
+      playbackKey="answer:reveal:1"
+      onPlaybackEvent={events}
+      autoplay
+    />,
+  );
+  expect(instance.player.loadVideoById).toHaveBeenCalledOnce();
+  state(instance, 0, 1713.1);
+  expect(events.mock.calls.filter(([e]) => e.type === "complete")).toHaveLength(
+    0,
+  );
+  state(instance, 1, 1717.8);
+  state(instance, 0, 1718);
+  expect(events.mock.calls.filter(([e]) => e.type === "complete")).toEqual([
+    [{ playbackKey: "answer:reveal:1", mode: "reveal", type: "complete" }],
+  ]);
+});
+it("keeps reopened review quiet, permits manual play and pauses an explicit analysis escape", async () => {
+  const events = vi.fn();
+  const view = render(
+    <YouTubeScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="reveal"
+      playbackKey="saved"
+      onPlaybackEvent={events}
+      autoplay={false}
+    />,
+  );
+  const instance = await ready();
+  expect(instance.player.loadVideoById).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Play continuation" }));
+  expect(instance.player.playVideo).toHaveBeenCalledOnce();
+  view.rerender(
+    <YouTubeScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="reveal"
+      playbackKey="replay"
+      onPlaybackEvent={events}
+      autoplay
+    />,
+  );
+  view.rerender(
+    <YouTubeScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="reveal"
+      playbackKey="replay"
+      onPlaybackEvent={events}
+      autoplay={false}
+    />,
+  );
+  expect(instance.state).toBe(2);
+  fireEvent.click(screen.getByRole("button", { name: "Play continuation" }));
+  expect(instance.player.playVideo).toHaveBeenCalledTimes(2);
+});
+it("rejects callbacks from a replaced provider and preserves manual volume on retry", async () => {
+  const events = vi.fn();
+  render(
+    <YouTubeScenarioPlayer
+      setup={setup}
+      reveal={reveal}
+      mode="reveal"
+      playbackKey="active"
+      onPlaybackEvent={events}
+      autoplay
+    />,
+  );
+  const first = await ready();
+  first.player.setVolume = vi.fn();
+  fireEvent.change(screen.getByRole("slider", { name: "Volume" }), {
+    target: { value: "35" },
+  });
+  expect(first.player.setVolume).toHaveBeenCalledWith(35);
+  act(() => first.events.onAutoplayBlocked({ target: first.player }));
+  expect(events).toHaveBeenLastCalledWith({
+    playbackKey: "active",
+    mode: "reveal",
+    type: "blocked",
+  });
+  act(() => first.events.onError({ target: first.player, data: 100 }));
+  fireEvent.click(screen.getByRole("button", { name: "Retry video" }));
+  await act(async () => {});
+  const second = provider.instances[1];
+  second.player.setVolume = vi.fn();
+  await ready(1);
+  events.mockClear();
+  expect(second.player.setVolume).toHaveBeenCalledWith(35);
+  state(first, 1, 1717.9);
+  act(() => first.events.onAutoplayBlocked({ target: first.player }));
+  expect(events).not.toHaveBeenCalled();
+  state(second, 1, 1714);
+  expect(events).toHaveBeenCalledWith({
+    playbackKey: "active",
+    mode: "reveal",
+    type: "started",
+  });
+});

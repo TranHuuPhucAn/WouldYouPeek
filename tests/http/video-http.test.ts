@@ -7,17 +7,27 @@ import type {
   VideoUploadSessionResponse,
   PlaybackAccess,
 } from "@/contracts/video";
+import type {
+  CreateSessionResponse,
+  SessionMutationResponse,
+  SessionSnapshot,
+} from "@/contracts/session";
 import type { TestUser } from "../integration/helpers/test-users";
 import {
   cleanupTestUsers,
   createVerifiedTestUser,
 } from "../integration/helpers/test-users";
-import { createVerifiedCreator } from "../integration/helpers/creator-scenarios";
+import {
+  createVerifiedCreator,
+  publishScenarioFixture,
+} from "../integration/helpers/creator-scenarios";
 import {
   fixture,
   fingerprint,
   objectPath,
   patchTus,
+  uploadedContent,
+  uploadReady,
   waitVideo,
 } from "../integration/helpers/videos";
 import { createLocalTestClient } from "../integration/helpers/local-supabase";
@@ -170,5 +180,136 @@ describe("uploaded-video HTTP lifecycle", () => {
     );
     expect(again.data.replayed).toBe(true);
     expect((await fetch(access.data.url)).ok).toBe(false);
+  });
+
+  it("replays a completed owned item through signed HTTP media without changing its saved session", async () => {
+    // Immutable published fixtures live only in the owned disposable stack;
+    // stack disposal cleans these accounts and objects without bypassing guards.
+    const savedOwner = await createVerifiedCreator();
+    const savedLearner = await createVerifiedTestUser();
+    const savedBrowser = await loginBrowser(savedLearner);
+    const video = await uploadReady(savedOwner, await fixture());
+    const scenario = await publishScenarioFixture(
+      savedOwner,
+      uploadedContent(video.id),
+    );
+    const start = await api<CreateSessionResponse>(
+      savedBrowser,
+      "/api/sessions",
+      {
+        requestId: randomUUID(),
+        target: { kind: "scenario", scenarioId: scenario.id },
+      },
+    );
+    expect(start.response.status).toBe(200);
+    let snapshot = start.data.session;
+    const item = snapshot.items[0];
+    const context = {
+      kind: "session-item" as const,
+      sessionId: snapshot.id,
+      itemId: item.id,
+      phase: "setup" as const,
+    };
+    const setup = await api<PlaybackAccess>(
+      savedBrowser,
+      "/api/media/playback",
+      context,
+    );
+    expect(setup.response.status).toBe(200);
+    expect(setup.data.assetId).toBe(video.id);
+    expect(
+      (
+        await api(savedBrowser, "/api/media/playback", {
+          ...context,
+          phase: "reveal",
+        })
+      ).response.status,
+    ).toBe(404);
+
+    const answered = await api<SessionMutationResponse>(
+      savedBrowser,
+      `/api/sessions/${snapshot.id}/items/${item.id}/answer`,
+      {
+        requestId: randomUUID(),
+        expectedRevision: snapshot.revision,
+        optionId: item.challenge.options[0].id,
+      },
+    );
+    expect(answered.response.status).toBe(200);
+    snapshot = answered.data.session;
+    const reveal = await api<PlaybackAccess>(
+      savedBrowser,
+      "/api/media/playback",
+      { ...context, phase: "reveal" },
+    );
+    expect(reveal.response.status).toBe(200);
+    expect(reveal.data.assetId).toBe(video.id);
+    const range = await fetch(reveal.data.url, {
+      headers: { Range: "bytes=0-31" },
+    });
+    expect(range.status).toBe(206);
+    expect((await range.arrayBuffer()).byteLength).toBe(32);
+
+    const completed = await api<SessionMutationResponse>(
+      savedBrowser,
+      `/api/sessions/${snapshot.id}/advance`,
+      {
+        requestId: randomUUID(),
+        expectedRevision: snapshot.revision,
+        fromItemId: item.id,
+      },
+    );
+    expect(completed.response.status).toBe(200);
+    snapshot = completed.data.session;
+    expect(snapshot.phase).toBe("completed");
+    const reopened = await loginBrowser(savedLearner);
+    for (const phase of ["setup", "reveal"] as const) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const playback = await api<PlaybackAccess>(
+          reopened,
+          "/api/media/playback",
+          { ...context, phase },
+        );
+        expect(playback.response.status).toBe(200);
+        expect(Object.keys(playback.data).sort()).toEqual([
+          "assetId",
+          "expiresAt",
+          "url",
+        ]);
+        expect(playback.data.assetId).toBe(video.id);
+        expect(Date.parse(playback.data.expiresAt)).toBeGreaterThan(Date.now());
+        expect(
+          Date.parse(playback.data.expiresAt) - Date.now(),
+        ).toBeLessThanOrEqual(300_000);
+        const replay = await fetch(playback.data.url, {
+          headers: { Range: "bytes=0-31" },
+        });
+        expect(replay.status).toBe(206);
+        expect((await replay.arrayBuffer()).byteLength).toBe(32);
+      }
+      expect(
+        (await api(null, "/api/media/playback", { ...context, phase })).response
+          .status,
+      ).toBe(401);
+      expect(
+        (await api(browser, "/api/media/playback", { ...context, phase }))
+          .response.status,
+      ).toBe(404);
+      expect(
+        (
+          await api(reopened, "/api/media/playback", {
+            ...context,
+            phase,
+            itemId: randomUUID(),
+          })
+        ).response.status,
+      ).toBe(404);
+    }
+    const afterReplay = await api<SessionSnapshot>(
+      reopened,
+      `/api/sessions/${snapshot.id}`,
+    );
+    expect(afterReplay.response.status).toBe(200);
+    expect(afterReplay.data).toEqual(snapshot);
   });
 });

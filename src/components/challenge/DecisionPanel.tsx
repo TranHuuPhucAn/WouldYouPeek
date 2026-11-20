@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ChallengeOption } from "@/contracts/challenge";
 
 type Props = {
@@ -25,6 +25,7 @@ export function DecisionPanel({
   onReplay,
 }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const errorId = useId();
 
   useEffect(() => {
     heading.current?.focus();
@@ -46,10 +47,13 @@ export function DecisionPanel({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit();
+          if (selectedOptionId && !pending) onSubmit();
         }}
       >
-        <fieldset disabled={pending}>
+        <fieldset
+          disabled={pending}
+          aria-describedby={error ? errorId : undefined}
+        >
           <legend className="sr-only">Choose your action</legend>
           <div className="option-list">
             {options.map((option, index) => (
@@ -74,7 +78,7 @@ export function DecisionPanel({
           </div>
         </fieldset>
         {error && (
-          <p className="inline-error" role="alert">
+          <p className="inline-error" id={errorId} role="alert">
             {error}
           </p>
         )}

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MediaAsset } from "@/contracts/challenge";
 import type { PlaybackContext } from "@/contracts/video";
+import type { PlaybackMode } from "@/lib/video/segment-controller";
+import type { ScenarioPlaybackEvent } from "@/lib/video/playback-events";
 import { UploadedScenarioPlayer } from "./UploadedScenarioPlayer";
 import { YouTubeScenarioPlayer } from "./YouTubeScenarioPlayer";
 
@@ -11,42 +13,83 @@ type Props = {
   label: string;
   onComplete?: () => void;
   context?: PlaybackContext;
+  mode?: PlaybackMode;
+  playbackKey?: string;
+  onPlaybackEvent?: (event: ScenarioPlaybackEvent) => void;
+  autoplay?: boolean;
+  hideCaption?: boolean;
+  completeLabel?: string;
 };
-
-export function ScenarioMedia({ media, label, onComplete, context }: Props) {
+export function ScenarioMedia({
+  media,
+  label,
+  onComplete,
+  context,
+  mode = "setup",
+  playbackKey = "legacy",
+  onPlaybackEvent,
+  autoplay,
+  hideCaption = false,
+  completeLabel = "Continue to decision",
+}: Props) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const video = useRef<HTMLVideoElement>(null);
+  const identity = `${playbackKey}:${mode}:${"src" in media ? media.src : media.kind}:${attempt}`;
+  const active = useRef(identity);
+  active.current = identity;
+  const priorIntent = useRef(autoplay);
+  const complete = useRef<string | null>(null);
+  function emit(type: ScenarioPlaybackEvent["type"]) {
+    if (active.current === identity)
+      onPlaybackEvent?.({ playbackKey, mode, type });
+  }
+  useEffect(() => {
+    setFailed(false);
+    complete.current = null;
+    const node = video.current;
+    return () => {
+      if (node && !node.paused) node.pause();
+    };
+  }, [identity]);
+  useEffect(() => {
+    if (priorIntent.current === true && autoplay === false)
+      video.current?.pause();
+    priorIntent.current = autoplay;
+  }, [autoplay]);
   function handleMediaError() {
+    if (active.current !== identity) return;
     setFailed(true);
+    emit("error");
   }
   function retryMedia() {
     setFailed(false);
     setAttempt((value) => value + 1);
   }
-
+  const presentation = { playbackKey, onPlaybackEvent, autoplay, hideCaption };
   if (media.kind === "youtube")
     return (
       <YouTubeScenarioPlayer
         setup={media}
-        mode="setup"
+        mode={mode}
         onComplete={onComplete}
+        {...presentation}
       />
     );
-
   if (media.kind === "uploaded-video")
     return context ? (
       <UploadedScenarioPlayer
         setup={media}
-        mode="setup"
+        mode={mode}
         context={context}
         onComplete={onComplete}
+        {...presentation}
       />
     ) : (
       <p role="alert">
         This recording is unavailable. Reload this page to try again.
       </p>
     );
-
   return (
     <section className="media-card" aria-label={label}>
       <div className="media-topline">
@@ -70,32 +113,58 @@ export function ScenarioMedia({ media, label, onComplete, context }: Props) {
           <div className="media-viewport">
             {media.kind === "video" ? (
               <video
-                key={`${media.src}-${attempt}`}
+                key={identity}
+                ref={video}
                 src={media.src}
                 aria-label={media.alt}
                 controls
                 playsInline
                 preload="metadata"
-                onEnded={onComplete}
+                onLoadedData={(event) => {
+                  const node = event.currentTarget;
+                  if (
+                    autoplay &&
+                    mode !== "decision" &&
+                    active.current === identity
+                  )
+                    void node.play().catch(() => emit("blocked"));
+                }}
+                onPlay={() => emit("started")}
+                onEnded={() => {
+                  if (
+                    active.current !== identity ||
+                    complete.current === identity
+                  )
+                    return;
+                  complete.current = identity;
+                  emit("complete");
+                  if (mode === "setup") onComplete?.();
+                }}
                 onError={handleMediaError}
               />
             ) : (
-              // Original local diagrams are intentionally displayed at their authored aspect ratio.
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                key={`${media.src}-${attempt}`}
+                key={identity}
                 src={media.src}
                 alt={media.alt}
                 onError={handleMediaError}
               />
             )}
           </div>
-          {media.caption && <p className="media-caption">{media.caption}</p>}
+          {!hideCaption && media.caption && (
+            <p className="media-caption">{media.caption}</p>
+          )}
           {onComplete && media.kind === "illustration" && (
             <div className="media-action">
-              <span>Read the scene. Make your call.</span>
+              <span>
+                {mode === "reveal"
+                  ? "Read the continuation, then explore the analysis."
+                  : "Read the scene. Make your call."}
+              </span>
               <button className="button button-primary" onClick={onComplete}>
-                Continue to decision <span aria-hidden="true">→</span>
+                {completeLabel}
+                <span aria-hidden="true">→</span>
               </button>
             </div>
           )}

@@ -221,6 +221,24 @@ describe("immutable playlist sessions and uploaded playback", () => {
     ).toEqual(["creator", "creator"]);
     expect(session.playlist).toEqual(originalMetadata);
     expect(session.title).toBe("Original practice sequence");
+    // Completed recap replay still resolves the original version after both
+    // source edits and withdrawal. Authorization is a read, not an advance.
+    for (const phase of ["setup", "reveal"] as const) {
+      expect(
+        (
+          await rpc<{ assetId: string }>(fresh, "authorize_video_playback", {
+            p_context: { ...context, phase },
+          })
+        ).assetId,
+      ).toBe(video.id);
+      expect(
+        (
+          await stranger.client.rpc("authorize_video_playback", {
+            p_context: { ...context, phase },
+          })
+        ).error?.message,
+      ).toBe("SESSION_NOT_FOUND");
+    }
     expect(
       await rpc<SessionSnapshot>(fresh, "get_training_session", {
         p_session_id: session.id,
