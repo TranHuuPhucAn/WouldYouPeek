@@ -2,6 +2,9 @@
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import {
   INITIAL_AUTH_STATE,
+  NEW_PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  NEW_PASSWORD_HINT,
   type AuthFormState,
   type AuthChallengeConfig,
 } from "@/contracts/auth";
@@ -78,8 +81,12 @@ export function AuthForm({
                 : undefined
             }
             required
-            maxLength={field === "email" ? 254 : 128}
-            minLength={field !== "email" && newPassword ? 12 : undefined}
+            maxLength={field === "email" ? 254 : PASSWORD_MAX_LENGTH}
+            minLength={
+              field !== "email" && newPassword
+                ? NEW_PASSWORD_MIN_LENGTH
+                : undefined
+            }
             autoComplete={
               field === "email"
                 ? "email"
@@ -111,10 +118,7 @@ export function AuthForm({
             }}
           />
           {field === "password" && newPassword && (
-            <small id={`${id}-password-hint`}>
-              Use 12–128 characters, with an uppercase letter, a lowercase
-              letter and a number.
-            </small>
+            <small id={`${id}-password-hint`}>{NEW_PASSWORD_HINT}</small>
           )}
           {state.fieldErrors?.[field] && (
             <p id={`${id}-${field}-error`} className="field-error">

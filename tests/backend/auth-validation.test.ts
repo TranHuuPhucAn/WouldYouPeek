@@ -21,28 +21,59 @@ describe("account input boundaries", () => {
   ])("rejects malformed/injected sign-in %j", (input) =>
     expect(() => parseSignInInput(input)).toThrow(),
   );
-  it("accepts matching strong passwords", () =>
+  it("accepts matching eight-character signup passwords", () =>
     expect(
       parseSignUpInput({
         email: "a@b.com",
-        password: "Password12345",
-        confirmPassword: "Password12345",
+        password: "Abcd123!",
+        confirmPassword: "Abcd123!",
       }),
-    ).toEqual({ email: "a@b.com", password: "Password12345" }));
+    ).toEqual({ email: "a@b.com", password: "Abcd123!" }));
   it.each([
-    "shortA1",
-    "alllowercase123",
-    "ALLUPPERCASE123",
-    "NoNumbersPassword",
+    "Abcd12!",
+    "Abcd123!" + "a".repeat(121),
+    "abcd123!",
+    "ABCD123!",
+    "Abcdefg!",
+    "Abcd1234",
+    "Abcd123 ",
+    "Abcd123😀",
   ])("rejects weak new password %s", (password) =>
     expect(() =>
       parseNewPassword({ password, confirmPassword: password }),
     ).toThrow(),
   );
+  it.each(["Abcd123!", "Abcd123!" + "a".repeat(120), " Abcd123! "])(
+    "accepts valid reset boundaries without trimming %s",
+    (password) =>
+      expect(parseNewPassword({ password, confirmPassword: password })).toEqual(
+        {
+          password,
+        },
+      ),
+  );
+  it.each(["[", "]", "{", "}", "\\", "'", '"', "-", "`", "~"])(
+    "accepts supported punctuation %s",
+    (symbol) => {
+      const password = `Abcd123${symbol}`;
+      expect(parseNewPassword({ password, confirmPassword: password })).toEqual(
+        {
+          password,
+        },
+      );
+    },
+  );
+  it.each(["x", "Abcd1234", " a password "])(
+    "allows existing passwords at sign-in %s",
+    (password) =>
+      expect(parseSignInInput({ email: "a@b.com", password }).password).toBe(
+        password,
+      ),
+  );
   it("reports confirmation mismatch", () =>
     expect(() =>
       parseNewPassword({
-        password: "Password12345",
+        password: "Abcd123!",
         confirmPassword: "different",
       }),
     ).toThrow(
@@ -54,8 +85,8 @@ describe("account input boundaries", () => {
     expect(() =>
       parseSignUpInput({
         email: "a@b.com",
-        password: "Password12345",
-        confirmPassword: "Password12345",
+        password: "Abcd123!",
+        confirmPassword: "Abcd123!",
         role: "creator",
       }),
     ).toThrow();

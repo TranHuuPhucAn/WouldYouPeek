@@ -74,8 +74,8 @@ describe("auth action adapters", () => {
         idle,
         form({
           email: "a@b.com",
-          password: "Password12345",
-          confirmPassword: "Password12345",
+          password: "Abcd123!",
+          confirmPassword: "Abcd123!",
           role: "creator",
         }),
       ),
@@ -89,8 +89,8 @@ describe("auth action adapters", () => {
         idle,
         form({
           email: "a@b.com",
-          password: "Password12345",
-          confirmPassword: "Password12345",
+          password: "Abcd123!",
+          confirmPassword: "Abcd123!",
           returnTo,
         }),
       ),
@@ -139,7 +139,7 @@ describe("auth action adapters", () => {
     await expect(
       updatePasswordAction(
         idle,
-        form({ password: "Password12345", confirmPassword: "Password12345" }),
+        form({ password: "Abcd123!", confirmPassword: "Abcd123!" }),
       ),
     ).rejects.toThrow("REDIRECT:/account?password=updated");
     await expect(signOutAction()).rejects.toThrow("REDIRECT:/sign-in");

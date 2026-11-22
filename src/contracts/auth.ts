@@ -18,6 +18,10 @@ export type AuthFormState = {
 
 export const INITIAL_AUTH_STATE: AuthFormState = { status: "idle" };
 
+export const NEW_PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 128;
+export const NEW_PASSWORD_HINT =
+  "Use 8–128 characters with uppercase, lowercase, a number and a symbol.";
+
 export type AuthChallengeConfig =
-  | { kind: "none" }
-  | { kind: "turnstile"; siteKey: string };
+  { kind: "none" } | { kind: "turnstile"; siteKey: string };
