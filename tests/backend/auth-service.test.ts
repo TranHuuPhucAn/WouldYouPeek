@@ -35,12 +35,12 @@ describe("auth provider operations", () => {
   it("signs up without accepting role metadata", async () => {
     await auth.signUp({
       email: "a@b.com",
-      password: "Password12345",
-      confirmPassword: "Password12345",
+      password: "Abcd123!",
+      confirmPassword: "Abcd123!",
     });
     expect(mocks.client.auth.signUp).toHaveBeenCalledWith({
       email: "a@b.com",
-      password: "Password12345",
+      password: "Abcd123!",
       options: { emailRedirectTo: "http://127.0.0.1:3000/auth/confirm" },
     });
   });
@@ -106,8 +106,8 @@ describe("auth provider operations", () => {
     mocks.requireVerifiedUser.mockRejectedValue(new Error("denied"));
     await expect(
       auth.updatePassword({
-        password: "Password12345",
-        confirmPassword: "Password12345",
+        password: "Abcd123!",
+        confirmPassword: "Abcd123!",
       }),
     ).rejects.toThrow("denied");
     expect(mocks.client.auth.updateUser).not.toHaveBeenCalled();
@@ -129,8 +129,8 @@ describe("hosted auth challenge forwarding", () => {
   it("forwards challenge tokens on all supported requests", async () => {
     await auth.signUp({
       email: "a@b.com",
-      password: "Password12345",
-      confirmPassword: "Password12345",
+      password: "Abcd123!",
+      confirmPassword: "Abcd123!",
       captchaToken,
     });
     expect(mocks.client.auth.signUp).toHaveBeenCalledWith(

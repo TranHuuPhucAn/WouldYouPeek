@@ -25,16 +25,35 @@ describe("real local authentication and captured email", () => {
     expect(assertLocalTestTarget("http://127.0.0.1:55321").port).toBe("55321");
   });
 
-  it("requires real email confirmation, rejects replay, resets password and signs out", async () => {
-    const credentials = newTestCredentials();
+  it.each([
+    ["seven characters", "Aa1!aaa"],
+    ["missing lowercase", "ABC1234!"],
+    ["missing uppercase", "abc1234!"],
+    ["missing digit", "Abcdefg!"],
+    ["missing symbol", "Abcd1234"],
+    ["space instead of symbol", "Abcd123 "],
+    ["emoji instead of symbol", "Abcd123🙂"],
+  ])("rejects %s at the real Auth provider", async (_reason, password) => {
+    const { email } = newTestCredentials();
+    const signup = await createLocalTestClient().auth.signUp({
+      email,
+      password,
+    });
+    if (signup.data.user?.id) users.push({ id: signup.data.user.id });
+    expect(signup.error?.code).toBe("weak_password");
+    expect(signup.data.user).toBeNull();
+  });
+
+  it("accepts eight-character passwords through email confirmation, replay rejection, recovery and sign-out", async () => {
+    const credentials = { ...newTestCredentials(), password: "Abcd123!" };
     const client = createLocalTestClient();
     const signup = await client.auth.signUp({
       ...credentials,
       options: { data: { role: "creator" } },
     });
+    if (signup.data.user?.id) users.push({ id: signup.data.user.id });
     expect(signup.error).toBeNull();
     expect(signup.data.user?.id).toBeTruthy();
-    users.push({ id: signup.data.user!.id });
     expect(signup.data.session).toBeNull();
     expect(
       (await client.auth.signInWithPassword(credentials)).error?.code,
@@ -69,7 +88,7 @@ describe("real local authentication and captured email", () => {
       token_hash: recovery.searchParams.get("token_hash")!,
     });
     expect(recovered.error).toBeNull();
-    const newPassword = `${credentials.password}-Changed2`;
+    const newPassword = "Reset12!";
     expect(
       (await recoveryClient.auth.updateUser({ password: newPassword })).error,
     ).toBeNull();
