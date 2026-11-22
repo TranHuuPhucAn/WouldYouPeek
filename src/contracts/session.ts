@@ -21,13 +21,14 @@ export type SessionSnapshot = {
   target: SessionTarget;
   title: string;
   playlist?: PlaylistSessionMetadata;
-  status: "in_progress" | "completed";
-  phase: "setup" | "review" | "completed";
+  status: "in_progress" | "completed" | "ended";
+  phase: "setup" | "review" | "completed" | "ended";
   revision: number;
   currentIndex: number | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  endedAt: string | null;
   items: SessionItem[];
 };
 export type SessionMutationResponse = {
@@ -42,12 +43,13 @@ export type SessionSummary = {
   target: SessionTarget;
   title: string;
   playlist?: PlaylistSessionMetadata;
-  status: "in_progress" | "completed";
+  status: "in_progress" | "completed" | "ended";
   answeredCount: number;
   totalCount: number;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  endedAt: string | null;
 };
 export type SessionHistoryResponse = {
   sessions: SessionSummary[];
@@ -71,6 +73,10 @@ export type AnswerSessionRequest = {
 };
 export type AdvanceSessionRequest = {
   fromItemId: string;
+  requestId: string;
+  expectedRevision: number;
+};
+export type EndSessionRequest = {
   requestId: string;
   expectedRevision: number;
 };

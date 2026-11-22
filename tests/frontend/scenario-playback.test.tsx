@@ -21,6 +21,29 @@ const common = () => ({
   onReadAnalysis: vi.fn(),
 });
 describe("scenario media routing", () => {
+  it("forwards suspension without changing provider identity or playback intent", () => {
+    const c = creatorPreview().challenge,
+      props = common();
+    const view = render(
+      <ScenarioPlayback challenge={c} mode="setup" {...props} />,
+    );
+    const node = screen.getByTestId("youtube-provider");
+    view.rerender(
+      <ScenarioPlayback challenge={c} mode="setup" {...props} suspended />,
+    );
+    expect(screen.getByTestId("youtube-provider")).toBe(node);
+    expect(
+      vi.mocked(YouTubeScenarioPlayer).mock.calls.at(-1)![0],
+    ).toMatchObject({
+      suspended: true,
+      autoplay: true,
+      playbackKey: props.playbackKey,
+    });
+    view.rerender(<ScenarioPlayback challenge={c} mode="setup" {...props} />);
+    expect(
+      vi.mocked(YouTubeScenarioPlayer).mock.calls.at(-1)![0].suspended,
+    ).toBe(false);
+  });
   it("retains the provider through pause and masks first-continuation labels without changing saved data", () => {
     const p = creatorPreview(),
       c = p.challenge,

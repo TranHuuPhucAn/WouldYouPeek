@@ -118,6 +118,7 @@ describe("playlist projection boundaries", () => {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       completedAt: null,
+      endedAt: null,
     };
     expect(toSessionSummary(summary).playlist).toEqual(session.playlist);
     expect(

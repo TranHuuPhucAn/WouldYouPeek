@@ -106,6 +106,90 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it.each(["setup", "reveal"] as const)(
+  "suspends manually started %s without seeking or resuming on close",
+  async (mode) => {
+    const complete = vi.fn(),
+      events = vi.fn();
+    const props = {
+      setup,
+      reveal,
+      mode,
+      autoplay: false,
+      onComplete: complete,
+      onPlaybackEvent: events,
+    };
+    const view = render(<YouTubeScenarioPlayer {...props} />);
+    const instance = await ready();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: mode === "setup" ? "Play setup" : "Play continuation",
+      }),
+    );
+    const time = mode === "setup" ? 1709 : 1715;
+    state(instance, 1, time);
+    const cueCount = vi.mocked(instance.player.cueVideoById).mock.calls.length;
+    const loadCount = vi.mocked(instance.player.loadVideoById).mock.calls
+      .length;
+    events.mockClear();
+    view.rerender(<YouTubeScenarioPlayer {...props} suspended />);
+    expect(instance.state).toBe(2);
+    expect(instance.time).toBe(time);
+    expect(
+      screen.getByRole("button", {
+        name: mode === "setup" ? "Play setup" : "Play continuation",
+      }),
+    ).toBeDisabled();
+    state(instance, 1, time);
+    expect(instance.state).toBe(2);
+    state(instance, 0, mode === "setup" ? setup.endSeconds : reveal.endSeconds);
+    act(() => vi.advanceTimersByTime(150));
+    expect(complete).not.toHaveBeenCalled();
+    expect(events).not.toHaveBeenCalled();
+    view.rerender(<YouTubeScenarioPlayer {...props} />);
+    act(() => vi.advanceTimersByTime(150));
+    expect(instance.player.playVideo).toHaveBeenCalledTimes(1);
+    expect(instance.player.cueVideoById).toHaveBeenCalledTimes(cueCount);
+    expect(instance.player.loadVideoById).toHaveBeenCalledTimes(loadCount);
+    expect(instance.player.seekTo).not.toHaveBeenCalled();
+    expect(events).not.toHaveBeenCalled();
+    instance.time = time;
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: mode === "setup" ? "Play setup" : "Play continuation",
+      }),
+    );
+    expect(instance.player.playVideo).toHaveBeenCalledTimes(2);
+    expect(instance.state).toBe(1);
+  },
+);
+
+it("cues an initially suspended continuation and requires Play after closing", async () => {
+  const events = vi.fn();
+  const props = {
+    setup,
+    reveal,
+    mode: "reveal" as const,
+    autoplay: true,
+    onPlaybackEvent: events,
+  };
+  const view = render(<YouTubeScenarioPlayer {...props} suspended />);
+  const instance = await ready();
+  expect(instance.player.loadVideoById).not.toHaveBeenCalled();
+  expect(instance.player.playVideo).not.toHaveBeenCalled();
+  view.rerender(<YouTubeScenarioPlayer {...props} />);
+  state(instance, 1, 1714);
+  expect(instance.state).toBe(2);
+  expect(events).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Play continuation" }));
+  expect(instance.player.playVideo).toHaveBeenCalledOnce();
+  expect(events).toHaveBeenCalledWith({
+    playbackKey: "legacy",
+    mode: "reveal",
+    type: "started",
+  });
+});
+
 describe("persistent YouTube scenario playback", () => {
   it("pauses before the setup boundary exactly once and keeps the iframe through the decision", async () => {
     const complete = vi.fn();

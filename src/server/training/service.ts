@@ -6,6 +6,7 @@ import {
   parseStartSession,
   parseAnswerCommand,
   parseAdvanceCommand,
+  parseEndCommand,
   parseHistoryCursor,
   parseUuid,
 } from "./validation";
@@ -75,4 +76,10 @@ export async function getActiveSessionSummary() {
     );
   }
   return summary;
+}
+export async function endSession(sessionId: string, input: unknown) {
+  await requireVerifiedUser();
+  return toMutationResponse(
+    await repository.endSession(parseUuid(sessionId), parseEndCommand(input)),
+  );
 }

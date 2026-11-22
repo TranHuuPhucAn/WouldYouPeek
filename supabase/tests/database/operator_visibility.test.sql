@@ -1,0 +1,46 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+insert into auth.users(id,email,email_confirmed_at) values
+('94000000-0000-4000-8000-000000000001','visibility-owner@example.test',now()),
+('94000000-0000-4000-8000-000000000002','visibility-operator@example.test',now()),
+('94000000-0000-4000-8000-000000000003','visibility-new-learner@example.test',now());
+insert into private.operator_memberships(user_id) values('94000000-0000-4000-8000-000000000002');
+create temporary table visibility_state(name text primary key,value jsonb);
+grant select,insert,update on visibility_state to authenticated;
+insert into visibility_state select 'playlist',jsonb_build_object('id',id,'version',current_version) from public.playlists where kind='editorial' limit 1;
+select ok(not has_table_privilege('authenticated','private.scenario_visibility','UPDATE'),'browser callers cannot remove a visibility hold directly');
+select ok(not has_function_privilege('anon','public.set_operator_scenario_visibility(text,uuid,integer,boolean,text)','EXECUTE'),'guests cannot change visibility');
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"94000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+insert into visibility_state select 'session',public.start_playlist_training_session('94000000-0000-4000-8000-000000000010',(value->>'id')::uuid,(value->>'version')::uuid)->'session' from visibility_state where name='playlist';
+select throws_ok($$select public.set_operator_scenario_visibility('bind-clove-utility-window','94000000-0000-4000-8000-000000000011',0,true,'Forged hold')$$,'P0001','OPERATOR_REQUIRED','learner cannot hide published content');
+select set_config('request.jwt.claims','{"sub":"94000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+insert into visibility_state values('hidden',public.set_operator_scenario_visibility('bind-clove-utility-window','94000000-0000-4000-8000-000000000020',0,true,'Review pause timing'));
+select is(value->'visibility'->>'hidden','true','operator hold is active') from visibility_state where name='hidden';
+select is(value->'visibility'->>'creatorPublished','true','operator hide is independent of creator/publication state') from visibility_state where name='hidden';
+select is((value->'visibility'->>'affectedEditorialPlaylistCount')::integer,1,'operator is told the starter playlist needs editorial recovery') from visibility_state where name='hidden';
+select is(public.set_operator_scenario_visibility('bind-clove-utility-window','94000000-0000-4000-8000-000000000020',0,true,'Review pause timing')->>'replayed','true','hide retry reuses its original command');
+select throws_ok($$select public.set_operator_scenario_visibility('bind-clove-utility-window','94000000-0000-4000-8000-000000000021',0,false,'Restore after old state')$$,'P0001','VISIBILITY_CONFLICT','stale visibility revision conflicts');
+select throws_ok($$select public.get_library_preview('bind-clove-utility-window')$$,'P0001','SCENARIO_UNAVAILABLE','direct Library detail is unavailable');
+select is((select count(*)::integer from jsonb_array_elements(public.list_library_previews()->'scenarios') s where s->>'id'='bind-clove-utility-window'),0,'public Library excludes hidden scenario');
+select is((select count(*)::integer from jsonb_array_elements(public.list_scenario_previews()) s where s->>'id'='bind-clove-utility-window'),0,'legacy challenges list also excludes hidden scenario');
+select is(public.get_scenario_preview('bind-clove-utility-window'),null::jsonb,'legacy direct preview cannot bypass hiding');
+select throws_ok(format('select public.get_library_playlist(%L)',value->>'id'),'P0001','PLAYLIST_UNAVAILABLE','starter collection is unavailable as a whole') from visibility_state where name='playlist';
+select set_config('request.jwt.claims','{"sub":"94000000-0000-4000-8000-000000000003","role":"authenticated"}',true);
+select throws_ok($$select public.start_training_session('94000000-0000-4000-8000-000000000030')$$,'P0001','SCENARIO_UNAVAILABLE','legacy demo start rejects instead of silently dropping hidden item');
+select throws_ok($$select public.start_selected_training_session('94000000-0000-4000-8000-000000000031','{"kind":"scenario","scenarioId":"bind-clove-utility-window"}')$$,'P0001','SCENARIO_UNAVAILABLE','selected start is blocked');
+select throws_ok(format('select public.start_playlist_training_session(%L,%L,%L)','94000000-0000-4000-8000-000000000032',value->>'id',value->>'version'),'P0001','PLAYLIST_UNAVAILABLE','playlist start is blocked') from visibility_state where name='playlist';
+select set_config('request.jwt.claims','{"sub":"94000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+select is(public.get_training_session((value->>'id')::uuid),value,'existing owned session retains original complete pinned content') from visibility_state where name='session';
+select set_config('request.jwt.claims','{"sub":"94000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+select is(public.set_operator_scenario_visibility('bind-clove-utility-window','94000000-0000-4000-8000-000000000040',1,false,'Timing verified')->'visibility'->>'hidden','false','explicit restore removes only the hold');
+select lives_ok($$select public.get_library_preview('bind-clove-utility-window')$$,'still-published standalone scenario returns after restore');
+select throws_ok(format('select public.get_library_playlist(%L)',value->>'id'),'P0001','PLAYLIST_UNAVAILABLE','restore does not silently reuse stale editorial generations') from visibility_state where name='playlist';
+reset role;
+select is((select generation::integer from private.scenario_availability_fences where scenario_id='bind-clove-utility-window'),1,'hide increments generation once and restore does not increment it again');
+select ok((select last_withdrawn_at is null from private.scenario_availability_fences where scenario_id='bind-clove-utility-window'),'operator hide does not pretend creator withdrew a source');
+select ok((select is_published from public.scenarios where id='bind-clove-utility-window'),'operator hide/restore preserves original publisher state');
+select * from finish();
+rollback;

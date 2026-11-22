@@ -114,6 +114,7 @@ it("completes the actual three-VOD catalogue with persistent decisions, replay, 
               phase: "completed",
               currentIndex: null,
               completedAt: viewer.createdAt,
+              endedAt: null,
               revision: canonical.revision + 1,
             }
           : {

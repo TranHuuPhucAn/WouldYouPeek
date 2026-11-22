@@ -9,6 +9,11 @@ import type {
 import type { SessionSummary } from "@/contracts/session";
 
 const ERROR_STATUS: Record<ApiErrorCode, number> = {
+  OPERATOR_REQUIRED: 403,
+  REPORT_NOT_FOUND: 404,
+  REPORT_CONFLICT: 409,
+  VISIBILITY_CONFLICT: 409,
+  REPORT_TARGET_CHANGED: 409,
   PLAYLIST_NOT_FOUND: 404,
   PLAYLIST_UNAVAILABLE: 404,
   PLAYLIST_CONFLICT: 409,
@@ -162,7 +167,8 @@ export function safeErrorDetails(
       Number(v.totalCount) < 1 ||
       Number(v.answeredCount) > Number(v.totalCount) ||
       Number(v.totalCount) > 100 ||
-      v.completedAt !== null
+      v.completedAt !== null ||
+      v.endedAt !== null
     )
       return;
     if (
@@ -198,6 +204,7 @@ export function safeErrorDetails(
         createdAt: v.createdAt,
         updatedAt: v.updatedAt,
         completedAt: null,
+        endedAt: null,
       } satisfies SessionSummary,
     };
   }
@@ -288,6 +295,14 @@ export function databaseError(error: {
   details?: string;
 }): never {
   const messages: Partial<Record<ApiErrorCode, string>> = {
+    OPERATOR_REQUIRED: "Operator access is required.",
+    REPORT_NOT_FOUND: "This report could not be found.",
+    REPORT_CONFLICT: "This report has changed. Refresh it before continuing.",
+    VISIBILITY_CONFLICT:
+      "Scenario visibility has changed. Refresh it before continuing.",
+    REPORT_TARGET_CHANGED:
+      "This scenario has changed. Review the updated version before reporting it.",
+    RATE_LIMITED: "You have reached the report limit. Please try again later.",
     PLAYLIST_NOT_FOUND: "This playlist could not be found.",
     PLAYLIST_UNAVAILABLE: "This playlist is not available for a new session.",
     PLAYLIST_CONFLICT:

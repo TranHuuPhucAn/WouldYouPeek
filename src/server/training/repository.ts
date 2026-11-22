@@ -4,6 +4,7 @@ import { databaseError } from "@/server/http";
 import type {
   AnswerSessionRequest,
   AdvanceSessionRequest,
+  EndSessionRequest,
   SessionTarget,
 } from "@/contracts/session";
 export async function startOrResumeSession(
@@ -81,6 +82,16 @@ export async function advanceSession(
 export async function findActiveSessionSummary() {
   const client = await createServerSupabaseClient();
   const { data, error } = await client.rpc("get_active_training_session");
+  if (error) databaseError(error);
+  return data;
+}
+export async function endSession(sessionId: string, input: EndSessionRequest) {
+  const client = await createServerSupabaseClient();
+  const { data, error } = await client.rpc("end_training_session", {
+    p_session_id: sessionId,
+    p_request_id: input.requestId,
+    p_expected_revision: input.expectedRevision,
+  });
   if (error) databaseError(error);
   return data;
 }

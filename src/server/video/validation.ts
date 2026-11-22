@@ -98,6 +98,15 @@ export function parseVideoCursor(value?: string | null): string | null {
 }
 export function parsePlaybackContext(value: unknown): PlaybackContext {
   if (!value || typeof value !== "object" || !("kind" in value)) invalid();
+  if (value.kind === "operator-report") {
+    const v = object(value, ["kind", "reportId", "phase"]);
+    if (v.phase !== "setup" && v.phase !== "reveal") invalid();
+    return {
+      kind: "operator-report",
+      reportId: parseVideoId(v.reportId),
+      phase: v.phase,
+    };
+  }
   if (value.kind === "creator-asset") {
     const v = object(value, ["kind", "assetId"]);
     return { kind: "creator-asset", assetId: parseVideoId(v.assetId) };

@@ -10,6 +10,7 @@ const activeSession = {
   createdAt: "2026-11-20T00:00:00Z",
   updatedAt: "2026-11-20T00:00:00Z",
   completedAt: null,
+  endedAt: null,
   target: { kind: "scenario", scenarioId: "bind-clove-utility-window" },
 };
 describe("curated active-session conflict summaries", () => {

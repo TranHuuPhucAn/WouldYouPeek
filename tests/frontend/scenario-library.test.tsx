@@ -120,7 +120,7 @@ describe("selected scenario starts", () => {
     expect(
       await screen.findByRole("link", { name: "Resume current session →" }),
     ).toHaveAttribute("href", `/play/${snapshot().id}`);
-    expect(screen.getByText(/Finish your current session/)).toBeInTheDocument();
+    expect(screen.getByText(/Resume or end your current session/)).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
     expect(
       screen.queryByRole("button", { name: /Retry starting/ }),

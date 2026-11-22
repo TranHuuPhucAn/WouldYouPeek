@@ -38,6 +38,7 @@ import {
 
 function expectSafePreview(preview: LibraryScenarioPreview) {
   expect(Object.keys(preview).sort()).toEqual([
+    "contentVersion",
     "context",
     "editorialOrigin",
     "id",
@@ -52,6 +53,7 @@ function expectSafePreview(preview: LibraryScenarioPreview) {
     "topic",
   ]);
   expect(Object.keys(preview.player).sort()).toEqual(["displayName", "id"]);
+  expect(preview.contentVersion).toEqual(expect.any(String));
   for (const field of [
     "question",
     "decision",

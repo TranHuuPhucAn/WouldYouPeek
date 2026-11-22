@@ -27,6 +27,7 @@ export function creatorSnapshot(
     readiness: { canReview: issues.length === 0, issues },
     review: null,
     publication: {
+      operatorVisibility: { hidden: false, reason: null, changedAt: null },
       state: "never_published",
       currentVersion: null,
       publishedAt: null,

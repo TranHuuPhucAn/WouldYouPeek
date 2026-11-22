@@ -47,6 +47,7 @@ export function parseApiError(body: unknown, status: number): ApiClientError {
               createdAt,
               updatedAt,
               completedAt,
+              endedAt,
             } = item;
             details = {
               activeSession: {
@@ -59,6 +60,7 @@ export function parseApiError(body: unknown, status: number): ApiClientError {
                 createdAt,
                 updatedAt,
                 completedAt,
+                endedAt,
                 ...(item.playlist ? { playlist: item.playlist } : {}),
               } satisfies SessionSummary,
             };

@@ -49,6 +49,7 @@ function parsePublication(value: unknown): CreatorPublication {
       "currentVersion",
       "publishedAt",
       "hasUnpublishedChanges",
+      "operatorVisibility",
     ]) ||
     !["never_published", "published", "withdrawn"].includes(
       String(value.state),
@@ -61,6 +62,19 @@ function parsePublication(value: unknown): CreatorPublication {
     value.state === "never_published"
       ? value.currentVersion !== null || value.publishedAt !== null
       : value.currentVersion === null || !isDate(value.publishedAt)
+  )
+    invalidResponse();
+  const hold = value.operatorVisibility;
+  if (
+    !isRecord(hold) ||
+    !exact(hold, ["hidden", "reason", "changedAt"]) ||
+    typeof hold.hidden !== "boolean" ||
+    (hold.hidden
+      ? typeof hold.reason !== "string" ||
+        !hold.reason.trim() ||
+        [...hold.reason].length > 1000 ||
+        !isDate(hold.changedAt)
+      : hold.reason !== null || hold.changedAt !== null)
   )
     invalidResponse();
   return value as CreatorPublication;

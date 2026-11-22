@@ -149,6 +149,7 @@ describe("playlist discovery and owner dashboard", () => {
               createdAt: saved.createdAt,
               updatedAt: saved.updatedAt,
               completedAt: null,
+              endedAt: null,
               playlist: saved.playlist,
             },
           ],

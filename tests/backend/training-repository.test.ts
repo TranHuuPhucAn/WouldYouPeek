@@ -46,6 +46,12 @@ describe("caller-scoped RPC repository", () => {
       p_request_id: "r",
       p_expected_revision: 3,
     });
+    await repository.endSession("s", { requestId: "r", expectedRevision: 3 });
+    expect(rpc).toHaveBeenLastCalledWith("end_training_session", {
+      p_session_id: "s",
+      p_request_id: "r",
+      p_expected_revision: 3,
+    });
   });
   it("bounds history pages and uses preview-only RPCs", async () => {
     await repository.listSessions(null);

@@ -82,6 +82,7 @@ function expectUnavailable(result: PageResult) {
 
 function expectSafePreview(preview: LibraryScenarioPreview) {
   expect(Object.keys(preview).sort()).toEqual([
+    "contentVersion",
     "context",
     "editorialOrigin",
     "id",

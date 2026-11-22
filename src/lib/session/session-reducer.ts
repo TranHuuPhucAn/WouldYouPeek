@@ -18,6 +18,7 @@ export type SessionState = {
     | "submitting"
     | "review"
     | "complete"
+    | "ended"
     | "auth-required";
   catalogue: ChallengeSummary[];
   currentIndex: number;
@@ -34,7 +35,8 @@ export type SessionAction =
   | { type: "HYDRATE"; snapshot: SessionSnapshot; viewerId: string }
   | { type: "SETUP_FINISHED"; challengeId?: string }
   | { type: "SELECT_OPTION"; optionId: string }
-  | { type: "REPLAY_SETUP" | "COMMAND_STARTED" | "AUTH_REQUIRED" }
+  | { type: "REPLAY_SETUP" | "AUTH_REQUIRED" }
+  | { type: "COMMAND_STARTED"; kind?: "answer" | "advance" | "end" }
   | { type: "COMMAND_FAILED"; message: string; unresolved: boolean }
   | { type: "SET_REVIEW_MEDIA"; media: "setup" | "outcome" };
 export function createInitialSessionState(input: {
@@ -64,7 +66,10 @@ export function sessionReducer(
       if (
         action.viewerId !== state.viewerId ||
         action.snapshot.id !== state.snapshot.id ||
-        action.snapshot.revision < state.snapshot.revision
+        action.snapshot.revision < state.snapshot.revision ||
+        (state.snapshot.status !== "in_progress" &&
+          (action.snapshot.status !== state.snapshot.status ||
+            action.snapshot.revision !== state.snapshot.revision))
       )
         return state;
       return hydrateSessionSnapshot(action.snapshot, action.viewerId);
@@ -75,18 +80,22 @@ export function sessionReducer(
         : state;
     case "SELECT_OPTION":
       return state.phase === "decision" &&
+        !state.pending &&
         !state.unresolved &&
         state.challenge?.options.some((item) => item.id === action.optionId)
         ? { ...state, selectedOptionId: action.optionId, error: null }
         : state;
     case "REPLAY_SETUP":
-      return state.phase === "decision" && !state.unresolved
+      return state.phase === "decision" && !state.pending && !state.unresolved
         ? { ...state, phase: "setup" }
         : state;
     case "COMMAND_STARTED":
       return {
         ...state,
-        phase: state.phase === "decision" ? "submitting" : state.phase,
+        phase:
+          state.phase === "decision" && action.kind !== "end"
+            ? "submitting"
+            : state.phase,
         pending: true,
         error: null,
       };

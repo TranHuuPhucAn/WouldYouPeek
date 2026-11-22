@@ -75,6 +75,7 @@ export type VideoUploadSessionResponse = {
 };
 export type PlaybackPhase = "setup" | "reveal";
 export type PlaybackContext =
+  | { kind: "operator-report"; reportId: string; phase: PlaybackPhase }
   | { kind: "creator-asset"; assetId: string }
   | {
       kind: "creator-scenario";

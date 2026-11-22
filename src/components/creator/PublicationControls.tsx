@@ -19,6 +19,16 @@ export function PublicationControls({
     <section className="publication-controls surface-card">
       <span className="eyebrow">PUBLICATION</span>
       <h2>{published ? "Your published scenario" : "Ready for learners?"}</h2>
+      {scenario.publication.operatorVisibility.hidden && (
+        <div className="creator-alert" role="status">
+          <strong>Hidden by operator</strong>
+          <p>{scenario.publication.operatorVisibility.reason}</p>
+          <p>
+            You can edit and publish a corrected version. It will stay hidden
+            until the operator restores visibility.
+          </p>
+        </div>
+      )}
       <p>
         {scenario.draft.content.title || "Untitled scenario"} · Draft{" "}
         {scenario.draft.revision}
@@ -46,9 +56,11 @@ export function PublicationControls({
         </button>
         {published && (
           <>
-            <Link className="text-button" href={`/library/${scenario.id}`}>
-              View library entry ↗
-            </Link>
+            {!scenario.publication.operatorVisibility.hidden && (
+              <Link className="text-button" href={`/library/${scenario.id}`}>
+                View library entry ↗
+              </Link>
+            )}
             <button
               type="button"
               className="text-button"

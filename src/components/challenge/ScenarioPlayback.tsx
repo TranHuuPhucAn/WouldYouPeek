@@ -16,6 +16,7 @@ export function ScenarioPlayback({
   analysisVisible,
   playbackKey,
   autoplay,
+  suspended = false,
   onPlaybackEvent,
   onComplete,
   onReadAnalysis,
@@ -27,6 +28,7 @@ export function ScenarioPlayback({
   analysisVisible: boolean;
   playbackKey: string;
   autoplay: boolean;
+  suspended?: boolean;
   onPlaybackEvent: (event: ScenarioPlaybackEvent) => void;
   onComplete?: () => void;
   onReadAnalysis: () => void;
@@ -37,6 +39,7 @@ export function ScenarioPlayback({
     mode,
     playbackKey,
     autoplay,
+    suspended,
     onPlaybackEvent,
     onComplete,
     hideCaption,

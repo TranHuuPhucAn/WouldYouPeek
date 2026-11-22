@@ -16,11 +16,13 @@ function SavedReplayPlayer({
   sessionId,
   viewerId,
   replay,
+  suspended = false,
 }: {
   item: SessionItem;
   sessionId: string;
   viewerId: string;
   replay: SavedReplay;
+  suspended?: boolean;
 }) {
   const mode = replay.media === "setup" ? "review-setup" : "reveal";
   const presentation = useReviewPresentation({
@@ -50,6 +52,7 @@ function SavedReplayPlayer({
       analysisVisible
       playbackKey={presentation.playbackKey}
       autoplay={presentation.autoplay}
+      suspended={suspended}
       onPlaybackEvent={presentation.onPlaybackEvent}
       onReadAnalysis={presentation.showAnalysis}
     />
@@ -62,6 +65,8 @@ export function SavedScenarioReview({
   replay,
   onReplay,
   onClose,
+  onReport,
+  suspended = false,
 }: {
   item: SessionItem;
   sessionId: string;
@@ -69,6 +74,8 @@ export function SavedScenarioReview({
   replay: SavedReplay | null;
   onReplay: (media: "setup" | "outcome") => void;
   onClose: () => void;
+  onReport?: () => void;
+  suspended?: boolean;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const setupButton = useRef<HTMLButtonElement>(null);
@@ -108,6 +115,11 @@ export function SavedScenarioReview({
             Close video
           </button>
         )}
+        {onReport && (
+          <button className="text-button" onClick={onReport}>
+            Report a problem
+          </button>
+        )}
       </div>
       {replay && (
         <SavedReplayPlayer
@@ -116,6 +128,7 @@ export function SavedScenarioReview({
           sessionId={sessionId}
           viewerId={viewerId}
           replay={replay}
+          suspended={suspended}
         />
       )}
       <FeedbackPanel

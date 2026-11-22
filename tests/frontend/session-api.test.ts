@@ -143,3 +143,112 @@ it("rejects replacement content versions and changed already-saved choices", () 
   altered.items[0].answer!.result.selectedOptionId = "peek";
   expect(() => validateSessionContinuity(altered, saved)).toThrow();
 });
+
+describe("early-ended session integrity", () => {
+  it("accepts zero answers and both legal partial-ended revisions", () => {
+    expect(parseSessionSnapshot(snapshot("ended")).revision).toBe(1);
+    expect(parseSessionSnapshot(snapshot("ended", 1)).revision).toBe(3);
+    expect(
+      parseSessionSnapshot({ ...snapshot("ended", 1), revision: 2 }).revision,
+    ).toBe(2);
+  });
+  it.each([
+    (s: ReturnType<typeof snapshot>) => ({ ...s, endedAt: null }),
+    (s: ReturnType<typeof snapshot>) => ({ ...s, currentIndex: 0 }),
+    (s: ReturnType<typeof snapshot>) => ({ ...s, completedAt: s.endedAt }),
+    (s: ReturnType<typeof snapshot>) => ({ ...s, revision: 99 }),
+    (s: ReturnType<typeof snapshot>) => ({
+      ...s,
+      updatedAt: "2026-11-18T00:00:00Z",
+    }),
+    (s: ReturnType<typeof snapshot>) => ({
+      ...s,
+      endedAt: "2020-01-01T00:00:00Z",
+    }),
+    (s: ReturnType<typeof snapshot>) => ({
+      ...s,
+      items: snapshot("completed").items,
+    }),
+    (s: ReturnType<typeof snapshot>) => ({
+      ...s,
+      items: [
+        { ...s.items[0], answer: null },
+        snapshot("review", 1).items[1],
+        s.items[2],
+      ],
+    }),
+  ])("rejects invalid ended state %#", (mutate) => {
+    expect(() => parseSessionSnapshot(mutate(snapshot("ended", 1)))).toThrow();
+  });
+  it("rejects terminal resurrection and modified saved explanations", () => {
+    const ended = snapshot("ended", 1);
+    expect(() =>
+      validateSessionContinuity(snapshot("setup", 2), ended),
+    ).toThrow();
+    const altered = structuredClone(ended);
+    altered.items[0].answer!.result.takeaway = "Changed saved analysis";
+    expect(() => validateSessionContinuity(altered, ended)).toThrow();
+    expect(() =>
+      validateSessionContinuity(
+        { ...ended, endedAt: "2026-11-18T00:00:00Z" },
+        ended,
+      ),
+    ).toThrow();
+  });
+  it("validates ended summaries and terminal dates", () => {
+    expect(
+      parseSessionHistory({
+        sessions: [sessionSummary("ended")],
+        nextCursor: null,
+      }).sessions[0].status,
+    ).toBe("ended");
+    expect(() =>
+      parseSessionHistory({
+        sessions: [{ ...sessionSummary("ended"), answeredCount: 3 }],
+        nextCursor: null,
+      }),
+    ).toThrow();
+  });
+  it("sends one exact end command and rejects a nonterminal acknowledgement", async () => {
+    const { endSession } = await import("@/lib/client/session-api");
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ session: snapshot("ended"), replayed: false }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ session: snapshot(), replayed: false }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const command = { requestId: sessionId, expectedRevision: 0 };
+    await expect(endSession(sessionId, command)).resolves.toMatchObject({
+      session: { status: "ended" },
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/sessions/${sessionId}/end`,
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        body: JSON.stringify(command),
+      }),
+    );
+    await expect(endSession(sessionId, command)).rejects.toThrow();
+  });
+  it("accepts an old advance receipt after that session was ended", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ session: snapshot("ended", 1), replayed: true }),
+        ),
+    );
+    await expect(
+      advanceSession(sessionId, {
+        requestId: sessionId,
+        expectedRevision: 1,
+        fromItemId: snapshot().items[0].id,
+      }),
+    ).resolves.toMatchObject({ session: { status: "ended" } });
+  });
+});

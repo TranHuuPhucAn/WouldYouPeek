@@ -175,6 +175,7 @@ describe("creator dashboard", () => {
           currentVersion: "creator-1",
           publishedAt: when,
           hasUnpublishedChanges: true,
+          operatorVisibility: { hidden: false, reason: null, changedAt: null },
         }}
         reviewed={false}
         canReview={true}

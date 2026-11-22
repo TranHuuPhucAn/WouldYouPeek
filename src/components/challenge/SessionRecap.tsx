@@ -6,6 +6,11 @@ import type { SessionItem } from "@/contracts/session";
 import Link from "next/link";
 import { assessmentLabel } from "./FeedbackPanel";
 import { SavedScenarioReview, type SavedReplay } from "./SavedScenarioReview";
+import { useScenarioReport } from "@/hooks/use-scenario-report";
+import {
+  ReportScenarioDialog,
+  ReportRequestStatus,
+} from "@/components/reports/ReportScenarioDialog";
 
 export function SessionRecap({
   items,
@@ -16,6 +21,8 @@ export function SessionRecap({
   completedAt,
   title,
   playlist,
+  status = "completed",
+  endedAt,
 }: {
   items: SessionItem[];
   sessionId: string;
@@ -25,9 +32,13 @@ export function SessionRecap({
   completedAt?: string | null;
   title?: string;
   playlist?: PlaylistSessionMetadata;
+  status?: "completed" | "ended";
+  endedAt?: string | null;
 }) {
   const [replay, setReplay] = useState<SavedReplay | null>(null);
+  const report = useScenarioReport(viewerId);
   const completed = items.filter((item) => item.answer);
+  const savedAt = status === "ended" ? endedAt : completedAt;
   const hasProScenarios = completed.some(
     ({ answer }) => answer?.result.observedAction,
   );
@@ -35,17 +46,25 @@ export function SessionRecap({
     <main className="recap-shell scenario-recap">
       <span className="eyebrow">
         <span className="status-dot" />
-        SESSION COMPLETE
+        {status === "ended" ? "ENDED EARLY" : "SESSION COMPLETE"}
       </span>
-      <h1>
-        {completed.length === 1
-          ? "One call."
-          : completed.length === 3
-            ? "Three calls."
-            : `${completed.length} calls.`}
-        <br />
-        <span className="accent-text">More perspective.</span>
-      </h1>
+      {status === "ended" ? (
+        <h1>
+          Session ended.
+          <br />
+          <span className="accent-text">Your history stays.</span>
+        </h1>
+      ) : (
+        <h1>
+          {completed.length === 1
+            ? "One call."
+            : completed.length === 3
+              ? "Three calls."
+              : `${completed.length} calls.`}
+          <br />
+          <span className="accent-text">More perspective.</span>
+        </h1>
+      )}
       {title && <p className="quiet-note">{title}</p>}
       {playlist && (
         <p className="quiet-note">
@@ -54,13 +73,19 @@ export function SessionRecap({
         </p>
       )}
       <p className="recap-intro">
-        Good decisions start with noticing the details. Take a moment to revisit
-        yours.
+        {status === "ended"
+          ? `${completed.length} of ${items.length} decisions saved. This session cannot be resumed.`
+          : "Good decisions start with noticing the details. Take a moment to revisit yours."}
       </p>
-      {completedAt && (
+      {status === "ended" && completed.length === 0 && (
+        <p>
+          No decisions were saved. Choose another scenario when you’re ready.
+        </p>
+      )}
+      {savedAt && (
         <p className="quiet-note">
           Saved on{" "}
-          {new Date(completedAt).toLocaleDateString("en", {
+          {new Date(savedAt).toLocaleDateString("en", {
             dateStyle: "medium",
             timeZone: "UTC",
           })}
@@ -135,17 +160,29 @@ export function SessionRecap({
                     }))
                   }
                   onClose={() => setReplay(null)}
+                  onReport={() =>
+                    report.begin({
+                      kind: "session-item",
+                      sessionId,
+                      itemId: item.id,
+                    })
+                  }
+                  suspended={report.open}
                 />
               </div>
             </details>
           );
         })}
       </div>
-      <p className="quiet-note">
-        {hasProScenarios
-          ? "Review the conditions behind your choices. Matching a pro’s action is a comparison, not a measure of rank or skill."
-          : "Review the conditions behind your choices. This session does not measure your rank or skill."}
-      </p>
+      <ReportRequestStatus report={report} />
+      <ReportScenarioDialog report={report} />
+      {completed.length > 0 && (
+        <p className="quiet-note">
+          {hasProScenarios
+            ? "Review the conditions behind your choices. Matching a pro’s action is a comparison, not a measure of rank or skill."
+            : "Review the conditions behind your choices. This session does not measure your rank or skill."}
+        </p>
+      )}
       <div className="recap-actions">
         <button
           className="button button-primary"

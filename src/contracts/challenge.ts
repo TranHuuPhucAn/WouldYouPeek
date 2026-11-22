@@ -118,6 +118,11 @@ export type AnswerResponse = {
 };
 
 export type ApiErrorCode =
+  | "OPERATOR_REQUIRED"
+  | "REPORT_NOT_FOUND"
+  | "REPORT_CONFLICT"
+  | "VISIBILITY_CONFLICT"
+  | "REPORT_TARGET_CHANGED"
   | "INVALID_JSON"
   | "INVALID_REQUEST"
   | "INVALID_OPTION"

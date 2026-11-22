@@ -75,6 +75,7 @@ function summary(
     createdAt: "2026-11-21T00:00:00Z",
     updatedAt: "2026-11-21T00:01:00Z",
     completedAt: null,
+    endedAt: null,
     ...(target.kind === "playlist"
       ? {
           playlist: {

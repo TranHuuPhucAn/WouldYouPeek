@@ -47,6 +47,7 @@ export function creatorSnapshot(
       currentVersion: null,
       publishedAt: null,
       hasUnpublishedChanges: false,
+      operatorVisibility: { hidden: false, reason: null, changedAt: null },
     },
     updatedAt: when,
   };
@@ -145,8 +146,17 @@ export function creatorPreview(s = creatorSnapshot()): CreatorReviewPreview {
   return { scenario: s, challenge, feedbackByOption };
 }
 export function libraryEntry(): LibraryScenarioPreview {
-  const { id, title, topic, order, mediaStatus, context, source, setup } =
-    creatorPreview().challenge;
+  const {
+    id,
+    title,
+    topic,
+    order,
+    mediaStatus,
+    context,
+    source,
+    setup,
+    contentVersion,
+  } = creatorPreview().challenge;
   return {
     id,
     title,
@@ -156,6 +166,7 @@ export function libraryEntry(): LibraryScenarioPreview {
     context,
     source,
     setup,
+    contentVersion,
     player: { id: "76af0a04-4751-4d26-9233-183a252e124b", displayName: "TenZ" },
     editorialOrigin: "creator",
     provenance: "creator",
@@ -171,20 +182,27 @@ export function selectedSnapshot(
     id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     target: { kind: "scenario", scenarioId: creatorId },
     title: p.challenge.title,
-    status: phase === "completed" ? "completed" : "in_progress",
+    status:
+      phase === "completed"
+        ? "completed"
+        : phase === "ended"
+          ? "ended"
+          : "in_progress",
     phase,
-    revision: phase === "setup" ? 0 : phase === "review" ? 1 : 2,
-    currentIndex: phase === "completed" ? null : 0,
+    revision:
+      phase === "setup" ? 0 : phase === "review" || phase === "ended" ? 1 : 2,
+    currentIndex: phase === "completed" || phase === "ended" ? null : 0,
     createdAt: when,
     updatedAt: when,
     completedAt: phase === "completed" ? when : null,
+    endedAt: phase === "ended" ? when : null,
     items: [
       {
         id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         position: 0,
         challenge: p.challenge,
         answer:
-          phase === "setup"
+          phase === "setup" || phase === "ended"
             ? null
             : {
                 id: "ffffffff-ffff-4fff-8fff-ffffffffffff",

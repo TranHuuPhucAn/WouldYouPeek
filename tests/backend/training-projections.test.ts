@@ -7,6 +7,53 @@ import {
 } from "@/server/training/projections";
 import { snapshot, reviewSnapshot, sessionId } from "./helpers/session";
 describe("safe canonical database projections", () => {
+  function ended(answered = 1, fromSetup = false) {
+    const result = answered ? reviewSnapshot(answered - 1) : snapshot();
+    result.phase = "ended";
+    result.status = "ended";
+    result.currentIndex = null;
+    result.revision = answered * 2 + (fromSetup || answered === 0 ? 1 : 0);
+    result.endedAt = result.updatedAt = "2026-01-01T00:02:00Z";
+    return result;
+  }
+  it("projects zero and partial endings with exact revision and preserved answers", () => {
+    for (const value of [ended(0), ended(1), ended(1, true), ended(2)]) {
+      expect(toSessionSnapshot(value)).toEqual(value);
+      const { items, phase, revision, currentIndex, ...summary } = value;
+      expect(
+        toSessionSummary({
+          ...summary,
+          answeredCount: items.filter((i) => i.answer).length,
+          totalCount: items.length,
+        }),
+      ).toMatchObject({
+        status: "ended",
+        endedAt: value.endedAt,
+        completedAt: null,
+      });
+    }
+  });
+  it.each([
+    { revision: 0 },
+    { revision: 99 },
+    { currentIndex: 0 },
+    { completedAt: "2026-01-01T00:02:00Z" },
+    { endedAt: null },
+    { endedAt: "2025-01-01T00:02:00Z" },
+    { status: "completed" },
+  ])("rejects malformed ended state %j", (patch) => {
+    expect(() => toSessionSnapshot({ ...ended(), ...patch })).toThrow();
+  });
+  it("rejects zero-answer even revision, ended answer gaps and full-answer endings", () => {
+    expect(() => toSessionSnapshot({ ...ended(0), revision: 0 })).toThrow();
+    const gap = ended(2);
+    gap.items[0].answer = null;
+    expect(() => toSessionSnapshot(gap)).toThrow();
+    expect(() => toSessionSnapshot(ended(3))).toThrow();
+    const future = ended();
+    future.items[0].answer!.answeredAt = "2026-01-01T00:03:00Z";
+    expect(() => toSessionSnapshot(future)).toThrow();
+  });
   it("accepts setup and final review without completing it", () => {
     expect(toSessionSnapshot(snapshot())).toEqual(snapshot());
     expect(toSessionSnapshot(reviewSnapshot(2))).toMatchObject({
@@ -15,6 +62,7 @@ describe("safe canonical database projections", () => {
       currentIndex: 2,
       revision: 5,
       completedAt: null,
+      endedAt: null,
     });
   });
   it("removes internal fields at every content boundary", () => {
