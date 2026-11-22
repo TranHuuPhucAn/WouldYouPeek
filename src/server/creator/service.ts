@@ -1,4 +1,5 @@
 import "server-only";
+import { requireUploadsEnabled } from "@/server/deployment/capabilities";
 import { requireCreator } from "@/server/auth/guards";
 import { ApiError } from "@/server/http";
 import * as repository from "./repository";
@@ -60,6 +61,7 @@ export async function saveDraft(rawId: string, input: unknown) {
   await requireCreator();
   const id = validation.parseCreatorId(rawId),
     command = validation.parseSaveDraft(input);
+  if (command.content.source.kind === "uploaded") await requireUploadsEnabled();
   return mutation(await repository.saveDraft(id, command), id);
 }
 export async function getReviewPreview(rawId: string, rawRevision: unknown) {
@@ -69,6 +71,8 @@ export async function getReviewPreview(rawId: string, rawRevision: unknown) {
   const result = toCreatorReviewPreview(
     await repository.getReviewPreview(id, revision),
   );
+  if (result.scenario.draft.content.source.kind === "uploaded")
+    await requireUploadsEnabled();
   assertIdentity(result.scenario, id);
   if (result.scenario.revision !== revision)
     throw new ApiError(

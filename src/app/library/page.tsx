@@ -1,3 +1,7 @@
+import { getPublicPageMetadata } from "@/server/metadata";
+export function generateMetadata() {
+  return getPublicPageMetadata({ title: "Scenario library", path: "/library" });
+}
 import Link from "next/link";
 import { LibrarySectionNav } from "@/components/library/LibrarySectionNav";
 import { getCurrentAccount } from "@/server/auth/guards";

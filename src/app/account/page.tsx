@@ -1,3 +1,5 @@
+import { getPrivatePageMetadata } from "@/server/metadata";
+export const metadata = getPrivatePageMetadata("Your account");
 import { requirePageAccount } from "@/app/protected-page";
 import { getCreatorProfile } from "@/server/account/creator-profile/service";
 import { CreatorProfileForm } from "@/components/account/CreatorProfileForm";

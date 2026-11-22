@@ -1,4 +1,5 @@
 import "server-only";
+import { requireUploadsEnabled } from "@/server/deployment/capabilities";
 import type { PlaybackAccess } from "@/contracts/video";
 import { requireVerifiedUser, requireOperator } from "@/server/auth/guards";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ export async function issuePlaybackUrl(
   await requireVerifiedUser();
   const context = parsePlaybackContext(input);
   if (context.kind === "operator-report") await requireOperator();
+  await requireUploadsEnabled();
   const object = toVideoObject(await authorize(context)),
     client = await createServerSupabaseClient();
   const expiresIn = 300;

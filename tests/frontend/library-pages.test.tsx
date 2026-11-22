@@ -16,6 +16,9 @@ import { ApiError } from "@/server/http";
 import { libraryEntry } from "./creator-fixtures";
 import { sessionSummary, viewer } from "./session-fixtures";
 vi.mock("server-only", () => ({}));
+vi.mock("@/server/auth/challenge", () => ({
+  getAuthChallengeConfig: () => ({ kind: "none" }),
+}));
 vi.mock("next/navigation", () => ({
   redirect: (destination: string) => {
     throw new Error(`REDIRECT:${destination}`);

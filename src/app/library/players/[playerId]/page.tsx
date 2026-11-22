@@ -7,6 +7,29 @@ import { getPlayer } from "@/server/players/service";
 import { getLibrary } from "@/server/library/service";
 import { ApiError } from "@/server/http";
 import { ScenarioLibrary } from "@/components/library/ScenarioLibrary";
+import {
+  getPublicPageMetadata,
+  getUnavailableMetadata,
+} from "@/server/metadata";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ playerId: string }>;
+}) {
+  const { playerId } = await params;
+  try {
+    const player = await getPlayer(playerId);
+    return player
+      ? getPublicPageMetadata({
+          title: `${player.displayName} scenarios`,
+          path: `/library/players/${player.id}`,
+        })
+      : getUnavailableMetadata("Player unavailable");
+  } catch {
+    return getUnavailableMetadata("Player unavailable");
+  }
+}
 
 export default async function PlayerPage({
   params,

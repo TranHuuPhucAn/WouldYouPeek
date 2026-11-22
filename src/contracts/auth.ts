@@ -17,3 +17,7 @@ export type AuthFormState = {
 };
 
 export const INITIAL_AUTH_STATE: AuthFormState = { status: "idle" };
+
+export type AuthChallengeConfig =
+  | { kind: "none" }
+  | { kind: "turnstile"; siteKey: string };

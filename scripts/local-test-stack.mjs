@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cleanChildEnvironment, localUrl, OWNER_FILE, readDisposableWorkspace, TEST_PORTS, TEST_APP_ORIGIN, testProjectId } from "./local-target.mjs";
+import { cleanChildEnvironment, configureLocalCapabilities, assertLocalHostedReady, localUrl, OWNER_FILE, readDisposableWorkspace, TEST_PORTS, TEST_APP_ORIGIN, testProjectId } from "./local-target.mjs";
 
 const sourceDefault = fileURLToPath(new URL("../", import.meta.url));
 export const LAST_M3_MIGRATION = "20261117000500";
@@ -165,7 +165,7 @@ export async function readTestEnvironment(target) {
   if (!key || !status.SERVICE_ROLE_KEY) throw new Error("Disposable credentials are unavailable.");
   const app = TEST_APP_ORIGIN;
   return {
-    ...cleanChildEnvironment(), WYP_TEST_WORKSPACE: owned.workspace, WYP_TEST_RUN_ID: owned.runId,
+    ...cleanChildEnvironment(), WYP_DEPLOYMENT_MODE: "local", WYP_TEST_WORKSPACE: owned.workspace, WYP_TEST_RUN_ID: owned.runId,
     WYP_TEST_PROJECT_ID: owned.projectId, SUPABASE_TEST_URL: api, SUPABASE_TEST_MAIL_URL: mail,
     SUPABASE_TEST_APP_URL: app, SUPABASE_TEST_PUBLISHABLE_KEY: key, SUPABASE_TEST_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
     NEXT_PUBLIC_SUPABASE_URL: api, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: key, NEXT_PUBLIC_APP_URL: app,
@@ -173,7 +173,7 @@ export async function readTestEnvironment(target) {
 }
 
 export function applicationEnvironment(testEnv) {
-  return { ...cleanChildEnvironment(testEnv), NEXT_PUBLIC_SUPABASE_URL: testEnv.NEXT_PUBLIC_SUPABASE_URL,
+  return { ...cleanChildEnvironment(testEnv), WYP_DEPLOYMENT_MODE: "local", NEXT_PUBLIC_SUPABASE_URL: testEnv.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: testEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_APP_URL: testEnv.NEXT_PUBLIC_APP_URL };
 }
@@ -277,6 +277,8 @@ export async function runVerificationPipeline(target, {
   run = runTestCommand, environment = readTestEnvironment, cli = runCli,
   startApp = startTestApp, stopApp = stopTestApp,
   startWorker = startTestMediaWorker, stopWorker = stopTestApp, signal,
+  configureCapabilities = configureLocalCapabilities,
+  verifyHostedReadiness = assertLocalHostedReady,
 } = {}) {
   const owned = readDisposableWorkspace(target.workspace);
   const env = await environment(owned);
@@ -294,8 +296,14 @@ export async function runVerificationPipeline(target, {
   await run(process.execPath, ["tests/migrations/session-end-preservation.test.mjs"], options);
   console.log("[verify] Checking preservation of saved decisions before scenario reporting and operator visibility.");
   await run(process.execPath, ["tests/migrations/moderation-preservation.test.mjs"], options);
+  console.log("[verify] Checking preserved local data and hosted source restrictions before launch.");
+  await run(process.execPath, ["tests/migrations/milestone-10-preservation.test.mjs"], options);
   // The upgrade script applies the pending migrations in this owned workspace.
   await cli(owned, ["db", "reset", "--yes"], { signal });
+  verifyHostedReadiness(owned.workspace);
+  console.log("[verify] Rehearsing encrypted backup and recovery in owned scratch databases.");
+  await run(process.execPath, ["tests/migrations/backup-restore.test.mjs"], options);
+  configureCapabilities(owned.workspace);
   await run(process.execPath, ["scripts/generate-video-fixtures.mjs"], options);
   let app, worker;
   try {
@@ -367,7 +375,7 @@ export async function withVerificationSignals(run) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.argv.length !== 2) throw new Error("Use npm run test:ci without target overrides.");
-    await withVerificationSignals((signal) => runFullVerification(sourceDefault, { signal }));
+    if (process.argv.length > 3 || (process.argv.length === 3 && process.argv[2] !== "--keep")) throw new Error("Use npm run test:ci, optionally -- --keep, without target overrides.");
+    await withVerificationSignals((signal) => runFullVerification(sourceDefault, { signal, keep: process.argv[2] === "--keep" }));
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

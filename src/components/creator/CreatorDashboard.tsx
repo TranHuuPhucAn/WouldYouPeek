@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CreatorFilter, CreatorListResponse } from "@/contracts/creator";
+import type { DeploymentCapabilities } from "@/contracts/deployment";
 import {
   createCreatorScenario,
   listCreatorScenarios,
@@ -12,8 +13,10 @@ import { invalidateAccountView } from "@/components/auth/AuthStateSync";
 import { CreatorStatus } from "./CreatorStatus";
 export function CreatorDashboard({
   initial,
+  capabilities = { sourceMode: "youtube-only" },
 }: {
   initial: CreatorListResponse;
+  capabilities?: DeploymentCapabilities;
 }) {
   const router = useRouter();
   const [list, setList] = useState(initial),
@@ -132,9 +135,11 @@ export function CreatorDashboard({
           </p>
         </div>
         <div className="creator-save-actions">
-          <Link href="/creator/videos" className="button button-secondary">
-            Your videos
-          </Link>
+          {capabilities.sourceMode === "youtube-and-upload" && (
+            <Link href="/creator/videos" className="button button-secondary">
+              Your videos
+            </Link>
+          )}
           <button
             className="button button-primary"
             disabled={creating}

@@ -160,12 +160,16 @@ function pipelineFakes(target, { failOn } = {}) {
       : args.includes("tests/migrations/milestone-6-preservation.test.mjs") ? "library-upgrade"
       : args.includes("tests/migrations/milestone-7-preservation.test.mjs") ? "playlist-upgrade"
       : args.includes("tests/migrations/session-end-preservation.test.mjs") ? "session-end-upgrade"
-      : args.includes("tests/migrations/moderation-preservation.test.mjs") ? "moderation-upgrade" : args[1] ?? args[0]),
+      : args.includes("tests/migrations/moderation-preservation.test.mjs") ? "moderation-upgrade"
+      : args.includes("tests/migrations/milestone-10-preservation.test.mjs") ? "launch-upgrade"
+      : args.includes("tests/migrations/backup-restore.test.mjs") ? "backup-restore" : args[1] ?? args[0]),
     cli: async (owned, args) => { assert.equal(owned.projectId, target.projectId); step(args.join(" ")); },
     startApp: async () => { step("start-app"); return "owned-process"; },
     stopApp: async (app) => { assert.equal(app, "owned-process"); step("stop-app"); },
     startWorker: async () => { step("start-worker"); return "owned-worker"; },
     stopWorker: async (worker) => { assert.equal(worker, "owned-worker"); step("stop-worker"); },
+    configureCapabilities: () => step("configure-local-capabilities"),
+    verifyHostedReadiness: () => step("verify-hosted-readiness"),
   } };
 }
 
@@ -185,10 +189,25 @@ test("full verification includes upgrade before clean install and every required
   assert.ok(fake.calls.indexOf("library-upgrade") < fake.calls.indexOf("playlist-upgrade"));
   assert.ok(fake.calls.indexOf("playlist-upgrade") < fake.calls.indexOf("session-end-upgrade"));
   assert.ok(fake.calls.indexOf("session-end-upgrade") < fake.calls.indexOf("moderation-upgrade"));
-  assert.ok(fake.calls.indexOf("moderation-upgrade") < fake.calls.indexOf("db reset --yes"));
+  assert.ok(fake.calls.indexOf("moderation-upgrade") < fake.calls.indexOf("launch-upgrade"));
+  assert.ok(fake.calls.indexOf("launch-upgrade") < fake.calls.indexOf("db reset --yes"));
+  assert.ok(fake.calls.indexOf("db reset --yes") < fake.calls.indexOf("configure-local-capabilities"));
+  assert.ok(fake.calls.indexOf("db reset --yes") < fake.calls.indexOf("verify-hosted-readiness"));
+  assert.ok(fake.calls.indexOf("verify-hosted-readiness") < fake.calls.indexOf("configure-local-capabilities"));
+  assert.ok(fake.calls.indexOf("verify-hosted-readiness") < fake.calls.indexOf("backup-restore"));
+  assert.ok(fake.calls.indexOf("backup-restore") < fake.calls.indexOf("configure-local-capabilities"));
+  assert.ok(fake.calls.indexOf("configure-local-capabilities") < fake.calls.indexOf("start-worker"));
   assert.ok(fake.calls.indexOf("scripts/generate-video-fixtures.mjs") < fake.calls.indexOf("start-worker"));
   for (const phase of ["db:seed:check", "db:types:check", "test", "test:db", "test:integration", "typecheck", "build", "test:http"]) assert.ok(fake.calls.includes(phase), phase);
   assert.deepEqual(fake.calls.slice(-2), ["stop-app", "stop-worker"]);
+});
+
+test("failed recovery rehearsal stops before enabling uploads or starting the app", async (t) => {
+  const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "backup-restore" });
+  await assert.rejects(runVerificationPipeline(target, fake.options), /failure: backup-restore/);
+  assert.equal(fake.calls.includes("configure-local-capabilities"), false);
+  assert.equal(fake.calls.includes("start-worker"), false);
+  assert.equal(fake.calls.includes("build"), false);
 });
 
 test("HTTP failure propagates while stopping the exact app process", async (t) => {
@@ -262,4 +281,12 @@ test("worker cleanup still happens when stopping the app fails", async (t) => {
   const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "stop-app" });
   await assert.rejects(runVerificationPipeline(target, fake.options), /failure: stop-app/);
   assert.equal(fake.calls.at(-1), "stop-worker");
+});
+
+test("failed launch preservation stops before reset or local upload enabling", async (t) => {
+  const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "launch-upgrade" });
+  await assert.rejects(runVerificationPipeline(target, fake.options), /failure: launch-upgrade/);
+  assert.ok(fake.calls.includes("moderation-upgrade"));
+  assert.equal(fake.calls.includes("db reset --yes"), false);
+  assert.equal(fake.calls.includes("configure-local-capabilities"), false);
 });

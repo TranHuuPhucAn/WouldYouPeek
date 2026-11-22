@@ -1,5 +1,6 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 
 export const TEST_PORTS = Object.freeze({
   api: 55321, db: 55322, shadow: 55320, studio: 55323,
@@ -112,5 +113,30 @@ export function readLocalProject(rootPath) {
 /** Do not allow an inherited provider environment to retarget CLI or application commands. */
 export function cleanChildEnvironment(env = process.env) {
   return Object.fromEntries(Object.entries(env).filter(([key]) =>
-    !/^(SUPABASE_|WYP_TEST_|WYP_MEDIA_|NEXT_PUBLIC_SUPABASE_|NEXT_PUBLIC_APP_URL$|DATABASE_URL$|PGHOST$|PGPORT$|PGDATABASE$|PGUSER$|PGPASSWORD$)/.test(key)));
+    !/^(SUPABASE_|WYP_|VERCEL_|TURNSTILE_|NEXT_PUBLIC_SUPABASE_|NEXT_PUBLIC_APP_URL$|NEXT_PUBLIC_TURNSTILE_|DATABASE_URL$|PG[A-Z_]+$)/.test(key)));
+}
+
+/** Never enable media merely because a database URL looks local. Prove container ownership too. */
+function runLocalMaintenance(rootPath, filename, { execute = execFileSync, env = process.env } = {}) {
+  const target = readLocalProject(rootPath), container = `supabase_db_${target.projectId}`;
+  const options = { cwd: target.workspace, env: cleanChildEnvironment(env), encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"], maxBuffer: 1024 * 1024 };
+  let labels;
+  try { labels = JSON.parse(execute("docker", ["inspect", container, "--format", "{{json .Config.Labels}}"], options)); }
+  catch { throw new Error("Cannot establish local database container ownership."); }
+  if (labels?.["com.supabase.cli.project"] !== target.projectId
+    || labels?.["com.supabase.cli.workdir"] !== target.workspace) {
+    throw new Error("Local database container ownership does not match this project.");
+  }
+  const input = readFileSync(join(target.workspace, "supabase/maintenance", filename), "utf8");
+  try { execute("docker", ["exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-X", "-q", "-v", "ON_ERROR_STOP=1"], { ...options, input }); }
+  catch { throw new Error("Local source-capability maintenance failed; no remote target was used."); }
+}
+
+export function configureLocalCapabilities(rootPath, options) {
+  return runLocalMaintenance(rootPath, "configure_local_capabilities.sql", options);
+}
+
+export function assertLocalHostedReady(rootPath, options) {
+  return runLocalMaintenance(rootPath, "assert_hosted_ready.sql", options);
 }

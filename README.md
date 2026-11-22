@@ -6,7 +6,7 @@ Matching the pro and making a defensible decision are separate outcomes. Creator
 
 ## Run locally
 
-Install **Node.js 24.x**, npm, **FFmpeg** (including `ffprobe`), and a running **Docker Desktop** (or compatible Docker runtime). On macOS, `brew install ffmpeg` supplies the video tools; on Ubuntu, use `sudo apt-get install ffmpeg`. The Supabase CLI is pinned in the project’s development dependencies; a global installation or hosted Supabase account is unnecessary. Everything in this milestone runs locally without paid services or AI APIs.
+Install **Node.js 24.x**, npm, **FFmpeg** (including `ffprobe`), and a running **Docker Desktop** (or compatible Docker runtime). On macOS, `brew install ffmpeg` supplies the video tools; on Ubuntu, use `sudo apt-get install ffmpeg`. The Supabase CLI is pinned in the project’s development dependencies; a global installation or hosted Supabase account is unnecessary for local development. Local development uses no paid services or AI APIs. The full verification suite additionally requires **age** for real backup-encryption tests (`brew install age` or `sudo apt-get install age`).
 
 ```sh
 git clone https://github.com/TranHuuPhucAn/WouldYouPeek.git
@@ -18,7 +18,7 @@ npm run media:setup
 npm run dev
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The first database start downloads local service images and applies the migrations and demo seed. `db:env` creates an ignored `.env.local` using the local API URL and public key; it never writes an administrator key into the application environment. `.env.example` documents the three settings.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The first database start downloads local service images and applies the migrations and demo seed. The local helper verifies the database container belongs to this checkout before enabling uploaded recordings. `db:env` creates an ignored `.env.local` using the local API URL, public key, application origin and `WYP_DEPLOYMENT_MODE=local`; it never writes an administrator key into the application environment. `.env.example` documents local and hosted settings.
 
 In a second terminal in the same project, start the uploaded-video validator:
 
@@ -34,7 +34,7 @@ Open **Library** to browse existing scenarios grouped by player, search player n
 
 Switch to **Playlists** to browse ordered collections, search included player names, or view playlists containing a selected player. A mixed-player collection always plays its full sequence. Its detail page shows the ordered scenario metadata and public creator credit; videos play after starting the saved session. The curated TenZ starter groups the three original moments under a Would You Peek editorial credit.
 
-Choose **Sign in to play** on a scenario or playlist, then register with an email and a password of 12–128 characters including uppercase, lowercase and a number. Open the confirmation email in the [local email inbox](http://127.0.0.1:54324). Verification returns you to the selected detail; resend keeps that destination too. These local emails are captured; no real email is sent. Password-reset messages use the same inbox.
+Choose **Sign in to play** on a scenario or playlist, then register with an email and a password of 12–128 characters including uppercase, lowercase and a number. Open the confirmation email in the [local email inbox](http://127.0.0.1:54324), follow its link and press **Verify email**. Opening or scanning the link alone does not consume it. Verification returns you to the selected detail; resend keeps that destination too. These local emails are captured; no real email is sent. Password-reset messages use the same inbox and an explicit confirmation before setting the new password.
 
 After verification, start a scenario. Watch setup, select an answer card, and **Lock in your call**. Replay setup keeps your selection. The answer is saved before the pro’s continuation plays; analysis appears below after that continuation finishes. The debrief separates your decision assessment from whether you matched the pro, with expandable conditions, risks and other choices. If playback is blocked or unavailable, use **Read saved analysis** to continue reviewing your saved choice. **Finish session** completes the review.
 
@@ -187,9 +187,11 @@ npm run test:ci
 
 Keep Docker running. The full command creates an ignored `.wyp-test-work/<run-id>/` source copy and a uniquely named disposable Supabase project. It uses API port 55321, database 55322, inbox 55324 and an app at `http://localhost:3100`. These ports must be free. The different app hostname also isolates browser auth cookies from your development app at `127.0.0.1:3000`.
 
-The runner first verifies additive upgrades from milestone three to four, four to five, five to six, and six to seven, preserving accounts, creator drafts, review digests, player mappings, immutable versions, uploaded bytes and references, saved sessions and command receipts. The M7 check also proves the curated playlist is added without reseeding existing data. Additional populated upgrades verify M9 → 9A session ending and 9A → 9B reports and visibility controls, including active, completed and ended history, command retries and real uploaded bytes. It then resets only its disposable database, generates small original video fixtures, starts its scoped media validator, and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data/Storage API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app/validator and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, video library, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
+The runner first verifies additive upgrades from milestone three to four, four to five, five to six, and six to seven, preserving accounts, creator drafts, review digests, player mappings, immutable versions, uploaded bytes and references, saved sessions and command receipts. The M7 check also proves the curated playlist is added without reseeding existing data. Additional populated upgrades verify M9 → 9A session ending and 9A → 9B reports and visibility controls, including active, completed and ended history, command retries and real uploaded bytes. The M10 upgrade proves hosted upload denial and preservation of local media/history. It then resets only its disposable database, verifies fresh hosted readiness, rehearses encrypted PostgreSQL backup/restore in two owned scratch databases, enables uploads through the validated local helper, generates small original video fixtures, starts its scoped media validator, and runs seed/type drift checks, unit/component tests, PostgreSQL pgTAP tests, real Auth/Data/Storage API integration tests, type checking, a production build and actual Next.js HTTP tests. It stops its own app/validator and removes only its owned test services, volumes and workspace, including on ordinary cancellation. Your development database, video library, `.env.local` and `.next` are untouched. Failure diagnostics are stored under ignored `test-results/` when available.
 
-`npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `npm run test:scripts` checks isolation, cleanup and pipeline failure handling without Docker. Database, integration and HTTP suites refuse the normal development project and hosted targets; run them through `test:ci` so publication fixtures remain isolated. Test administrator credentials are never passed to the web app.
+`npm test` runs fast backend/frontend tests; `test:backend` and `test:frontend` select a suite. `npm run test:scripts` checks isolation, cleanup and pipeline failure handling without Docker. Database, integration and HTTP suites refuse the normal development project and hosted targets; run them through `test:ci` so publication fixtures remain isolated. Test administrator credentials are never passed to the web app. The recovery rehearsal uses real `pg_dump`, PostgreSQL COPY and age encryption, checks every restored table plus password hashes, history and permissions, and refuses a target populated during preparation. It models remote transport and provider schema comparison; actual hosted login and provider recovery remain separate release acceptance checks.
+
+For local investigation, `npm run test:ci -- --keep` retains its owned disposable database/workspace after the run; the app and validator still stop. Record the printed workspace and clean it up with the validated `stopTestStack()` and `cleanupTestWorkspace()` helpers after investigation. Never substitute the normal project identity. CI uses the default automatic cleanup.
 
 `db:seed:generate` regenerates SQL from the canonical fixtures; `db:types` regenerates TypeScript from the local schema. Their `:check` counterparts detect drift. These scripts accept no extra remote-target arguments. Type checking generates Next.js route types and checks without the incremental cache. Builds use Webpack; development uses Turbopack.
 
@@ -305,6 +307,121 @@ The official YouTube iframe remains mounted through setup and decision. Playback
 
 The seven `artifacts/vod-review/scenario-*.jpg` images preserve visual source evidence. Simulated player tests establish application behavior, not normal-speed audio quality or tactical correctness. Automated upload tests generate original small video files under ignored `test-results/`; no real VODs or uploaded user files belong in Git.
 
+## Hosted launch and release operation
+
+Milestone 10 adds hosted configuration and release tools. **A successful local build does not deploy this application.** Provider setup, actual email delivery, the hosted restore rehearsal and public deployment require their own verified release steps. There is no automatic deployment or migration workflow in this repository. GitHub's existing `Verify` / `verify` check remains the merge gate.
+
+The first hosted release starts with fresh accounts, the three canonical TenZ scenarios and the editorial starter playlist. Do not copy local users, histories, drafts or uploaded videos. Hosted mode allows YouTube sources only. The interface, server, SQL RPCs, worker entry points and Storage policies enforce that boundary. Local mode retains the upload workflow. Database capability defaults to YouTube only; ordinary users, creators and operators cannot change it. A deployment/configuration mismatch fails closed.
+
+The proposed free setup is Vercel Hobby (personal, non-commercial use), Supabase Free and Cloudflare Turnstile Free, using provider hostnames. Confirm current eligibility and capacity at setup time. Supabase's free tier may pause for inactivity and does not provide automatic database backups; no keep-alive traffic or automatic paid upgrade is configured. Use separate Supabase projects for preview and production. Preview is internal release verification, not a public beta. Do not enable preview deployments with production environment values.
+
+### Application environment
+
+| Setting | Hosted value |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Exact `https://<project-ref>.supabase.co` URL for this environment |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | That project's public publishable/anon key |
+| `NEXT_PUBLIC_APP_URL` | Exact canonical HTTPS application origin |
+| `WYP_DEPLOYMENT_MODE` | `hosted` |
+| `WYP_RELEASE_ENVIRONMENT` | `preview` or `production`; must match the host environment when supplied |
+| `WYP_SUPABASE_PROJECT_REF` | Exact project reference, matching the public URL |
+| `WYP_SUPPORT_EMAIL` | An address the owner actually monitors; displayed on Help/privacy |
+| `WYP_TURNSTILE_SITE_KEY` | Real public Turnstile widget key for the allowed hostname |
+
+The web application never receives the database password, Supabase service-role key, SMTP password, Turnstile secret or hosted maintenance token. Configure SMTP credentials and the Turnstile secret in Supabase Auth. Keep real values out of Git and CI output. `NEXT_PUBLIC_*` values are embedded at build time: build the tested commit separately for production, rather than promoting a preview bundle connected to another database.
+
+### Real email and bot protection
+
+Supabase's default sender restricts recipients to project-team addresses and cannot support public registration. Configure custom SMTP and keep email confirmation enabled. A dedicated free project Gmail account with 2-Step Verification and an app password is a candidate, **not a proven delivery service**. Use that account's own sender address through `smtp.gmail.com`, not a paid Workspace trial. Prove verification, resend and recovery delivery to external Gmail and Outlook inboxes before release. Start with a conservative total email rate allowance, such as 10/hour, and change it only within demonstrated provider limits. Failure is a sender-setup blocker; it does not authorize payment or disabling verification.
+
+Set the exact site URL and allowed callback origins in Supabase Auth, and install the reviewed confirmation/recovery templates from `supabase/templates/`. Disable provider link tracking. GET/HEAD on `/auth/confirm` lead to an explicit confirmation form; only its POST exchanges the token. Test scanner-style repeated reads, expired/used links, cross-device opening and return to the requested scenario. Never include callback tokens in logs, screenshots or support messages.
+
+Enable Cloudflare Turnstile in Supabase Auth as well as configuring the app's widget key. Sign-up, sign-in, reset requests and verification resend forward the challenge token. Provider rejection of missing/invalid/reused tokens must be tested against the actual hosted Auth endpoint; hiding a submit button is insufficient. Local configuration uses Mailpit and no live challenge service. A blocked widget has a retry path, not an authentication bypass.
+
+### Explicit hosted targets
+
+The maintenance tools additionally require **PostgreSQL client tools** (`psql`, `pg_dump`, `pg_dumpall`), **age**, Docker and the pinned Supabase CLI. On macOS, `brew install libpq age` installs the clients; add Homebrew's `libpq/bin` directory to the current terminal's `PATH`. Use a PostgreSQL client at least as new as the server. Never replace the local helpers' target checks to make them operate remotely.
+
+Store a private target JSON file **outside the checkout**, with file mode `600`, in a directory you control. The tool requires canonical filesystem paths rather than symlink aliases. Example shape (the references below are placeholders):
+
+```json
+{
+  "schemaVersion": 1,
+  "environment": "preview",
+  "projectRef": "bbbbbbbbbbbbbbbbbbbb",
+  "productionProjectRef": "aaaaaaaaaaaaaaaaaaaa",
+  "appOrigin": "https://your-preview-host.vercel.app",
+  "database": {
+    "host": "db.bbbbbbbbbbbbbbbbbbbb.supabase.co",
+    "port": 5432,
+    "user": "postgres",
+    "name": "postgres"
+  }
+}
+```
+
+Production uses `environment: production` and identical `projectRef`/`productionProjectRef`. Preview must use a different reference. If a direct IPv6 connection is unavailable, use the dashboard's **session** pooler on port 5432 with username `postgres.<project-ref>`; transaction pooler port 6543 is rejected. TLS certificate verification is required. `WYP_HOSTED_CA_FILE` may select the provider's trusted CA file; otherwise libpq uses its system trust configuration.
+
+Supply `WYP_HOSTED_DB_PASSWORD` and, for migration, backup schema checks and restore preparation, a scoped `WYP_HOSTED_ACCESS_TOKEN` through a protected environment or password manager. Do not put values in command arguments, screenshots, public workflows or shell history. `WYP_TARGET_FILE`, `WYP_PROJECT_REF`, `WYP_RELEASE_ENVIRONMENT` and `WYP_RELEASE_SHA` in the commands below are non-secret variables identifying the reviewed target and full commit SHA; set them deliberately before running anything.
+
+```sh
+npm run hosted:release -- preflight --target "$WYP_TARGET_FILE" --project "$WYP_PROJECT_REF" --environment "$WYP_RELEASE_ENVIRONMENT" --sha "$WYP_RELEASE_SHA"
+```
+
+Preflight requires a clean checkout of the exact current release-branch commit and a successful latest `Verify` push run for that SHA: `dev` for preview, `main` for production. It rejects divergent migration history, uploaded objects and contradictory source capabilities. Seeded current databases also pass the read-only SQL readiness assertions. Unavailable GitHub evidence keeps the gate closed. These tools do not push, merge, buy services or assign hostnames.
+
+After reviewing preflight and, for a populated database, making a recent encrypted backup:
+
+```sh
+npm run hosted:release -- migrate --target "$WYP_TARGET_FILE" --project "$WYP_PROJECT_REF" --environment "$WYP_RELEASE_ENVIRONMENT" --sha "$WYP_RELEASE_SHA" --confirm "$WYP_PROJECT_REF" --backup "$WYP_BACKUP_MANIFEST"
+```
+
+Omit `--backup` only for a fresh project without accounts. The CLI applies reviewed additive migrations to the explicit project reference. It does not reset the database, copy local Auth settings or seed user accounts. Existing remote migration versions must be an ordered prefix of the checkout. An encrypted backup matching the current project/migration state and no older than 24 hours is required before migrating a database with accounts.
+
+For the initial project only:
+
+```sh
+npm run hosted:release -- seed --target "$WYP_TARGET_FILE" --project "$WYP_PROJECT_REF" --environment "$WYP_RELEASE_ENVIRONMENT" --sha "$WYP_RELEASE_SHA" --confirm "$WYP_PROJECT_REF"
+```
+
+Seeding checks freshness inside the same transaction as the canonical seed. An already seeded project is checked without rewriting its content. Accounts or unexpected content block initial seeding. Never run `db:reset:local`, the local fixture runner or the local validator against hosting.
+
+Create and verify the owner's account normally, then use the exact-UUID operator SQL shown in **Operator maintenance** through trusted administration of the intended hosted project. First confirm the project identity. Never infer operator membership from creator access or user-editable metadata. Verify both grant and revoke behavior with an ordinary creator and the operator.
+
+### Encrypted backups and isolated restore
+
+Create an age recovery key outside the checkout (`age-keygen -o /absolute/private/path/recovery.agekey`), protect it with file mode `600`, and keep a separate protected recovery copy. Use the public recipient from `age-keygen -y` for exports. The private backup directory must have mode `700` and must be outside Git. Database records and credentials must never become GitHub Actions artifacts.
+
+```sh
+npm run hosted:backup -- export --target "$WYP_TARGET_FILE" --project "$WYP_PROJECT_REF" --environment "$WYP_RELEASE_ENVIRONMENT" --sha "$WYP_RELEASE_SHA" --destination "$WYP_BACKUP_DIRECTORY" --recipient "$WYP_AGE_RECIPIENT"
+```
+
+Export from a clean checkout of the recorded source SHA whose migrations match the database. A strict schema comparison against the reviewed migrations must also pass; unresolved drift blocks the backup instead of silently omitting it. Four encrypted files contain role/schema evidence, managed-schema evidence and application/authentication data. A private manifest records migration hashes, encrypted-file checksums and table row hashes. Plaintext exports are not written to disk. Unexpected uploaded objects or a failed hosted-readiness check block export. Backups contain sensitive password hashes and private records even though encrypted. Store a separate protected copy outside the hosting provider. Auth provider settings, SMTP/CAPTCHA secrets, API keys and recovery-key custody require a separate owner-controlled inventory.
+
+The automated restore path is for an **empty, different preview project only**, with compatible Supabase managed schemas and no application migrations/accounts/objects:
+
+```sh
+npm run hosted:backup -- restore --target "$WYP_RESTORE_TARGET_FILE" --project "$WYP_RESTORE_PROJECT_REF" --environment preview --manifest "$WYP_BACKUP_MANIFEST" --identity "$WYP_AGE_IDENTITY_FILE" --confirm "$WYP_RESTORE_PROJECT_REF"
+```
+
+Use the exact reviewed migration files recorded by the backup. Restore decrypts and checks all files before mutation, replays those migrations to recreate application roles/grants/RLS and custom Auth/Storage objects, then imports the data transactionally. It does not blindly replay managed platform DDL. It checks every captured table's rows/hash and hosted readiness afterward. The encrypted schema/role exports remain recovery evidence for reviewing unexpected drift; schema changes must be represented by reviewed migrations. A same-project, production or nonempty restore destination is refused. Tables are locked and emptiness is rechecked inside the import transaction. A failed preparation can leave an initialized disposable target; inspect it or deliberately create another empty target rather than forcing a destructive retry. Never use public CI to restore real users' data.
+
+A completed restore command is not full operational acceptance. On synthetic staging data, prove restored password login/reset, profile synchronization, cross-account denial, session/playlist snapshots, operator grant/revoke, reports/holds and YouTube playback. Reconfigure provider settings with destination-specific credentials. Do not send test emails to restored real users. Hosted-to-hosted recovery remains a release checkpoint until it has actually been rehearsed on the chosen providers.
+
+Take protected backups daily while operating and before every populated migration. This is an owner-run procedure; no scheduler is installed. Record backup age and the last successful restore rehearsal. Missing a backup increases possible data loss. Database exports do not contain Storage file bytes; hosted YouTube-only mode deliberately has none.
+
+### Publication and rollback
+
+1. Finish the full local CI suite, populated-upgrade tests and desktop/device acceptance. Commit/push/merge remain with the repository owner.
+2. Configure isolated preview hosting, prove real emails/CAPTCHA and all learner/creator/operator flows, then rehearse recovery with synthetic records.
+3. Review the exact production `main` SHA after its required `Verify` check passes. Disable automatic production promotion that could race CI. Apply compatible migrations and build that commit with production values.
+4. Inspect the production candidate and its read-only checks. A candidate URL may already be publicly reachable; confirm the free host's actual deployment protection rather than assuming an unaliased URL is private. Review the exact final hostname before approving promotion.
+5. After explicit deployment approval and hostname promotion, immediately verify final-origin signup/verification/reset, cookies, all three scenarios, playlist resume/history, early ending, publishing and reports. Full callback behavior on that hostname cannot be proven before it points to the candidate.
+
+`npm run hosted:release -- smoke` accepts the same explicit target/SHA flags as preflight and performs read-only page/readiness checks. It does not create accounts or replace real playback/email testing. `/api/health` returns only bounded readiness; application errors avoid private payloads and credentials. Use the providers' free dashboards to review usage and failures; no paid monitoring service or learner analytics integration is added.
+
+Keep the previous verified application build and its compatible schema range. Routine rollback changes the application deployment, not saved user data. Use additive migrations and forward fixes. Do not run down migrations, database reset or an old seed as rollback. Emergency data recovery restores privately into another target, validates it, and reviews cutover while preserving the original database and newer writes for reconciliation.
+
 ## Project progression
 
 1. **Milestone one:** illustrative decision-player prototype.
@@ -316,6 +433,6 @@ The seven `artifacts/vod-review/scenario-*.jpg` images preserve visual source ev
 7. **Milestone seven:** creator playlists, including mixed-player collections and ordered, resumable training sessions.
 8. **Milestone eight:** a film-room Home page with saved-session resume, a live featured moment, player counts, playlist discovery and account-specific entry points.
 9. **Milestone nine:** clearer scenario presentation and training UX; **9A** adds permanent early session ending with answered history, and **9B** adds scenario reports and operator hide/restore.
-10. **Milestone ten:** feature-review checkpoint before hosted launch, real account email, backups and operational checks. The first hosted release uses YouTube; uploads stay local initially.
+10. **Milestone ten:** hosted YouTube-only configuration, explicit email confirmation and bot protection, Help/privacy, release checks and protected backup/restore tooling. Actual provider/email acceptance and public deployment are separate release gates.
 
-Work branches target `dev`; tested releases move from `dev` to `main`. Milestones 9A and 9B are built together on `feat/session-reports` from `dev`. GitHub pushes and merges remain with the repository owner. Each later milestone needs its own approved plan. At milestone ten, review possible additional features before proceeding with launch. Hosted deployment and production email remain separate work. Automatic extraction is not part of the current roadmap.
+Work branches target `dev`; tested releases move from `dev` to `main`. Milestone 10 is built on `feat/launch` from merged `dev`. GitHub commits, pushes and merges remain with the repository owner. The milestone-10 feature checkpoint selected launch of the current features. Later progress, bookmarks, filters and guided-authoring features need separate approval. Automatic extraction is not part of the current roadmap.

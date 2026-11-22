@@ -1,36 +1,33 @@
 import { NextResponse } from "next/server";
-import { verifyEmailToken } from "@/server/auth/service";
+import { parseConfirmationRequest } from "@/server/auth/confirmation";
 import { safeReturnTo } from "@/server/auth/redirects";
 import { getServerAppConfig } from "@/server/config";
 
+/** Opening/scanning an email link is read-only. Only the explicit form POST verifies it. */
 export async function GET(request: Request) {
   const origin = getServerAppConfig().appOrigin;
   const query = new URL(request.url).searchParams;
-  const type = query.get("type");
-  const tokenHash = query.get("token_hash");
-  const returnTo = safeReturnTo(
+  const fallback = safeReturnTo(
     query.getAll("next").length === 1 ? query.get("next") : null,
   );
-  let destination = `/auth/error?returnTo=${encodeURIComponent(returnTo)}`;
-  let providerHeaders: Headers | undefined;
-  if (
-    (type === "signup" || type === "recovery") &&
-    tokenHash &&
-    query.getAll("type").length === 1 &&
-    query.getAll("token_hash").length === 1
-  ) {
-    try {
-      providerHeaders = await verifyEmailToken(tokenHash, type);
-      destination = type === "recovery" ? "/reset-password" : returnTo;
-    } catch {
-      /* Never include one-time tokens or provider errors in the destination. */
-    }
+  let destination = new URL(
+    `/auth/error?returnTo=${encodeURIComponent(fallback)}`,
+    origin,
+  );
+  try {
+    const parsed = parseConfirmationRequest(query);
+    destination = new URL("/auth/confirm-email", origin);
+    destination.searchParams.set("type", parsed.type);
+    destination.searchParams.set("token_hash", parsed.tokenHash);
+    destination.searchParams.set("next", parsed.returnTo);
+  } catch {
+    /* Never put malformed tokens or provider details into recovery links. */
   }
-  const response = NextResponse.redirect(new URL(destination, origin), 303);
-  if (providerHeaders)
-    for (const [name, value] of providerHeaders)
-      response.headers.set(name, value);
-  if (!response.headers.has("Cache-Control"))
-    response.headers.set("Cache-Control", "private, no-store");
+  const response = NextResponse.redirect(destination, 303);
+  response.headers.set("Cache-Control", "private, no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  response.headers.set("X-Robots-Tag", "noindex, nofollow");
   return response;
 }
+
+export const HEAD = GET;

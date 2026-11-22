@@ -1,3 +1,4 @@
+import { getAuthChallengeConfig } from "@/server/auth/challenge";
 import Link from "next/link";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { getCurrentAccount } from "@/server/auth/guards";
@@ -20,7 +21,7 @@ export default async function SignInPage({
         <p className="auth-intro">
           Your decisions are waiting. Sign in to resume or begin a session.
         </p>
-        <SignInForm returnTo={returnTo} />
+        <SignInForm challenge={getAuthChallengeConfig()} returnTo={returnTo} />
         <p className="auth-switch">
           New to the lab?{" "}
           <Link href={`/sign-up?returnTo=${encodeURIComponent(returnTo)}`}>

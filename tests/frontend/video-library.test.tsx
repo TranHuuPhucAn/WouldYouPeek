@@ -39,6 +39,7 @@ describe("creator recording library and source selection", () => {
     const replace = vi.fn(() => true);
     render(
       <SourceFields
+        capabilities={{ sourceMode: "youtube-and-upload" }}
         source={createUploadedSource()}
         onChange={vi.fn()}
         onReplace={replace}
@@ -62,6 +63,7 @@ describe("creator recording library and source selection", () => {
       change = vi.fn();
     render(
       <SourceFields
+        capabilities={{ sourceMode: "youtube-and-upload" }}
         source={content.source}
         onChange={change}
         onReplace={replace}
@@ -148,6 +150,7 @@ it.each(["youtube", "uploaded"] as const)(
       change = vi.fn();
     render(
       <SourceFields
+        capabilities={{ sourceMode: "youtube-and-upload" }}
         source={source}
         onReplace={replace}
         onChange={change}
@@ -182,6 +185,7 @@ it("restores the selected uploaded asset after cancellation", async () => {
     change = vi.fn();
   render(
     <SourceFields
+      capabilities={{ sourceMode: "youtube-and-upload" }}
       source={createUploadedSource(VIDEO_ID)}
       onReplace={replace}
       onChange={change}
@@ -196,4 +200,39 @@ it("restores the selected uploaded asset after cancellation", async () => {
   );
   expect(selection).toHaveValue(VIDEO_ID);
   expect(change).not.toHaveBeenCalled();
+});
+
+it("offers only YouTube fields and no upload fetch in hosted mode", () => {
+  const replace = vi.fn(() => true);
+  render(
+    <SourceFields
+      capabilities={{ sourceMode: "youtube-only" }}
+      source={validContent().source}
+      onChange={vi.fn()}
+      onReplace={replace}
+      issues={[]}
+    />,
+  );
+  expect(screen.getByLabelText("YouTube URL")).toBeVisible();
+  expect(screen.queryByLabelText("Video source")).not.toBeInTheDocument();
+  expect(api.listCreatorVideos).not.toHaveBeenCalled();
+});
+
+it("does not fetch an imported uploaded source and requires explicit YouTube replacement", () => {
+  const replace = vi.fn(() => false);
+  render(
+    <SourceFields
+      capabilities={{ sourceMode: "youtube-only" }}
+      source={createUploadedSource(VIDEO_ID)}
+      onChange={vi.fn()}
+      onReplace={replace}
+      issues={[]}
+    />,
+  );
+  expect(api.listCreatorVideos).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText("Uploaded recording")).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Replace with YouTube link" }),
+  );
+  expect(replace).toHaveBeenCalledWith(expect.objectContaining({ url: "" }));
 });

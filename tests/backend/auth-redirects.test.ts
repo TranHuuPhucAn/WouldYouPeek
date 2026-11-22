@@ -32,6 +32,8 @@ describe("trusted auth destinations and configuration", () => {
     "/creator",
     "/history",
     "/demo",
+    "/operator/reports",
+    "/operator/reports/11111111-1111-4111-8111-111111111111",
     "/library",
     "/library/bind-clove-utility-window",
     "/library/11111111-1111-4111-8111-111111111111",
@@ -46,6 +48,9 @@ describe("trusted auth destinations and configuration", () => {
     "/play/11111111-1111-4111-8111-111111111111",
   ])("keeps %s", (value) => expect(safeReturnTo(value)).toBe(value));
   it("builds callback from configured origin only", () => {
+    vi.stubEnv("WYP_DEPLOYMENT_MODE", "local");
+    vi.stubEnv("WYP_RELEASE_ENVIRONMENT", "");
+    vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "public-test");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://127.0.0.1:3000");
@@ -65,6 +70,9 @@ describe("trusted auth destinations and configuration", () => {
   it("rejects missing, malformed and secret configuration", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
     expect(getPublicSupabaseConfig).toThrow();
+    vi.stubEnv("WYP_DEPLOYMENT_MODE", "local");
+    vi.stubEnv("WYP_RELEASE_ENVIRONMENT", "");
+    vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_secret_bad");
     expect(getPublicSupabaseConfig).toThrow();

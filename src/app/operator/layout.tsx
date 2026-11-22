@@ -1,3 +1,5 @@
+import { getPrivatePageMetadata } from "@/server/metadata";
+export const metadata = getPrivatePageMetadata("Operator reports");
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { requireOperatorPage } from "./access";

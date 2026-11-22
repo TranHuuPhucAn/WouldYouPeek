@@ -2,10 +2,18 @@
 import Link from "next/link";
 import { signInAction } from "@/app/(auth)/actions";
 import { AuthForm } from "./AuthForm";
-export function SignInForm({ returnTo = "/library" }: { returnTo?: string }) {
+import type { AuthChallengeConfig } from "@/contracts/auth";
+export function SignInForm({
+  returnTo = "/library",
+  challenge,
+}: {
+  returnTo?: string;
+  challenge?: AuthChallengeConfig;
+}) {
   return (
     <>
       <AuthForm
+        challenge={challenge}
         action={signInAction}
         fields={["email", "password"]}
         label="Sign in"

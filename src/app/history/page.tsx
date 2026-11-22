@@ -1,3 +1,5 @@
+import { getPrivatePageMetadata } from "@/server/metadata";
+export const metadata = getPrivatePageMetadata("Your saved sessions");
 import { requirePageAccount } from "@/app/protected-page";
 import { getHistory } from "@/server/training/service";
 import { SessionHistory } from "@/components/sessions/SessionHistory";

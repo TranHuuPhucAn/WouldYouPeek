@@ -1,14 +1,21 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-export function CreatorSectionNav() {
+import type { DeploymentCapabilities } from "@/contracts/deployment";
+export function CreatorSectionNav({
+  capabilities = { sourceMode: "youtube-only" },
+}: {
+  capabilities?: DeploymentCapabilities;
+}) {
   const path = usePathname();
   return (
     <nav className="section-nav" aria-label="Creator sections">
       {[
         ["/creator", "Scenarios"],
         ["/creator/playlists", "Playlists"],
-        ["/creator/videos", "Your videos"],
+        ...(capabilities.sourceMode === "youtube-and-upload"
+          ? [["/creator/videos", "Your videos"]]
+          : []),
       ].map(([href, label]) => {
         const active =
           href === "/creator"

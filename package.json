@@ -28,7 +28,9 @@
     "media:setup": "node scripts/local-media-worker.mjs setup",
     "media:check": "node scripts/local-media-worker.mjs check",
     "media:worker": "node scripts/local-media-worker.mjs worker",
-    "media:fixtures": "node scripts/generate-video-fixtures.mjs"
+    "media:fixtures": "node scripts/generate-video-fixtures.mjs",
+    "hosted:release": "node scripts/hosted-release.mjs",
+    "hosted:backup": "node scripts/hosted-backup.mjs"
   },
   "engines": {
     "node": "^22.13.0 || ^24.0.0 || >=26.0.0"

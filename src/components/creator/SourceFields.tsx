@@ -11,19 +11,23 @@ import type {
   ValidationIssue,
 } from "@/contracts/creator";
 import { PlayerNameField } from "./PlayerNameField";
-import { SelectField, TextField } from "./EditorFields";
+import { SelectField, TextField, fieldId } from "./EditorFields";
 import { parseYouTubeSource } from "@/lib/creator/content";
+import type { DeploymentCapabilities } from "@/contracts/deployment";
 export function SourceFields({
   source,
   onChange,
   issues,
   onReplace,
+  capabilities = { sourceMode: "youtube-only" },
 }: {
   source: CreatorDraftContent["source"];
   onChange: (source: CreatorDraftContent["source"]) => void;
   issues: ValidationIssue[];
   onReplace: (source: CreatorDraftContent["source"]) => boolean;
+  capabilities?: DeploymentCapabilities;
 }) {
+  const uploadsEnabled = capabilities.sourceMode === "youtube-and-upload";
   const updateSourceField = <K extends keyof CreatorSourceAttribution>(
     key: K,
     value: (typeof source)[K],
@@ -41,6 +45,7 @@ export function SourceFields({
     if (!uploaded && parsedSource) acceptedUrl.current = source.url;
   }, [uploaded, parsedSource?.videoId, !uploaded ? source.url : ""]);
   async function loadVideos(nextCursor: string | null = null) {
+    if (!uploadsEnabled || !uploaded) return;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -90,13 +95,13 @@ export function SourceFields({
       setVideos([]);
     };
     window.addEventListener("wyp:identity-invalidated", invalidate);
-    if (uploaded) void loadVideos();
+    if (uploaded && uploadsEnabled) void loadVideos();
     return () => {
       valid.current = false;
       request.current?.abort();
       window.removeEventListener("wyp:identity-invalidated", invalidate);
     };
-  }, [uploaded]);
+  }, [uploaded, uploadsEnabled]);
   function attribution(): CreatorSourceAttribution {
     const {
       title,
@@ -126,6 +131,7 @@ export function SourceFields({
     };
   }
   function chooseKind(kind: string): boolean {
+    if (kind === "uploaded" && !uploadsEnabled) return false;
     if (kind === "uploaded" && !uploaded)
       return onReplace({
         ...attribution(),
@@ -156,17 +162,34 @@ export function SourceFields({
         Use a player’s own information. Credit the recording and enter its
         context; metadata is not fetched automatically.
       </p>
-      <SelectField
-        path="source.kind"
-        label="Video source"
-        value={uploaded ? "uploaded" : "youtube"}
-        onChange={chooseKind}
-        choices={[
-          { value: "youtube", label: "YouTube link" },
-          { value: "uploaded", label: "Uploaded recording" },
-        ]}
-      />
-      {uploaded ? (
+      {uploadsEnabled && (
+        <SelectField
+          path="source.kind"
+          label="Video source"
+          value={uploaded ? "uploaded" : "youtube"}
+          onChange={chooseKind}
+          choices={[
+            { value: "youtube", label: "YouTube link" },
+            { value: "uploaded", label: "Uploaded recording" },
+          ]}
+        />
+      )}
+      {uploaded && !uploadsEnabled ? (
+        <div className="form-message">
+          <p>
+            This draft uses an uploaded recording. Your text is saved, but this
+            site supports YouTube links. Replace the source to continue.
+          </p>
+          <button
+            id={fieldId("source.kind")}
+            type="button"
+            className="button button-secondary"
+            onClick={() => chooseKind("youtube")}
+          >
+            Replace with YouTube link
+          </button>
+        </div>
+      ) : uploaded ? (
         <>
           <SelectField
             path="source.assetId"

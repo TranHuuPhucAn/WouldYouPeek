@@ -1,3 +1,4 @@
+import { getAuthChallengeConfig } from "@/server/auth/challenge";
 import Link from "next/link";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 export default async function ForgotPasswordPage({
@@ -13,7 +14,7 @@ export default async function ForgotPasswordPage({
         <p className="auth-intro">
           Enter your email and we’ll send a link to set a new password.
         </p>
-        <ForgotPasswordForm />
+        <ForgotPasswordForm challenge={getAuthChallengeConfig()} />
         <p className="auth-switch">
           Remembered your password? <Link href="/sign-in">Sign in</Link>
         </p>

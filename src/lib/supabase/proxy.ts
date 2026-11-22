@@ -39,7 +39,7 @@ export async function refreshAuthSession(request: NextRequest) {
   const { data } = await client.auth.getClaims();
   const protectedPath =
     request.nextUrl.pathname !== "/play" &&
-    /^\/(?:play|history|account|creator)(?:\/|$)/.test(
+    /^\/(?:play|history|account|creator|operator)(?:\/|$)/.test(
       request.nextUrl.pathname,
     );
   if (!data?.claims.sub && protectedPath) {

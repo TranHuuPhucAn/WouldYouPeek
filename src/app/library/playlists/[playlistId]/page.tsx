@@ -4,6 +4,28 @@ import { getPublishedPlaylist } from "@/server/playlists/service";
 import { ApiError } from "@/server/http";
 import { PlaylistItemList } from "@/components/creator/PlaylistItemList";
 import { SessionStart } from "@/components/sessions/SessionStart";
+import {
+  getPublicPageMetadata,
+  getUnavailableMetadata,
+} from "@/server/metadata";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ playlistId: string }>;
+}) {
+  const { playlistId } = await params;
+  try {
+    const playlist = await getPublishedPlaylist(playlistId);
+    return getPublicPageMetadata({
+      title: playlist.title,
+      description: playlist.description,
+      path: `/library/playlists/${playlist.id}`,
+    });
+  } catch {
+    return getUnavailableMetadata("Playlist unavailable");
+  }
+}
 export default async function LibraryPlaylistPage({
   params,
 }: {

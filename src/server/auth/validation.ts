@@ -47,14 +47,19 @@ function password(value: unknown, newPassword: boolean): string {
   return value;
 }
 export function parseSignInInput(value: unknown) {
-  const input = record(value, ["email", "password"]);
+  const input = record(value, ["email", "password", "captchaToken"]);
   return {
     email: email(input.email),
     password: password(input.password, false),
   };
 }
 export function parseSignUpInput(value: unknown) {
-  const input = record(value, ["email", "password", "confirmPassword"]);
+  const input = record(value, [
+    "email",
+    "password",
+    "confirmPassword",
+    "captchaToken",
+  ]);
   return {
     email: email(input.email),
     ...parseNewPassword({
@@ -64,7 +69,7 @@ export function parseSignUpInput(value: unknown) {
   };
 }
 export function parseResetRequest(value: unknown) {
-  const input = record(value, ["email"]);
+  const input = record(value, ["email", "captchaToken"]);
   return { email: email(input.email) };
 }
 export function parseNewPassword(value: unknown) {
