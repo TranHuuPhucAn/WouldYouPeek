@@ -38,6 +38,7 @@ describe("owner DTO projections", () => {
   it("keeps the original publication receipt distinct from a newer live version", () => {
     const source = creatorSnapshot();
     source.publication = {
+      operatorVisibility: { hidden: false, reason: null, changedAt: null },
       state: "published",
       currentVersion: "creator-2",
       publishedAt: source.updatedAt,

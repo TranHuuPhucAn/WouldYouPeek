@@ -4,10 +4,12 @@ const mock = vi.hoisted(() => ({
   user: vi.fn(),
   single: vi.fn(),
   config: vi.fn(),
+  rpc: vi.fn(),
 }));
 vi.mock("@/server/config", () => ({ getPublicSupabaseConfig: mock.config }));
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: async () => ({
+    rpc: mock.rpc,
     auth: { getClaims: mock.claims, getUser: mock.user },
     from: () => ({ select: () => ({ eq: () => ({ single: mock.single }) }) }),
   }),
@@ -16,26 +18,25 @@ import {
   getCurrentAccount,
   requireVerifiedUser,
   requireCreator,
+  requireOperator,
+  hasOperatorAccess,
 } from "@/server/auth/guards";
 beforeEach(() => {
+  mock.rpc.mockReset().mockResolvedValue({ data: false, error: null });
   mock.config.mockReset().mockReturnValue({});
   mock.claims
     .mockReset()
     .mockResolvedValue({ data: { claims: { sub: "u" } }, error: null });
-  mock.user
-    .mockReset()
-    .mockResolvedValue({
-      data: {
-        user: { id: "u", email: "a@b.com", email_confirmed_at: "2026-01-01" },
-      },
-      error: null,
-    });
-  mock.single
-    .mockReset()
-    .mockResolvedValue({
-      data: { role: "learner", created_at: "2026-01-01" },
-      error: null,
-    });
+  mock.user.mockReset().mockResolvedValue({
+    data: {
+      user: { id: "u", email: "a@b.com", email_confirmed_at: "2026-01-01" },
+    },
+    error: null,
+  });
+  mock.single.mockReset().mockResolvedValue({
+    data: { role: "learner", created_at: "2026-01-01" },
+    error: null,
+  });
 });
 describe("validated account guards", () => {
   it("requires verified claims then a fresh provider user", async () => {
@@ -126,5 +127,38 @@ describe("validated account guards", () => {
     });
     expect(await getCurrentAccount()).toBeNull();
     await expect(requireVerifiedUser()).rejects.toThrow("config");
+  });
+});
+
+describe("operator access is independently checked", () => {
+  it("does not trust account role or editable metadata", async () => {
+    mock.single.mockResolvedValue({
+      data: { role: "creator", created_at: "2026-01-01" },
+      error: null,
+    });
+    await expect(hasOperatorAccess()).resolves.toBe(false);
+    await expect(requireOperator()).rejects.toMatchObject({
+      code: "OPERATOR_REQUIRED",
+    });
+    expect(mock.rpc).toHaveBeenCalledWith("get_operator_access");
+  });
+  it("reads the server membership again after revocation", async () => {
+    mock.rpc.mockResolvedValueOnce({ data: true, error: null });
+    expect(await requireOperator()).toMatchObject({ role: "learner" });
+    await expect(requireOperator()).rejects.toMatchObject({
+      code: "OPERATOR_REQUIRED",
+    });
+  });
+  it("fails closed on malformed membership results and unverified accounts", async () => {
+    mock.rpc.mockResolvedValue({ data: { operator: true }, error: null });
+    await expect(requireOperator()).rejects.toMatchObject({
+      code: "STORAGE_UNAVAILABLE",
+    });
+    mock.user.mockResolvedValue({ data: { user: { id: "u" } }, error: null });
+    mock.rpc.mockClear();
+    await expect(hasOperatorAccess()).rejects.toMatchObject({
+      code: "EMAIL_NOT_VERIFIED",
+    });
+    expect(mock.rpc).not.toHaveBeenCalled();
   });
 });

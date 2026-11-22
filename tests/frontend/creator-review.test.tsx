@@ -74,6 +74,7 @@ function published() {
     currentVersion: "creator-1",
     publishedAt: when,
     hasUnpublishedChanges: false,
+    operatorVisibility: { hidden: false, reason: null, changedAt: null },
   };
   return s;
 }

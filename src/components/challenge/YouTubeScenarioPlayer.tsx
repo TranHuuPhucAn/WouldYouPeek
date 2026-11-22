@@ -23,6 +23,7 @@ type Props = {
   playbackKey?: string;
   onPlaybackEvent?: (event: ScenarioPlaybackEvent) => void;
   autoplay?: boolean;
+  suspended?: boolean;
   hideCaption?: boolean;
 };
 type Status = "loading" | "ready" | "playing" | "paused" | "complete";
@@ -43,6 +44,7 @@ export function YouTubeScenarioPlayer({
   playbackKey = "legacy",
   onPlaybackEvent,
   autoplay,
+  suspended = false,
   hideCaption = false,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
@@ -55,6 +57,7 @@ export function YouTubeScenarioPlayer({
     playbackKey,
     onPlaybackEvent,
     autoplay,
+    suspended,
   });
   current.current = {
     setup,
@@ -64,6 +67,7 @@ export function YouTubeScenarioPlayer({
     playbackKey,
     onPlaybackEvent,
     autoplay,
+    suspended,
   };
   const active = useRef<Activation | null>(null);
   const generation = useRef(0);
@@ -78,6 +82,7 @@ export function YouTubeScenarioPlayer({
   const userVolume = useRef<number | null>(null);
   const previousMode = useRef<PlaybackMode | null>(null);
   const priorIntent = useRef(autoplay);
+  const resumeRequired = useRef(suspended);
   function isCurrent(running: Activation | null): running is Activation {
     return (
       !!running &&
@@ -101,6 +106,7 @@ export function YouTubeScenarioPlayer({
   ) {
     const target = player.current;
     if (!target) return;
+    shouldPlay = shouldPlay && !current.current.suspended;
     clearTimeout(playbackTimeout.current);
     active.current = {
       segment,
@@ -147,6 +153,8 @@ export function YouTubeScenarioPlayer({
         target = player.current;
       if (
         disposed ||
+        current.current.suspended ||
+        resumeRequired.current ||
         !isCurrent(running) ||
         !running.positioned ||
         running.finished ||
@@ -166,6 +174,10 @@ export function YouTubeScenarioPlayer({
       const running = active.current,
         target = player.current;
       if (disposed || !target || !isCurrent(running)) return;
+      if (current.current.suspended || resumeRequired.current) {
+        if (target.getPlayerState() === 1) target.pauseVideo();
+        return;
+      }
       const time = target.getCurrentTime(),
         playing = target.getPlayerState() === 1;
       if (
@@ -234,6 +246,12 @@ export function YouTubeScenarioPlayer({
             if (disposed) return;
             const running = active.current;
             if (!isCurrent(running)) return;
+            if (current.current.suspended || resumeRequired.current) {
+              clearTimeout(playbackTimeout.current);
+              if (data === 1 || data === 3) player.current?.pauseVideo();
+              setStatus(running.finished ? "complete" : "paused");
+              return;
+            }
             if (data !== 3) clearTimeout(playbackTimeout.current);
             if (data === 1) {
               if (document.hidden) {
@@ -264,7 +282,12 @@ export function YouTubeScenarioPlayer({
           },
           onAutoplayBlocked: () => {
             clearTimeout(playbackTimeout.current);
-            if (!disposed && isCurrent(active.current)) {
+            if (
+              !disposed &&
+              !current.current.suspended &&
+              !resumeRequired.current &&
+              isCurrent(active.current)
+            ) {
               setStatus("paused");
               emit("blocked");
             }
@@ -303,6 +326,7 @@ export function YouTubeScenarioPlayer({
     clearTimeout(playbackTimeout.current);
     const prior = previousMode.current;
     previousMode.current = mode;
+    resumeRequired.current = current.current.suspended;
     if (mode === "decision") {
       const previous = active.current;
       active.current = {
@@ -322,11 +346,13 @@ export function YouTubeScenarioPlayer({
           startSeconds: Math.max(setup.startSeconds, setup.endSeconds - 1),
         };
         active.current.segment = restore;
-        player.current.loadVideoById({
+        const bounds = {
           videoId: setup.videoId,
           startSeconds: restore.startSeconds,
           endSeconds: setup.endSeconds,
-        });
+        };
+        if (current.current.suspended) player.current.cueVideoById(bounds);
+        else player.current.loadVideoById(bounds);
       }
       return;
     }
@@ -358,12 +384,21 @@ export function YouTubeScenarioPlayer({
     priorIntent.current = autoplay;
   }, [autoplay]);
   useEffect(() => {
+    if (!suspended) return;
+    resumeRequired.current = true;
+    clearTimeout(playbackTimeout.current);
+    player.current?.pauseVideo();
+    setStatus(active.current?.finished ? "complete" : "paused");
+  }, [suspended]);
+  useEffect(() => {
     if (error) player.current?.pauseVideo();
   }, [error]);
   function play() {
-    if (!player.current || mode === "decision") return;
+    if (!player.current || mode === "decision" || current.current.suspended)
+      return;
     const segment = mode === "reveal" ? reveal : setup;
     if (!segment) return;
+    resumeRequired.current = false;
     if (active.current?.finished) startSegment(segment, true);
     else {
       player.current.playVideo();
@@ -396,6 +431,7 @@ export function YouTubeScenarioPlayer({
           <p>{error}</p>
           <button
             className="button button-secondary"
+            disabled={suspended}
             onClick={() => setAttempt((value) => value + 1)}
           >
             Retry video
@@ -428,7 +464,7 @@ export function YouTubeScenarioPlayer({
               max="100"
               step="5"
               value={volume}
-              disabled={!ready}
+              disabled={!ready || suspended}
               onChange={(event) => {
                 const next = Number(event.target.value);
                 userVolume.current = next;
@@ -440,7 +476,7 @@ export function YouTubeScenarioPlayer({
           {mode !== "decision" && (
             <button
               className="button button-secondary"
-              disabled={!ready}
+              disabled={!ready || suspended}
               onClick={status === "playing" ? pause : play}
             >
               {status === "playing"

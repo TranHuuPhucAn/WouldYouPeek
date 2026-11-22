@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   listSessions: vi.fn(),
   submitSessionAnswer: vi.fn(),
   advanceSession: vi.fn(),
+  endSession: vi.fn(),
 }));
 vi.mock("@/server/auth/guards", () => ({ requireVerifiedUser: mocks.guard }));
 vi.mock("@/server/training/repository", () => mocks);
@@ -41,6 +42,42 @@ describe("training service boundaries", () => {
       code: "AUTH_REQUIRED",
     });
     expect(mocks.startOrResumeSession).not.toHaveBeenCalled();
+    await expect(
+      service.endSession(sessionId, { requestId, expectedRevision: 0 }),
+    ).rejects.toMatchObject({ code: "AUTH_REQUIRED" });
+    expect(mocks.endSession).not.toHaveBeenCalled();
+  });
+  it("projects the owned terminal result and rejects malformed end commands", async () => {
+    const ended = {
+      ...snapshot(),
+      status: "ended",
+      phase: "ended",
+      currentIndex: null,
+      revision: 1,
+      updatedAt: "2026-01-01T00:02:00Z",
+      endedAt: "2026-01-01T00:02:00Z",
+    };
+    mocks.endSession.mockResolvedValue({ session: ended, replayed: true });
+    const command = { requestId, expectedRevision: 0 };
+    expect(await service.endSession(sessionId, command)).toEqual({
+      session: ended,
+      replayed: true,
+    });
+    expect(mocks.endSession).toHaveBeenCalledWith(sessionId, command);
+    mocks.endSession.mockClear();
+    for (const input of [
+      null,
+      [],
+      {},
+      { ...command, ownerId: "other" },
+      { ...command, expectedRevision: 2_147_483_648 },
+      { ...command, requestId: "bad" },
+    ]) {
+      await expect(service.endSession(sessionId, input)).rejects.toMatchObject({
+        code: "INVALID_REQUEST",
+      });
+    }
+    expect(mocks.endSession).not.toHaveBeenCalled();
   });
   it("does not accept user-supplied grading", async () => {
     await expect(
@@ -110,6 +147,7 @@ describe("training service boundaries", () => {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       completedAt: null,
+      endedAt: null,
       target: { kind: "scenario", scenarioId: "bind-clove-utility-window" },
       title: "Saved scenario",
     };

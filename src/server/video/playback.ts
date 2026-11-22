@@ -1,6 +1,6 @@
 import "server-only";
 import type { PlaybackAccess } from "@/contracts/video";
-import { requireVerifiedUser } from "@/server/auth/guards";
+import { requireVerifiedUser, requireOperator } from "@/server/auth/guards";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getPublicSupabaseConfig } from "@/server/config";
 import { ApiError } from "@/server/http";
@@ -11,8 +11,9 @@ export async function issuePlaybackUrl(
   input: unknown,
 ): Promise<PlaybackAccess> {
   await requireVerifiedUser();
-  const context = parsePlaybackContext(input),
-    object = toVideoObject(await authorize(context)),
+  const context = parsePlaybackContext(input);
+  if (context.kind === "operator-report") await requireOperator();
+  const object = toVideoObject(await authorize(context)),
     client = await createServerSupabaseClient();
   const expiresIn = 300;
   const { data, error } = await client.storage

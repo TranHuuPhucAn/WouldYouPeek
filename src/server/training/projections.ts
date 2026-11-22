@@ -242,44 +242,74 @@ export function toSessionSnapshot(value: unknown): SessionSnapshot {
   )
     invalid();
   const phase = input.phase;
-  if (phase !== "setup" && phase !== "review" && phase !== "completed")
-    invalid();
-  if (input.status !== (phase === "completed" ? "completed" : "in_progress"))
-    invalid();
-  const currentIndex =
-    phase === "completed" ? null : integer(input.currentIndex);
   if (
-    (phase === "completed" && input.currentIndex !== null) ||
+    phase !== "setup" &&
+    phase !== "review" &&
+    phase !== "completed" &&
+    phase !== "ended"
+  )
+    invalid();
+  const terminal = phase === "completed" || phase === "ended";
+  if (input.status !== (terminal ? phase : "in_progress")) invalid();
+  const currentIndex = terminal ? null : integer(input.currentIndex);
+  if (
+    (terminal && input.currentIndex !== null) ||
     (currentIndex !== null && currentIndex >= items.length)
   )
     invalid();
   const revision = integer(input.revision);
+  const answeredCount = items.filter((item) => item.answer !== null).length;
   if (
-    revision !==
-    (phase === "completed"
-      ? items.length * 2
-      : currentIndex! * 2 + (phase === "review" ? 1 : 0))
+    phase === "ended"
+      ? answeredCount >= items.length ||
+        !(
+          revision === answeredCount * 2 + 1 ||
+          (answeredCount > 0 && revision === answeredCount * 2)
+        )
+      : revision !==
+        (phase === "completed"
+          ? items.length * 2
+          : currentIndex! * 2 + (phase === "review" ? 1 : 0))
   )
     invalid();
   for (const item of items) {
     const shouldHaveAnswer =
       phase === "completed" ||
-      item.position < currentIndex! ||
-      (item.position === currentIndex && phase === "review");
+      (phase === "ended"
+        ? item.position < answeredCount
+        : item.position < currentIndex! ||
+          (item.position === currentIndex && phase === "review"));
     if (Boolean(item.answer) !== shouldHaveAnswer) invalid();
   }
   const completedAt = phase === "completed" ? date(input.completedAt) : null;
   if (phase !== "completed" && input.completedAt !== null) invalid();
+  const endedAt = phase === "ended" ? date(input.endedAt) : null;
+  if (phase !== "ended" && input.endedAt !== null) invalid();
+  const createdAt = date(input.createdAt),
+    updatedAt = date(input.updatedAt);
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) invalid();
+  if (
+    endedAt !== null &&
+    (Date.parse(endedAt) !== Date.parse(updatedAt) ||
+      items.some(
+        (item) =>
+          item.answer !== null &&
+          (Date.parse(item.answer.answeredAt) < Date.parse(createdAt) ||
+            Date.parse(item.answer.answeredAt) > Date.parse(endedAt)),
+      ))
+  )
+    invalid();
   return {
     id: id(input.id),
     ...metadata,
-    status: phase === "completed" ? "completed" : "in_progress",
+    status: terminal ? phase : "in_progress",
     phase,
     revision,
     currentIndex,
-    createdAt: date(input.createdAt),
-    updatedAt: date(input.updatedAt),
+    createdAt,
+    updatedAt,
     completedAt,
+    endedAt,
     items,
   };
 }
@@ -289,22 +319,40 @@ export function toSessionSummary(value: unknown): SessionSummary {
     totalCount = integer(input.totalCount);
   if (
     totalCount < 1 ||
+    totalCount > 100 ||
     answeredCount > totalCount ||
-    (input.status !== "in_progress" && input.status !== "completed")
+    (input.status !== "in_progress" &&
+      input.status !== "completed" &&
+      input.status !== "ended")
   )
     invalid();
   if (input.status === "completed" && answeredCount !== totalCount) invalid();
+  if (input.status === "ended" && answeredCount >= totalCount) invalid();
   const metadata = sessionMetadata(input);
   if (metadata.target.kind === "playlist" && totalCount > 20) invalid();
+  if (metadata.target.kind === "scenario" && totalCount !== 1) invalid();
+  const createdAt = date(input.createdAt),
+    updatedAt = date(input.updatedAt);
+  const completedAt =
+    input.status === "completed" ? date(input.completedAt) : null;
+  const endedAt = input.status === "ended" ? date(input.endedAt) : null;
+  if (
+    (input.status !== "completed" && input.completedAt !== null) ||
+    (input.status !== "ended" && input.endedAt !== null) ||
+    Date.parse(updatedAt) < Date.parse(createdAt) ||
+    (endedAt !== null && Date.parse(endedAt) !== Date.parse(updatedAt))
+  )
+    invalid();
   return {
     id: id(input.id),
     ...metadata,
     status: input.status as SessionSummary["status"],
     answeredCount,
     totalCount,
-    createdAt: date(input.createdAt),
-    updatedAt: date(input.updatedAt),
-    completedAt: input.status === "completed" ? date(input.completedAt) : null,
+    createdAt,
+    updatedAt,
+    completedAt,
+    endedAt,
   };
 }
 export function toMutationResponse(value: unknown): SessionMutationResponse {

@@ -17,6 +17,7 @@ type Props = {
   playbackKey?: string;
   onPlaybackEvent?: (event: ScenarioPlaybackEvent) => void;
   autoplay?: boolean;
+  suspended?: boolean;
   hideCaption?: boolean;
   completeLabel?: string;
 };
@@ -29,16 +30,20 @@ export function ScenarioMedia({
   playbackKey = "legacy",
   onPlaybackEvent,
   autoplay,
+  suspended = false,
   hideCaption = false,
   completeLabel = "Continue to decision",
 }: Props) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [needsResume, setNeedsResume] = useState(suspended);
   const video = useRef<HTMLVideoElement>(null);
   const identity = `${playbackKey}:${mode}:${"src" in media ? media.src : media.kind}:${attempt}`;
   const active = useRef(identity);
   active.current = identity;
   const priorIntent = useRef(autoplay);
+  const suspension = useRef({ suspended, resumeRequired: suspended });
+  suspension.current.suspended = suspended;
   const complete = useRef<string | null>(null);
   function emit(type: ScenarioPlaybackEvent["type"]) {
     if (active.current === identity)
@@ -47,6 +52,8 @@ export function ScenarioMedia({
   useEffect(() => {
     setFailed(false);
     complete.current = null;
+    suspension.current.resumeRequired = suspension.current.suspended;
+    setNeedsResume(suspension.current.suspended);
     const node = video.current;
     return () => {
       if (node && !node.paused) node.pause();
@@ -57,16 +64,40 @@ export function ScenarioMedia({
       video.current?.pause();
     priorIntent.current = autoplay;
   }, [autoplay]);
+  useEffect(() => {
+    if (!suspended) return;
+    suspension.current.resumeRequired = true;
+    setNeedsResume(true);
+    video.current?.pause();
+  }, [suspended]);
   function handleMediaError() {
     if (active.current !== identity) return;
     setFailed(true);
     emit("error");
   }
   function retryMedia() {
+    if (suspension.current.suspended) return;
     setFailed(false);
     setAttempt((value) => value + 1);
   }
-  const presentation = { playbackKey, onPlaybackEvent, autoplay, hideCaption };
+  function resumeVideo() {
+    const node = video.current;
+    if (!node || suspension.current.suspended || active.current !== identity)
+      return;
+    suspension.current.resumeRequired = false;
+    setNeedsResume(false);
+    void node.play().catch(() => {
+      if (!suspension.current.suspended && !suspension.current.resumeRequired)
+        emit("blocked");
+    });
+  }
+  const presentation = {
+    playbackKey,
+    onPlaybackEvent,
+    autoplay,
+    suspended,
+    hideCaption,
+  };
   if (media.kind === "youtube")
     return (
       <YouTubeScenarioPlayer
@@ -104,7 +135,11 @@ export function ScenarioMedia({
           <span className="error-symbol">!</span>
           <h3>Media couldn’t load</h3>
           <p>Your progress is safe. Try loading this scene again.</p>
-          <button className="button button-secondary" onClick={retryMedia}>
+          <button
+            className="button button-secondary"
+            disabled={suspended}
+            onClick={retryMedia}
+          >
             Retry media
           </button>
         </div>
@@ -117,22 +152,42 @@ export function ScenarioMedia({
                 ref={video}
                 src={media.src}
                 aria-label={media.alt}
-                controls
+                controls={!suspended && !needsResume}
                 playsInline
                 preload="metadata"
                 onLoadedData={(event) => {
                   const node = event.currentTarget;
                   if (
                     autoplay &&
+                    !suspension.current.suspended &&
+                    !suspension.current.resumeRequired &&
                     mode !== "decision" &&
                     active.current === identity
                   )
-                    void node.play().catch(() => emit("blocked"));
+                    void node.play().catch(() => {
+                      if (
+                        !suspension.current.suspended &&
+                        !suspension.current.resumeRequired
+                      )
+                        emit("blocked");
+                    });
                 }}
-                onPlay={() => emit("started")}
+                onPlay={(event) => {
+                  if (
+                    suspension.current.suspended ||
+                    suspension.current.resumeRequired
+                  ) {
+                    event.currentTarget.pause();
+                    return;
+                  }
+                  if (event.currentTarget.paused) return;
+                  emit("started");
+                }}
                 onEnded={() => {
                   if (
                     active.current !== identity ||
+                    suspension.current.suspended ||
+                    suspension.current.resumeRequired ||
                     complete.current === identity
                   )
                     return;
@@ -155,6 +210,17 @@ export function ScenarioMedia({
           {!hideCaption && media.caption && (
             <p className="media-caption">{media.caption}</p>
           )}
+          {media.kind === "video" && needsResume && (
+            <div className="media-action">
+              <button
+                className="button button-secondary"
+                disabled={suspended}
+                onClick={resumeVideo}
+              >
+                Resume video
+              </button>
+            </div>
+          )}
           {onComplete && media.kind === "illustration" && (
             <div className="media-action">
               <span>
@@ -162,7 +228,13 @@ export function ScenarioMedia({
                   ? "Read the continuation, then explore the analysis."
                   : "Read the scene. Make your call."}
               </span>
-              <button className="button button-primary" onClick={onComplete}>
+              <button
+                className="button button-primary"
+                disabled={suspended}
+                onClick={() => {
+                  if (!suspension.current.suspended) onComplete();
+                }}
+              >
                 {completeLabel}
                 <span aria-hidden="true">→</span>
               </button>

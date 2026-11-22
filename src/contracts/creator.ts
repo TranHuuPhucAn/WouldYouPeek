@@ -76,6 +76,7 @@ export type CreatorPublication = {
   currentVersion: string | null;
   publishedAt: string | null;
   hasUnpublishedChanges: boolean;
+  operatorVisibility: import("./moderation").CreatorVisibilityNotice;
 };
 export type CreatorScenarioSnapshot = {
   id: string;

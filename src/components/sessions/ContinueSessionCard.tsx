@@ -8,6 +8,7 @@ export function ContinueSessionCard({
   session: SessionSummary;
   prefetch?: boolean;
 }) {
+  if (session.status !== "in_progress") return null;
   return (
     <section
       className="surface-card continue-session"

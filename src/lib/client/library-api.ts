@@ -20,15 +20,25 @@ export function parseLibraryEntry(
     !isRecord(value) ||
     !isScenarioId(value.id) ||
     (expectedId && value.id !== expectedId) ||
+    typeof value.contentVersion !== "string" ||
+    !value.contentVersion.trim() ||
+    value.contentVersion.length > 100 ||
     !["ai", "creator", "ai-assisted"].includes(String(value.provenance)) ||
     !["curated", "creator"].includes(String(value.editorialOrigin)) ||
     (value.publishedAt !== null && !isDate(value.publishedAt))
   )
     invalidResponse();
-  const { provenance, publishedAt, editorialOrigin, player, ...preview } =
-    value;
+  const {
+    provenance,
+    publishedAt,
+    editorialOrigin,
+    player,
+    contentVersion,
+    ...preview
+  } = value;
   return {
     ...parseChallengePreview(preview),
+    contentVersion,
     provenance: provenance as LibraryScenarioPreview["provenance"],
     editorialOrigin:
       editorialOrigin as LibraryScenarioPreview["editorialOrigin"],

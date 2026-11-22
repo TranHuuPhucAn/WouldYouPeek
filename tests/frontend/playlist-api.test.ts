@@ -232,6 +232,7 @@ describe("playlist boundaries", () => {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       completedAt: null,
+      endedAt: null,
       playlist: session.playlist,
     };
     expect(parseSessionSummary(summary).totalCount).toBe(20);

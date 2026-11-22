@@ -158,7 +158,9 @@ function pipelineFakes(target, { failOn } = {}) {
     run: async (command, args) => step(args.includes("tests/migrations/milestone-4-preservation.test.mjs") ? "upgrade"
       : args.includes("tests/migrations/milestone-5-preservation.test.mjs") ? "media-upgrade"
       : args.includes("tests/migrations/milestone-6-preservation.test.mjs") ? "library-upgrade"
-      : args.includes("tests/migrations/milestone-7-preservation.test.mjs") ? "playlist-upgrade" : args[1] ?? args[0]),
+      : args.includes("tests/migrations/milestone-7-preservation.test.mjs") ? "playlist-upgrade"
+      : args.includes("tests/migrations/session-end-preservation.test.mjs") ? "session-end-upgrade"
+      : args.includes("tests/migrations/moderation-preservation.test.mjs") ? "moderation-upgrade" : args[1] ?? args[0]),
     cli: async (owned, args) => { assert.equal(owned.projectId, target.projectId); step(args.join(" ")); },
     startApp: async () => { step("start-app"); return "owned-process"; },
     stopApp: async (app) => { assert.equal(app, "owned-process"); step("stop-app"); },
@@ -181,7 +183,9 @@ test("full verification includes upgrade before clean install and every required
   assert.ok(fake.calls.indexOf("upgrade") < fake.calls.indexOf("media-upgrade"));
   assert.ok(fake.calls.indexOf("media-upgrade") < fake.calls.indexOf("library-upgrade"));
   assert.ok(fake.calls.indexOf("library-upgrade") < fake.calls.indexOf("playlist-upgrade"));
-  assert.ok(fake.calls.indexOf("playlist-upgrade") < fake.calls.indexOf("db reset --yes"));
+  assert.ok(fake.calls.indexOf("playlist-upgrade") < fake.calls.indexOf("session-end-upgrade"));
+  assert.ok(fake.calls.indexOf("session-end-upgrade") < fake.calls.indexOf("moderation-upgrade"));
+  assert.ok(fake.calls.indexOf("moderation-upgrade") < fake.calls.indexOf("db reset --yes"));
   assert.ok(fake.calls.indexOf("scripts/generate-video-fixtures.mjs") < fake.calls.indexOf("start-worker"));
   for (const phase of ["db:seed:check", "db:types:check", "test", "test:db", "test:integration", "typecheck", "build", "test:http"]) assert.ok(fake.calls.includes(phase), phase);
   assert.deepEqual(fake.calls.slice(-2), ["stop-app", "stop-worker"]);
@@ -226,6 +230,15 @@ test("a failed integration suite stops the owned worker without starting the app
   assert.equal(fake.calls.at(-1), "stop-worker");
 });
 
+test("failed session-ending preservation prevents reset and every later suite", async (t) => {
+  const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "session-end-upgrade" });
+  await assert.rejects(runVerificationPipeline(target, fake.options), /failure: session-end-upgrade/);
+  assert.ok(fake.calls.includes("playlist-upgrade"));
+  assert.equal(fake.calls.includes("db reset --yes"), false);
+  assert.equal(fake.calls.includes("start-worker"), false);
+  assert.equal(fake.calls.includes("build"), false);
+});
+
 test("an unexpectedly exited validator cannot be hidden by passing application checks", async (t) => {
   const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target);
   let stopped = false;
@@ -233,6 +246,15 @@ test("an unexpectedly exited validator cannot be hidden by passing application c
   fake.options.stopWorker = async () => { stopped = true; };
   await assert.rejects(runVerificationPipeline(target, fake.options), /stopped unexpectedly/);
   assert.equal(stopped, true);
+  assert.equal(fake.calls.includes("build"), false);
+});
+
+test("failed moderation preservation prevents reset and later passing checks", async (t) => {
+  const target = prepareTestWorkspace(fixtureProject(t)), fake = pipelineFakes(target, { failOn: "moderation-upgrade" });
+  await assert.rejects(runVerificationPipeline(target, fake.options), /failure: moderation-upgrade/);
+  assert.ok(fake.calls.includes("session-end-upgrade"));
+  assert.equal(fake.calls.includes("db reset --yes"), false);
+  assert.equal(fake.calls.includes("start-worker"), false);
   assert.equal(fake.calls.includes("build"), false);
 });
 

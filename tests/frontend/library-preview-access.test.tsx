@@ -50,7 +50,7 @@ describe("public Library media access", () => {
       expect(media).not.toHaveBeenCalled();
       expect(screen.queryByTestId("scenario-media")).not.toBeInTheDocument();
       const link = screen.getByRole("link", {
-        name: account ? /verify/i : /sign in/i,
+        name: account ? "Verify email →" : "Sign in to preview →",
       });
       expect(link.getAttribute("href")).toContain(
         account ? "/check-email" : "/sign-in",

@@ -157,7 +157,9 @@ export function CreatorReview({
           next.kind === "review"
             ? "Saved revision reviewed. You can publish it now."
             : next.kind === "publish"
-              ? `Publication confirmed${result.publishedVersion ? ` (${result.publishedVersion})` : ""}. The status below shows the latest saved state.`
+              ? result.scenario.publication.operatorVisibility.hidden
+                ? "Publication saved. This scenario remains hidden by the operator; publishing does not restore public visibility."
+                : `Publication confirmed${result.publishedVersion ? ` (${result.publishedVersion})` : ""}. The status below shows the latest saved state.`
               : "Scenario withdrawn. Existing learner sessions keep their saved content.",
         );
       }

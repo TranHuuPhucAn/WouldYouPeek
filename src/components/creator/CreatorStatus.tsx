@@ -19,7 +19,7 @@ export function describeCreatorStatus({
     : canReview
       ? "Ready for review"
       : "Incomplete draft";
-  return `${live} · ${draft}${publication.state !== "never_published" && publication.hasUnpublishedChanges ? " · Unpublished changes" : ""}`;
+  return `${publication.operatorVisibility.hidden ? "Hidden by operator · " : ""}${live} · ${draft}${publication.state !== "never_published" && publication.hasUnpublishedChanges ? " · Unpublished changes" : ""}`;
 }
 export function CreatorStatus(props: {
   publication: CreatorPublication;
@@ -28,7 +28,7 @@ export function CreatorStatus(props: {
 }) {
   return (
     <span
-      className={`creator-status ${props.publication.state === "published" ? "is-published" : ""}`}
+      className={`creator-status ${props.publication.operatorVisibility.hidden ? "is-hidden" : props.publication.state === "published" ? "is-published" : ""}`}
     >
       {describeCreatorStatus(props)}
     </span>

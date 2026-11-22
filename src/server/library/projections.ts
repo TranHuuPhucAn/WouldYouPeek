@@ -21,6 +21,8 @@ export function toLibraryPreview(value: unknown): LibraryScenarioPreview {
   const v = record(value);
   if (
     !isScenarioId(v.id) ||
+    typeof v.contentVersion !== "string" ||
+    !/^[\w.-]{1,80}$/.test(v.contentVersion) ||
     !["ai", "creator", "ai-assisted"].includes(String(v.provenance)) ||
     (v.editorialOrigin !== "curated" && v.editorialOrigin !== "creator") ||
     (v.editorialOrigin === "creator" && v.provenance === "ai") ||
@@ -34,6 +36,7 @@ export function toLibraryPreview(value: unknown): LibraryScenarioPreview {
     invalid();
   return {
     ...toChallengePreview(value),
+    contentVersion: v.contentVersion as string,
     player: toPlayerSummary(v.player),
     editorialOrigin:
       v.editorialOrigin as LibraryScenarioPreview["editorialOrigin"],

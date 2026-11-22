@@ -18,6 +18,7 @@ import {
   toSavedAnswer,
 } from "@/server/training/projections";
 import { UUID_PATTERN } from "@/server/training/validation";
+import { toCreatorVisibilityNotice } from "@/server/moderation/projections";
 
 function invalid(): never {
   throw new ApiError(
@@ -77,6 +78,7 @@ function publication(value: unknown): CreatorPublication {
     currentVersion,
     publishedAt,
     hasUnpublishedChanges: boolean(p.hasUnpublishedChanges),
+    operatorVisibility: toCreatorVisibilityNotice(p.operatorVisibility),
   };
 }
 function issues(value: unknown): ValidationIssue[] {

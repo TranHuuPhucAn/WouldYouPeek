@@ -3,11 +3,13 @@ export function SessionPersistenceNotice({
   error,
   unresolved,
   onRetry,
+  ending = false,
 }: {
   pending: boolean;
   error: string | null;
   unresolved: boolean;
   onRetry: () => void;
+  ending?: boolean;
 }) {
   return (
     <div
@@ -16,13 +18,17 @@ export function SessionPersistenceNotice({
       aria-live="polite"
     >
       {pending ? (
-        "Saving your progress…"
+        ending ? (
+          "Ending your session…"
+        ) : (
+          "Saving your progress…"
+        )
       ) : error ? (
         <>
           {error}{" "}
           {unresolved && (
             <button className="text-button" onClick={onRetry}>
-              Retry save
+              {ending ? "Retry ending session" : "Retry save"}
             </button>
           )}
         </>

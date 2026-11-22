@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import type { AccountUser } from "@/contracts/auth";
 import type {
   SessionSummary,
+  SessionSnapshot,
   SessionTarget,
   StartSessionRequest,
 } from "@/contracts/session";
-import { createOrResumeSession } from "@/lib/client/session-api";
+import { createOrResumeSession, getSession } from "@/lib/client/session-api";
 import { ApiClientError } from "@/lib/client/api-response";
 import { invalidateAccountView } from "@/components/auth/AuthStateSync";
+import { ActiveSessionEndControl } from "./ActiveSessionEndControl";
 type SessionStartProps = {
   target: Exclude<SessionTarget, { kind: "demo" }>;
   expectedPublicationVersion?: string;
@@ -38,6 +40,14 @@ function SessionStartState({
   const identity = JSON.stringify(target);
   const command = useRef<StartSessionRequest | null>(null);
   const [changed, setChanged] = useState(false);
+  const [activeSnapshot, setActiveSnapshot] = useState<SessionSnapshot | null>(
+    null,
+  );
+  const [closed, setClosed] = useState(false);
+  const startButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (closed) startButton.current?.focus();
+  }, [closed]);
   const router = useRouter(),
     requestId = useRef<string | null>(null),
     request = useRef<AbortController | null>(null),
@@ -53,6 +63,7 @@ function SessionStartState({
       valid.current = false;
       request.current?.abort();
       setActive(null);
+      setActiveSnapshot(null);
       setIdentityChanged(true);
     };
     window.addEventListener("wyp:identity-invalidated", invalidate);
@@ -78,6 +89,8 @@ function SessionStartState({
     setPending(true);
     setError(null);
     setActive(null);
+    setActiveSnapshot(null);
+    setClosed(false);
     try {
       const response = await createOrResumeSession(
         command.current,
@@ -104,7 +117,7 @@ function SessionStartState({
             : null,
         );
         setError(
-          `Finish your current session before starting this ${playlist ? "playlist" : "scenario"}.`,
+          `Resume or end your current session before starting this ${playlist ? "playlist" : "scenario"}.`,
         );
         command.current = null;
         requestId.current = null;
@@ -137,6 +150,45 @@ function SessionStartState({
       }
     }
   }
+  async function loadActiveSessionForEnd() {
+    if (request.current || !valid.current || !viewer?.emailVerified || !active)
+      return;
+    const activeId = active.id;
+    const controller = new AbortController();
+    request.current = controller;
+    setPending(true);
+    setError(null);
+    try {
+      const snapshot = await getSession(activeId, controller.signal);
+      if (controller.signal.aborted || !valid.current) return;
+      if (snapshot.status !== "in_progress") handleSessionEnded(activeId);
+      else setActiveSnapshot(snapshot);
+    } catch (error) {
+      if (controller.signal.aborted || !valid.current) return;
+      if (
+        error instanceof ApiClientError &&
+        [401, 403].includes(error.status)
+      ) {
+        invalidateAccountView();
+        return;
+      }
+      setError(
+        "Your current session couldn’t be checked. Retry before ending it.",
+      );
+    } finally {
+      if (request.current === controller) {
+        request.current = null;
+        setPending(false);
+      }
+    }
+  }
+  function handleSessionEnded(id: string) {
+    if (!valid.current || active?.id !== id) return;
+    setActive(null);
+    setActiveSnapshot(null);
+    setError(null);
+    setClosed(true);
+  }
   return (
     <section className="scenario-start surface-card">
       <h2>{playlist ? "Your next session." : "Your next call."}</h2>
@@ -159,6 +211,7 @@ function SessionStartState({
         !unavailable &&
         !changed && (
           <button
+            ref={startButton}
             className="button button-primary"
             disabled={pending}
             onClick={() => void startScenario()}
@@ -176,6 +229,12 @@ function SessionStartState({
           Refresh playlist preview
         </a>
       )}
+      {closed && (
+        <p role="status">
+          Your previous session is closed. Saved decisions remain in History.
+          Start this {playlist ? "playlist" : "scenario"} when you’re ready.
+        </p>
+      )}
       {error && (
         <p className="field-error" role="alert">
           {error}
@@ -190,6 +249,22 @@ function SessionStartState({
           <Link className="button button-primary" href={`/play/${active.id}`}>
             Resume current session →
           </Link>
+          {activeSnapshot && viewer ? (
+            <ActiveSessionEndControl
+              key={activeSnapshot.id}
+              snapshot={activeSnapshot}
+              viewerId={viewer.id}
+              onEnded={handleSessionEnded}
+            />
+          ) : (
+            <button
+              className="button button-secondary"
+              disabled={pending}
+              onClick={() => void loadActiveSessionForEnd()}
+            >
+              {pending ? "Checking saved session…" : "End current session"}
+            </button>
+          )}
         </>
       )}
       {error && !active && !changed && (

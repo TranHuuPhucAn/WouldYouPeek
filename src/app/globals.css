@@ -3425,3 +3425,37 @@ select:focus-visible {
     animation: none;
   }
 }
+
+/* Ending a session uses an in-page modal; its command remains in the caller. */
+.session-dialog {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  box-shadow: 0 1.5rem 6rem #0008;
+}
+.session-dialog::backdrop { background: #080b14b8; }
+.session-dialog h2 { margin: .6rem 0 1rem; font-size: clamp(1.5rem, 4vw, 2rem); }
+.session-dialog p { margin: .75rem 0; line-height: 1.65; }
+.session-dialog .card-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+.session-end-action { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.active-session-end { margin-top: 1rem; }
+
+.report-entry, .report-status { margin-top: 1rem; }
+.report-field { display: grid; gap: .5rem; margin: 1rem 0; font-weight: 600; }
+.report-field select, .report-field textarea { width: 100%; padding: .8rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--bg); color: var(--text); font: inherit; }
+.report-field textarea { resize: vertical; min-height: 6rem; }
+.report-field select:focus-visible, .report-field textarea:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+.report-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.operator-nav { display: flex; flex-wrap: wrap; gap: 1rem; padding-block: 1rem; }
+.operator-detail > section { margin-block: 1.5rem; }
+.operator-detail .card-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
+.operator-detail p, .operator-detail h3 { margin-block: .75rem; }
+.operator-detail, .operator-detail p, .history-list h2 { overflow-wrap: anywhere; }
+.operator-media { margin-top: 1rem; }
+.creator-status.is-hidden { color: var(--amber); }

@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import type {
   AdvanceSessionRequest,
   AnswerSessionRequest,
+  EndSessionRequest,
   SessionSnapshot,
 } from "@/contracts/session";
 import {
   advanceSession,
   answerSessionItem,
   createOrResumeSession,
+  endSession,
   getSession,
   validateSessionContinuity,
 } from "@/lib/client/session-api";
@@ -22,7 +24,8 @@ import { invalidateAccountView } from "@/components/auth/AuthStateSync";
 
 type PendingCommand =
   | { kind: "answer"; itemId: string; input: AnswerSessionRequest }
-  | { kind: "advance"; input: AdvanceSessionRequest };
+  | { kind: "advance"; input: AdvanceSessionRequest }
+  | { kind: "end"; input: EndSessionRequest };
 export function useChallengeSession(
   initialSession: SessionSnapshot,
   viewerId: string,
@@ -91,7 +94,7 @@ export function useChallengeSession(
     command.current = pending;
     const controller = new AbortController();
     request.current = controller;
-    dispatch({ type: "COMMAND_STARTED" });
+    dispatch({ type: "COMMAND_STARTED", kind: pending.kind });
     try {
       const response =
         pending.kind === "answer"
@@ -101,15 +104,22 @@ export function useChallengeSession(
               pending.input,
               controller.signal,
             )
-          : await advanceSession(
-              initialSession.id,
-              pending.input,
-              controller.signal,
-            );
+          : pending.kind === "end"
+            ? await endSession(
+                initialSession.id,
+                pending.input,
+                controller.signal,
+              )
+            : await advanceSession(
+                initialSession.id,
+                pending.input,
+                controller.signal,
+              );
       validateSessionContinuity(response.session, current.current.snapshot);
       if (!controller.signal.aborted && valid.current) {
         command.current = null;
         dispatch({ type: "HYDRATE", snapshot: response.session, viewerId });
+        if (response.session.status === "ended") router.refresh();
       }
     } catch (error) {
       if (controller.signal.aborted || !valid.current || authFailure(error))
@@ -121,17 +131,30 @@ export function useChallengeSession(
         const item =
           pending.kind === "answer"
             ? snapshot.items.find((item) => item.id === pending.itemId)
-            : snapshot.items.find(
-                (item) => item.id === pending.input.fromItemId,
-              );
+            : pending.kind === "advance"
+              ? snapshot.items.find(
+                  (item) => item.id === pending.input.fromItemId,
+                )
+              : undefined;
         const resolved =
-          pending.kind === "answer"
+          snapshot.status !== "in_progress" ||
+          (pending.kind === "answer"
             ? !!item?.answer
-            : snapshot.status === "completed" ||
-              (!!item && snapshot.currentIndex! > item.position);
+            : pending.kind === "advance" &&
+              !!item &&
+              snapshot.currentIndex! > item.position);
         if (resolved || conflict) {
           command.current = null;
           dispatch({ type: "HYDRATE", snapshot, viewerId });
+          if (snapshot.status === "ended") router.refresh();
+          if (pending.kind === "end" && !resolved) {
+            dispatch({
+              type: "COMMAND_FAILED",
+              unresolved: false,
+              message:
+                "Your session changed. Review the saved count and confirm again.",
+            });
+          }
           return;
         }
       } catch (reconcileError) {
@@ -147,8 +170,12 @@ export function useChallengeSession(
       dispatch({
         type: "COMMAND_FAILED",
         message: rejected
-          ? "That choice couldn’t be saved. Please check your selection and try again."
-          : "We couldn’t confirm the save. Retry to check and safely continue.",
+          ? pending.kind === "end"
+            ? "This session couldn’t be ended. Refresh and try again."
+            : "That choice couldn’t be saved. Please check your selection and try again."
+          : pending.kind === "end"
+            ? "We couldn’t confirm the end. Retry to check the saved session."
+            : "We couldn’t confirm the save. Retry to check and safely continue.",
         unresolved: !rejected,
       });
     } finally {
@@ -181,8 +208,39 @@ export function useChallengeSession(
       },
     });
   }
+  async function endSessionEarly(expectedRevision: number) {
+    const latest = current.current;
+    if (
+      request.current ||
+      command.current ||
+      !valid.current ||
+      latest.pending ||
+      latest.unresolved ||
+      latest.snapshot.status !== "in_progress" ||
+      latest.snapshot.items.every((item) => item.answer)
+    )
+      return;
+    if (expectedRevision !== latest.snapshot.revision) {
+      dispatch({
+        type: "COMMAND_FAILED",
+        unresolved: false,
+        message:
+          "Your session changed. Review the saved count and confirm again.",
+      });
+      return;
+    }
+    return execute({
+      kind: "end",
+      input: { requestId: crypto.randomUUID(), expectedRevision },
+    });
+  }
   async function createNextSession() {
-    if (request.current || state.phase !== "complete" || !valid.current) return;
+    if (
+      request.current ||
+      !["complete", "ended"].includes(state.phase) ||
+      !valid.current
+    )
+      return;
     if (state.snapshot.target.kind === "playlist") {
       router.push(`/library/playlists/${state.snapshot.target.playlistId}`);
       return;
@@ -221,6 +279,8 @@ export function useChallengeSession(
     submitSelection,
     advance,
     nextChallenge: advance,
+    endSessionEarly,
+    pendingKind: command.current?.kind ?? null,
     retrySave: () => (command.current ? execute(command.current) : undefined),
     createNextSession,
     restart: createNextSession,

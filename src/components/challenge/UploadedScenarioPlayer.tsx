@@ -20,6 +20,7 @@ type Props = {
   playbackKey?: string;
   onPlaybackEvent?: (event: ScenarioPlaybackEvent) => void;
   autoplay?: boolean;
+  suspended?: boolean;
   hideCaption?: boolean;
 };
 export function UploadedScenarioPlayer({
@@ -31,6 +32,7 @@ export function UploadedScenarioPlayer({
   playbackKey = "legacy",
   onPlaybackEvent,
   autoplay,
+  suspended = false,
   hideCaption = false,
 }: Props) {
   const segment = mode === "reveal" ? reveal : setup;
@@ -50,6 +52,7 @@ export function UploadedScenarioPlayer({
     playbackKey,
     onPlaybackEvent,
     autoplay,
+    suspended,
     activationKey,
   });
   current.current = {
@@ -60,6 +63,7 @@ export function UploadedScenarioPlayer({
     playbackKey,
     onPlaybackEvent,
     autoplay,
+    suspended,
     activationKey,
   };
   const running = useRef({
@@ -77,6 +81,7 @@ export function UploadedScenarioPlayer({
   const desired = useRef({ time: setup.startSeconds, play: false });
   const recovering = useRef(false);
   const priorIntent = useRef(autoplay);
+  const resumeRequired = useRef(suspended);
   const setVideoElement = useCallback((video: HTMLVideoElement | null) => {
     if (element.current === video) return;
     element.current?.pause();
@@ -109,6 +114,8 @@ export function UploadedScenarioPlayer({
           time: safeTime(video.currentTime),
           play:
             !video.paused &&
+            !current.current.suspended &&
+            !resumeRequired.current &&
             current.current.mode !== "decision" &&
             !running.current.finished,
         };
@@ -150,6 +157,7 @@ export function UploadedScenarioPlayer({
         );
   }
   async function playPositioned(video: HTMLVideoElement) {
+    if (current.current.suspended || resumeRequired.current) return;
     const token = generation.current,
       key = current.current.activationKey;
     try {
@@ -157,6 +165,8 @@ export function UploadedScenarioPlayer({
     } catch {
       if (
         token === generation.current &&
+        !current.current.suspended &&
+        !resumeRequired.current &&
         key === current.current.activationKey &&
         video === element.current
       ) {
@@ -173,12 +183,14 @@ export function UploadedScenarioPlayer({
       !video ||
       !active ||
       !isActive() ||
+      current.current.suspended ||
       current.current.mode === "decision" ||
       access.invalid ||
       access.error ||
       mediaError
     )
       return;
+    resumeRequired.current = false;
     if (running.current.finished) {
       running.current.finished = false;
       running.current.started = false;
@@ -207,7 +219,12 @@ export function UploadedScenarioPlayer({
     running.current.positioned = true;
     setPositioned(true);
     video.style.visibility = "visible";
-    if (current.current.mode === "decision" || running.current.finished) {
+    if (
+      current.current.suspended ||
+      resumeRequired.current ||
+      current.current.mode === "decision" ||
+      running.current.finished
+    ) {
       video.pause();
       setPlaying(false);
     } else if (desired.current.play && !document.hidden)
@@ -233,6 +250,8 @@ export function UploadedScenarioPlayer({
       !video ||
       !active ||
       !isActive() ||
+      current.current.suspended ||
+      resumeRequired.current ||
       !running.current.positioned ||
       running.current.finished ||
       current.current.mode === "decision" ||
@@ -257,6 +276,10 @@ export function UploadedScenarioPlayer({
     const video = element.current,
       active = bounds();
     if (!video || !active || !isActive() || !running.current.positioned) return;
+    if (current.current.suspended || resumeRequired.current) {
+      if (!video.paused) pause();
+      return;
+    }
     const instruction = getPlaybackInstruction({
       mode: current.current.mode,
       segment: active,
@@ -281,6 +304,7 @@ export function UploadedScenarioPlayer({
   useEffect(() => {
     if (running.current.key === activationKey) return;
     const prior = running.current.key;
+    resumeRequired.current = current.current.suspended;
     generation.current++;
     running.current = {
       key: activationKey,
@@ -299,6 +323,7 @@ export function UploadedScenarioPlayer({
           : (segment?.startSeconds ?? 0),
       play:
         mode !== "decision" &&
+        !current.current.suspended &&
         (current.current.autoplay ?? (mode !== "setup" || !!prior)),
     };
     positionVideo();
@@ -307,6 +332,13 @@ export function UploadedScenarioPlayer({
     if (priorIntent.current === true && autoplay === false) pause();
     priorIntent.current = autoplay;
   }, [autoplay]);
+  useEffect(() => {
+    if (!suspended) return;
+    resumeRequired.current = true;
+    // Invalidate a play promise that may settle after the confirmation closes.
+    generation.current++;
+    pause();
+  }, [suspended]);
   useEffect(() => {
     const timer = setInterval(checkPosition, 50);
     const hide = () => {
@@ -398,6 +430,8 @@ export function UploadedScenarioPlayer({
                   time: safeTime(video.currentTime),
                   play:
                     !video.paused &&
+                    !current.current.suspended &&
+                    !resumeRequired.current &&
                     current.current.mode !== "decision" &&
                     !running.current.finished,
                 };
@@ -420,6 +454,8 @@ export function UploadedScenarioPlayer({
               }
               if (
                 current.current.mode === "decision" ||
+                current.current.suspended ||
+                resumeRequired.current ||
                 document.hidden ||
                 !running.current.positioned ||
                 running.current.finished
@@ -451,7 +487,9 @@ export function UploadedScenarioPlayer({
             <button
               type="button"
               className="button button-secondary"
+              disabled={suspended}
               onClick={() => {
+                if (current.current.suspended) return;
                 setMediaError(null);
                 recovering.current = false;
                 const key = current.current.activationKey,
@@ -484,7 +522,9 @@ export function UploadedScenarioPlayer({
           <button
             type="button"
             className="button button-primary"
-            disabled={!positioned || mode === "decision" || access.loading}
+            disabled={
+              !positioned || mode === "decision" || access.loading || suspended
+            }
             onClick={() => (playing ? pause() : void play())}
           >
             {playing ? "Pause" : finished ? "Replay segment" : "Play"}

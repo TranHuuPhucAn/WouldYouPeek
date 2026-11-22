@@ -187,7 +187,9 @@ export async function applyPendingMigrations(target, { through, cli = runCli } =
     if (through !== undefined && name.slice(0, 14) > through) continue;
     renameSync(join(pending, name), join(owned.workspace, "supabase/migrations", name));
   }
-  await cli(owned, ["migration", "up"]);
+  // Migration diagnostics contain schema statements, not captured status credentials.
+  // Keep the actual SQL failure visible instead of reducing it to a CLI exit code.
+  await cli(owned, ["migration", "up"], { capture: false });
 }
 
 export async function stopTestStack(target) {
@@ -288,6 +290,10 @@ export async function runVerificationPipeline(target, {
   await run(process.execPath, ["tests/migrations/milestone-6-preservation.test.mjs"], options);
   console.log("[verify] Checking preservation of milestone-six accounts, player identities, uploads and saved practice.");
   await run(process.execPath, ["tests/migrations/milestone-7-preservation.test.mjs"], options);
+  console.log("[verify] Checking preservation of existing practice before session ending.");
+  await run(process.execPath, ["tests/migrations/session-end-preservation.test.mjs"], options);
+  console.log("[verify] Checking preservation of saved decisions before scenario reporting and operator visibility.");
+  await run(process.execPath, ["tests/migrations/moderation-preservation.test.mjs"], options);
   // The upgrade script applies the pending migrations in this owned workspace.
   await cli(owned, ["db", "reset", "--yes"], { signal });
   await run(process.execPath, ["scripts/generate-video-fixtures.mjs"], options);

@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { AccountUser } from "@/contracts/auth";
 import type { SessionSnapshot } from "@/contracts/session";
 import type { PlaybackMode } from "@/lib/video/segment-controller";
 import { SessionPersistenceNotice } from "@/components/sessions/SessionPersistenceNotice";
+import { EndSessionDialog } from "@/components/sessions/EndSessionDialog";
+import { useScenarioReport } from "@/hooks/use-scenario-report";
+import {
+  ReportScenarioDialog,
+  ReportRequestStatus,
+} from "@/components/reports/ReportScenarioDialog";
 import { useChallengeSession } from "@/hooks/use-challenge-session";
 import { useReviewPresentation } from "@/hooks/use-review-presentation";
 import { DecisionPanel } from "./DecisionPanel";
@@ -25,6 +31,12 @@ export function ChallengePlayer({
 }) {
   const session = useChallengeSession(initialSession, viewer.id);
   const { state } = session;
+  const report = useScenarioReport(viewer.id);
+  const [endOpen, setEndOpen] = useState(false);
+  const terminal = state.phase === "complete" || state.phase === "ended";
+  const answeredCount = state.snapshot.items.filter(
+    (item) => item.answer,
+  ).length;
   const challenge = state.challenge;
   const item = state.snapshot.items[state.currentIndex];
   const isDecision = state.phase === "decision" || state.phase === "submitting";
@@ -55,7 +67,7 @@ export function ChallengePlayer({
   const analysisId = useId();
   useEffect(() => {
     heading.current?.focus();
-  }, [state.currentIndex, state.phase === "complete"]);
+  }, [state.currentIndex, terminal]);
   useEffect(() => {
     if (focusAnalysis.current && presentation.analysisVisible) {
       focusAnalysis.current = false;
@@ -96,8 +108,9 @@ export function ChallengePlayer({
         error={state.error}
         unresolved={state.unresolved}
         onRetry={session.retrySave}
+        ending={session.pendingKind === "end"}
       />
-      {state.phase === "complete" && !identityChanged ? (
+      {terminal && !identityChanged ? (
         <>
           <h2 className="sr-only" ref={heading} tabIndex={-1}>
             Session recap
@@ -109,6 +122,8 @@ export function ChallengePlayer({
             onRestart={session.restart}
             pending={state.pending}
             completedAt={state.snapshot.completedAt}
+            endedAt={state.snapshot.endedAt}
+            status={state.snapshot.status === "ended" ? "ended" : "completed"}
             title={state.snapshot.title}
             playlist={state.snapshot.playlist}
           />
@@ -150,6 +165,12 @@ export function ChallengePlayer({
                 analysisVisible={presentation.analysisVisible}
                 playbackKey={presentation.playbackKey}
                 autoplay={presentation.autoplay}
+                suspended={
+                  endOpen ||
+                  report.open ||
+                  (session.pendingKind === "end" &&
+                    (state.pending || state.unresolved))
+                }
                 onPlaybackEvent={presentation.onPlaybackEvent}
                 onComplete={session.completeSetup}
                 onReadAnalysis={showAnalysis}
@@ -169,7 +190,11 @@ export function ChallengePlayer({
                   question={challenge.question}
                   options={challenge.options}
                   selectedOptionId={state.selectedOptionId}
-                  pending={state.phase === "submitting" || state.unresolved}
+                  pending={
+                    state.pending ||
+                    state.phase === "submitting" ||
+                    state.unresolved
+                  }
                   error={state.error}
                   onSelect={session.selectOption}
                   onSubmit={session.submitSelection}
@@ -213,10 +238,65 @@ export function ChallengePlayer({
                   />
                 </>
               )}
+              {answeredCount < state.snapshot.items.length && (
+                <div className="session-end-action" tabIndex={-1}>
+                  <button
+                    className="text-button"
+                    disabled={state.pending || state.unresolved || report.open}
+                    onClick={() => setEndOpen(true)}
+                  >
+                    End session early
+                  </button>
+                  {(state.pending || state.unresolved) && (
+                    <p className="quiet-note">
+                      Confirm the pending save before ending this session.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="report-entry">
+                <button
+                  className="text-button"
+                  disabled={
+                    state.pending ||
+                    state.unresolved ||
+                    endOpen ||
+                    report.invalid
+                  }
+                  onClick={() =>
+                    report.begin({
+                      kind: "session-item",
+                      sessionId: state.snapshot.id,
+                      itemId: item.id,
+                    })
+                  }
+                >
+                  Report a problem
+                </button>
+              </div>
             </>
           ) : null}
         </main>
       )}
+      <EndSessionDialog
+        open={
+          endOpen &&
+          !terminal &&
+          !identityChanged &&
+          state.phase !== "auth-required"
+        }
+        answeredCount={answeredCount}
+        totalCount={state.snapshot.items.length}
+        hasUnsubmittedChoice={!!state.selectedOptionId && !item?.answer}
+        pending={state.pending}
+        unresolved={state.unresolved}
+        error={state.error}
+        onClose={() => setEndOpen(false)}
+        onRetry={session.retrySave}
+        onConfirm={() => void session.endSessionEarly(state.snapshot.revision)}
+      />
+      <ReportRequestStatus report={report} />
+      <ReportScenarioDialog report={report} />
       <footer className="site-footer">
         <span>MAKE THE CALL. THEN LEARN WHY.</span>
         <span>

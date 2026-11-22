@@ -20,10 +20,10 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 export function isText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
-function isAssessment(value: unknown): value is Assessment {
+export function isAssessment(value: unknown): value is Assessment {
   return value === "recommended" || value === "reasonable" || value === "risky";
 }
-function isMedia(value: unknown): value is MediaAsset {
+export function isMedia(value: unknown): value is MediaAsset {
   if (
     !isRecord(value) ||
     !isText(value.alt) ||
@@ -142,7 +142,7 @@ function isSource(value: unknown): value is ChallengeSource {
     return false;
   }
 }
-function isAnalysis(value: unknown): value is ScenarioAnalysis {
+export function isAnalysis(value: unknown): value is ScenarioAnalysis {
   return (
     isRecord(value) &&
     ["ai", "creator", "ai-assisted"].includes(String(value.author)) &&

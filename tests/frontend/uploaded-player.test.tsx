@@ -68,6 +68,105 @@ function ready() {
   fireEvent.seeked(element);
   return element;
 }
+
+it.each(["setup", "reveal"] as const)(
+  "pauses a manual %s and rejects late events until the learner explicitly plays again",
+  async (mode) => {
+    const events = vi.fn(),
+      complete = vi.fn();
+    const props = {
+      setup,
+      reveal,
+      mode,
+      context: { ...context, phase: mode },
+      autoplay: false,
+      onPlaybackEvent: events,
+      onComplete: complete,
+    };
+    const view = render(<UploadedScenarioPlayer {...props} />);
+    const video = ready();
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await act(async () => {});
+    const time = mode === "setup" ? 14 : 24;
+    video.currentTime = time;
+    events.mockClear();
+    view.rerender(<UploadedScenarioPlayer {...props} suspended />);
+    expect(video.paused).toBe(true);
+    expect(video.currentTime).toBe(time);
+    expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      value: false,
+    });
+    fireEvent.play(video);
+    expect(video.paused).toBe(true);
+    video.currentTime = mode === "setup" ? 20 : 30;
+    fireEvent.ended(video);
+    act(() => vi.advanceTimersByTime(100));
+    expect(events).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+    view.rerender(<UploadedScenarioPlayer {...props} />);
+    fireEvent.ended(video);
+    act(() => vi.advanceTimersByTime(100));
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce();
+    expect(events).not.toHaveBeenCalled();
+    video.currentTime = time;
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await act(async () => {});
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
+    expect(video.paused).toBe(false);
+  },
+);
+
+it("keeps a renewed capability paused across suspension and closing", async () => {
+  const props = {
+    setup,
+    reveal,
+    mode: "reveal" as const,
+    context: { ...context, phase: "reveal" as const },
+    autoplay: true,
+  };
+  const view = render(<UploadedScenarioPlayer {...props} />);
+  const video = ready();
+  await act(async () => {});
+  video.currentTime = 24;
+  view.rerender(<UploadedScenarioPlayer {...props} suspended />);
+  const beforeReplace = vi.mocked(useUploadedPlayback).mock.calls.at(-1)![2]!;
+  act(() => beforeReplace());
+  access = {
+    ...access,
+    access: { ...access.access!, url: "http://localhost/signed-suspended" },
+  };
+  view.rerender(<UploadedScenarioPlayer {...props} suspended />);
+  video.currentTime = 0;
+  fireEvent.loadedMetadata(video);
+  fireEvent.seeked(video);
+  expect(video.currentTime).toBe(24);
+  expect(video.paused).toBe(true);
+  view.rerender(<UploadedScenarioPlayer {...props} />);
+  expect(video.paused).toBe(true);
+  expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  await act(async () => {});
+  expect(video.currentTime).toBe(24);
+  expect(video.paused).toBe(false);
+});
+
+it("does not autoplay an uploaded continuation first mounted under a dialog", () => {
+  const props = {
+    setup,
+    reveal,
+    mode: "reveal" as const,
+    context: { ...context, phase: "reveal" as const },
+    autoplay: true,
+  };
+  const view = render(<UploadedScenarioPlayer {...props} suspended />);
+  const video = ready();
+  expect(video.paused).toBe(true);
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  view.rerender(<UploadedScenarioPlayer {...props} />);
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+});
 describe("bounded native recording playback", () => {
   it("positions at setup start, pauses before decision and keeps the same element for reveal", async () => {
     const complete = vi.fn();
