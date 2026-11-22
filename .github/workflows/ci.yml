@@ -17,7 +17,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Install local video validation tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install local video and backup verification tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg age
       - name: Verify upgrade, database, application and production API
         run: npm run test:ci

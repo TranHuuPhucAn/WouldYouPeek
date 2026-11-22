@@ -1,14 +1,32 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import type { AuthFormState } from "@/contracts/auth";
 import * as auth from "@/server/auth/service";
 import { safeReturnTo } from "@/server/auth/redirects";
 import { AuthValidationError } from "@/server/auth/validation";
 import { ApiError } from "@/server/http";
+import {
+  confirmEmail,
+  parseConfirmationRequest,
+} from "@/server/auth/confirmation";
+import { getServerAppConfig } from "@/server/config";
 
 function fields(data: FormData, names: string[]) {
-  return Object.fromEntries(names.map((name) => [name, data.get(name)]));
+  return Object.fromEntries(
+    names.flatMap((name) => {
+      const values = data.getAll(name);
+      if (values.length > 1)
+        throw new ApiError(
+          "INVALID_REQUEST",
+          "Send each account field only once.",
+        );
+      return name === "captchaToken" && values.length === 0
+        ? []
+        : [[name, values[0] ?? null]];
+    }),
+  );
 }
 function failure(error: unknown): AuthFormState {
   if (error instanceof AuthValidationError)
@@ -21,7 +39,12 @@ function failure(error: unknown): AuthFormState {
     return {
       status: "error",
       message: error.message,
-      ...(error.code === "RATE_LIMITED" ? { retryAfter: 60 } : {}),
+      ...(error.code === "RATE_LIMITED" &&
+      Number.isSafeInteger(error.retryAfter) &&
+      error.retryAfter! > 0 &&
+      error.retryAfter! <= 86400
+        ? { retryAfter: error.retryAfter }
+        : {}),
     };
   return {
     status: "error",
@@ -35,7 +58,7 @@ export async function signUpAction(
   const returnTo = safeReturnTo(data.get("returnTo"));
   try {
     await auth.signUp(
-      fields(data, ["email", "password", "confirmPassword"]),
+      fields(data, ["email", "password", "confirmPassword", "captchaToken"]),
       returnTo,
     );
   } catch (error) {
@@ -48,7 +71,7 @@ export async function signInAction(
   data: FormData,
 ): Promise<AuthFormState> {
   try {
-    await auth.signIn(fields(data, ["email", "password"]));
+    await auth.signIn(fields(data, ["email", "password", "captchaToken"]));
   } catch (error) {
     return failure(error);
   }
@@ -60,7 +83,7 @@ export async function requestResetAction(
   data: FormData,
 ): Promise<AuthFormState> {
   try {
-    await auth.requestPasswordReset(fields(data, ["email"]));
+    await auth.requestPasswordReset(fields(data, ["email", "captchaToken"]));
     return {
       status: "success",
       message:
@@ -76,7 +99,7 @@ export async function resendVerificationAction(
 ): Promise<AuthFormState> {
   try {
     await auth.resendVerification(
-      fields(data, ["email"]),
+      fields(data, ["email", "captchaToken"]),
       safeReturnTo(data.get("returnTo")),
     );
     return {
@@ -104,4 +127,29 @@ export async function signOutAction(): Promise<void> {
   await auth.signOut();
   revalidatePath("/", "layout");
   redirect("/sign-in");
+}
+
+export async function confirmEmailAction(
+  _previous: AuthFormState,
+  data: FormData,
+): Promise<AuthFormState> {
+  let destination: string;
+  try {
+    const requestHeaders = await headers();
+    if (
+      requestHeaders.get("origin") !== getServerAppConfig().appOrigin ||
+      requestHeaders.get("sec-fetch-site") === "cross-site"
+    )
+      throw new ApiError(
+        "INVALID_REQUEST",
+        "Open this email link in this application and try again.",
+      );
+    destination = await confirmEmail(
+      parseConfirmationRequest(data, "returnTo"),
+    );
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/", "layout");
+  redirect(destination);
 }

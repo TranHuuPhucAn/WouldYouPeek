@@ -15,6 +15,7 @@ const entryPaths = new Set([
   "/creator/playlists",
   "/library/playlists",
   "/demo",
+  "/operator/reports",
 ]);
 function isReturnPath(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 512) return false;
@@ -22,6 +23,8 @@ function isReturnPath(value: unknown): value is string {
   const parts = value.split("/");
   if (parts[0] !== "") return false;
   if (parts.length === 3 && parts[1] === "play") return uuid.test(parts[2]);
+  if (parts.length === 4 && parts[1] === "operator" && parts[2] === "reports")
+    return uuid.test(parts[3]);
   if (parts.length === 3 && parts[1] === "library")
     return (
       !["players", "playlists"].includes(parts[2]) && isScenarioId(parts[2])

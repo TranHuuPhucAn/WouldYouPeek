@@ -1,3 +1,7 @@
+import { getPublicPageMetadata } from "@/server/metadata";
+export function generateMetadata() {
+  return getPublicPageMetadata({ title: "Make the call", path: "/" });
+}
 import { HomePageView } from "@/components/home/HomePageView";
 import { getCurrentAccount } from "@/server/auth/guards";
 import { getHomePageData } from "@/server/home/service";

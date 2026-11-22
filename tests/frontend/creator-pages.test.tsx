@@ -20,6 +20,10 @@ import {
   libraryEntry,
 } from "./creator-fixtures";
 vi.mock("server-only", () => ({}));
+import { getDeploymentCapabilities } from "@/server/deployment/capabilities";
+vi.mock("@/server/deployment/capabilities", () => ({
+  getDeploymentCapabilities: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`REDIRECT:${path}`);
@@ -76,6 +80,9 @@ vi.mock("@/components/challenge/ScenarioMedia", () => ({
   ScenarioMedia: () => <div>Safe setup only</div>,
 }));
 beforeEach(() => {
+  vi.mocked(getDeploymentCapabilities)
+    .mockReset()
+    .mockResolvedValue({ sourceMode: "youtube-and-upload" });
   vi.mocked(getCurrentAccount).mockReset().mockResolvedValue(null);
   vi.mocked(listVideos).mockReset().mockResolvedValue(videoList());
   vi.mocked(requireVerifiedUser)
@@ -196,4 +203,43 @@ describe("private creator recording page", () => {
     await expect(CreatorVideosPage()).rejects.toThrow();
     expect(listVideos).not.toHaveBeenCalled();
   });
+});
+
+it("provides a hosted direct-link recovery without fetching uploaded videos", async () => {
+  vi.mocked(getDeploymentCapabilities).mockResolvedValue({
+    sourceMode: "youtube-only",
+  });
+  render(await CreatorVideosPage());
+  expect(
+    screen.getByRole("heading", { name: "Create with a YouTube recording." }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "Your scenarios →" }),
+  ).toHaveAttribute("href", "/creator");
+  expect(listVideos).not.toHaveBeenCalled();
+});
+
+it("does not request a review preview for an uploaded draft on a YouTube-only site", async () => {
+  vi.mocked(getDeploymentCapabilities).mockResolvedValue({
+    sourceMode: "youtube-only",
+  });
+  const saved = creatorSnapshot();
+  const { url: _url, ...attribution } = saved.draft.content.source as Extract<
+    typeof saved.draft.content.source,
+    { url: string }
+  >;
+  saved.draft.content.source = {
+    ...attribution,
+    kind: "uploaded",
+    assetId: creatorId,
+    creditUrl: "",
+  };
+  vi.mocked(creator.findOwnedScenario).mockResolvedValue(saved);
+  render(await ReviewPage({ params: Promise.resolve({ id: creatorId }) }));
+  expect(
+    screen.getByRole("heading", {
+      name: "Replace this recording to continue.",
+    }),
+  ).toBeVisible();
+  expect(creator.getReviewPreview).not.toHaveBeenCalled();
 });

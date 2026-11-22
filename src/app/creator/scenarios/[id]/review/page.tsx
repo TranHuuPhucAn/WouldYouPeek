@@ -3,6 +3,8 @@ import { requirePageCreator } from "@/app/protected-page";
 import { findOwnedScenario, getReviewPreview } from "@/server/creator/service";
 import { ApiError } from "@/server/http";
 import { CreatorReview } from "@/components/creator/CreatorReview";
+import Link from "next/link";
+import { getDeploymentCapabilities } from "@/server/deployment/capabilities";
 export default async function CreatorReviewPage({
   params,
 }: {
@@ -12,6 +14,28 @@ export default async function CreatorReviewPage({
     viewer = await requirePageCreator(`/creator/scenarios/${id}/review`);
   try {
     const initial = await findOwnedScenario(id);
+    const capabilities = await getDeploymentCapabilities();
+    if (
+      initial.draft.content.source.kind === "uploaded" &&
+      capabilities.sourceMode === "youtube-only"
+    )
+      return (
+        <main className="page-shell">
+          <section className="surface-card">
+            <h1>Replace this recording to continue.</h1>
+            <p>
+              Your draft is saved. This site supports YouTube recordings, so
+              choose a YouTube link before reviewing or publishing.
+            </p>
+            <Link
+              className="button button-primary"
+              href={`/creator/scenarios/${id}`}
+            >
+              Edit scenario →
+            </Link>
+          </section>
+        </main>
+      );
     let preview = null,
       error: string | undefined;
     if (initial.readiness.canReview) {

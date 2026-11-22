@@ -17,6 +17,9 @@ export default function NotFound() {
         <Link href="/creator" className="text-button">
           Creator workspace
         </Link>
+        <Link href="/help" className="text-button">
+          Get help
+        </Link>
       </div>
     </main>
   );

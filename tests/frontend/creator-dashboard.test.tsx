@@ -185,3 +185,27 @@ describe("creator dashboard", () => {
     expect(screen.getByText(/Unpublished changes/)).toBeInTheDocument();
   });
 });
+
+it("shows upload management only when its server capability is enabled", () => {
+  const initial = { scenarios: [], nextCursor: null };
+  const view = render(
+    <CreatorDashboard
+      initial={initial}
+      capabilities={{ sourceMode: "youtube-only" }}
+    />,
+  );
+  expect(
+    screen.queryByRole("link", { name: "Your videos" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "New scenario →" })).toBeVisible();
+  view.rerender(
+    <CreatorDashboard
+      initial={initial}
+      capabilities={{ sourceMode: "youtube-and-upload" }}
+    />,
+  );
+  expect(screen.getByRole("link", { name: "Your videos" })).toHaveAttribute(
+    "href",
+    "/creator/videos",
+  );
+});

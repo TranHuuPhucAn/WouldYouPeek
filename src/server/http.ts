@@ -7,6 +7,7 @@ import type {
   ApiErrorDetails,
 } from "@/contracts/challenge";
 import type { SessionSummary } from "@/contracts/session";
+import { createRequestId, logOperationalEvent } from "@/server/observability";
 
 const ERROR_STATUS: Record<ApiErrorCode, number> = {
   OPERATOR_REQUIRED: 403,
@@ -46,6 +47,7 @@ const ERROR_STATUS: Record<ApiErrorCode, number> = {
   VIDEO_NOT_READY: 409,
   VIDEO_IN_USE: 409,
   UPLOAD_LIMIT_REACHED: 429,
+  UPLOADS_DISABLED: 403,
   UPLOAD_EXPIRED: 410,
   VIDEO_UNSUPPORTED: 422,
   MEDIA_UNAVAILABLE: 503,
@@ -55,6 +57,7 @@ export class ApiError extends Error {
     public readonly code: ApiErrorCode,
     message: string,
     public readonly details?: ApiErrorDetails,
+    public readonly retryAfter?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -277,7 +280,24 @@ export function errorResponse(error: unknown): Response {
     },
   };
   const response = jsonResponse(body, ERROR_STATUS[code]);
-  if (code === "RATE_LIMITED") response.headers.set("Retry-After", "60");
+  if (ERROR_STATUS[code] >= 500) {
+    const requestId = createRequestId();
+    logOperationalEvent({
+      operation: "api-error",
+      code,
+      status: ERROR_STATUS[code],
+      requestId,
+    });
+    response.headers.set("X-Request-Id", requestId);
+  }
+  if (
+    code === "RATE_LIMITED" &&
+    error instanceof ApiError &&
+    Number.isSafeInteger(error.retryAfter) &&
+    error.retryAfter! > 0 &&
+    error.retryAfter! <= 86400
+  )
+    response.headers.set("Retry-After", String(error.retryAfter));
   return response;
 }
 export async function handleRoute(
@@ -336,6 +356,7 @@ export function databaseError(error: {
     VIDEO_NOT_READY: "Wait for this video to finish validation.",
     VIDEO_IN_USE: "This video is referenced by a draft or saved publication.",
     UPLOAD_LIMIT_REACHED: "Your video upload limit has been reached.",
+    UPLOADS_DISABLED: "Video uploads are unavailable here. Use a YouTube link.",
     UPLOAD_EXPIRED:
       "This upload has expired. Remove it and start a new upload.",
     VIDEO_UNSUPPORTED: "Use a supported MP4 recording.",

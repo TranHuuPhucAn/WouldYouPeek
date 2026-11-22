@@ -1,3 +1,10 @@
+import { getPublicPageMetadata } from "@/server/metadata";
+export function generateMetadata() {
+  return getPublicPageMetadata({
+    title: "Playlist library",
+    path: "/library/playlists",
+  });
+}
 import Link from "next/link";
 import { getCurrentAccount } from "@/server/auth/guards";
 import { getActiveSessionSummary } from "@/server/training/service";

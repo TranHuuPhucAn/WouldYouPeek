@@ -8,6 +8,7 @@ import {
 } from "./helpers/video";
 const mocks = vi.hoisted(() => ({
   guard: vi.fn(),
+  uploads: vi.fn(),
   verified: vi.fn(),
   getUploadSession: vi.fn(),
   finishUploadSession: vi.fn(),
@@ -25,6 +26,9 @@ vi.mock("@/server/auth/guards", () => ({
   requireVerifiedUser: mocks.verified,
 }));
 vi.mock("@/server/video/repository", () => mocks);
+vi.mock("@/server/deployment/capabilities", () => ({
+  requireUploadsEnabled: mocks.uploads,
+}));
 vi.mock("@/server/config", () => ({
   getPublicSupabaseConfig: () => ({
     url: "http://127.0.0.1:54321",
@@ -46,6 +50,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset());
   mocks.guard.mockResolvedValue({});
   mocks.verified.mockResolvedValue({});
+  mocks.uploads.mockResolvedValue(undefined);
   mocks.getSession.mockResolvedValue({
     data: { session: { access_token: "caller-session" } },
     error: null,
@@ -198,4 +203,26 @@ describe("signed playback boundary", () => {
       issuePlaybackUrl({ kind: "creator-asset", assetId }),
     ).rejects.toMatchObject({ code: "MEDIA_UNAVAILABLE" });
   });
+});
+
+it("rejects disabled uploads before obtaining credentials, storage or transport", async () => {
+  mocks.uploads.mockRejectedValue(new Error("Uploads disabled"));
+  await expect(getUploadSession(assetId, {})).rejects.toThrow(
+    "Uploads disabled",
+  );
+  await expect(
+    deleteVideo(assetId, { requestId: videoRequestId, expectedRevision: 0 }),
+  ).rejects.toThrow("Uploads disabled");
+  await expect(
+    issuePlaybackUrl({
+      kind: "creator-draft",
+      scenarioId: assetId,
+      expectedDraftRevision: 1,
+      assetId,
+    }),
+  ).rejects.toThrow();
+  expect(mocks.getUploadSession).not.toHaveBeenCalled();
+  expect(mocks.getSession).not.toHaveBeenCalled();
+  expect(mocks.fetch).not.toHaveBeenCalled();
+  expect(mocks.remove).not.toHaveBeenCalled();
 });

@@ -3459,3 +3459,49 @@ select:focus-visible {
 .operator-detail, .operator-detail p, .history-list h2 { overflow-wrap: anywhere; }
 .operator-media { margin-top: 1rem; }
 .creator-status.is-hidden { color: var(--amber); }
+
+.site-information-footer {
+  width: 100%;
+  margin: auto auto 0;
+  padding: 2rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+.site-information-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+.site-information-footer a,
+.information-page a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.information-page {
+  max-width: 880px;
+}
+.information-page .surface-card {
+  margin-bottom: 1.25rem;
+}
+.information-page p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.information-page p + p {
+  margin-top: 1rem;
+}
+.information-page h2 {
+  margin-bottom: 0.75rem;
+}
+.auth-challenge {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.auth-challenge > div {
+  max-width: 100%;
+}
+
+.site-information-footer a { display: inline-flex; align-items: center; min-height: 44px; }

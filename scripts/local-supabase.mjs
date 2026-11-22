@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { cleanChildEnvironment, localUrl, readLocalProject, TEST_APP_ORIGIN } from "./local-target.mjs";
+import { cleanChildEnvironment, configureLocalCapabilities, localUrl, readLocalProject, TEST_APP_ORIGIN } from "./local-target.mjs";
 
 const defaultRoot = fileURLToPath(new URL("../", import.meta.url));
 const commands = new Set(["start", "stop", "reset", "migrate", "env", "types", "types-check", "test-db", "integration", "http"]);
@@ -36,6 +36,7 @@ export function runLocalCommand(command, {
   switch (command) {
     case "start":
       run(["start"]);
+      configureLocalCapabilities(root, { execute, env: cleanEnv });
       log("Local Supabase started. Run npm run db:env to configure the app.");
       return;
     case "stop":
@@ -45,11 +46,13 @@ export function runLocalCommand(command, {
     case "reset":
       status();
       run(["db", "reset", "--yes"]);
+      configureLocalCapabilities(root, { execute, env: cleanEnv });
       log("Local database reset and demo scenarios seeded. Previous local records were removed.");
       return;
     case "migrate":
       status();
       run(["migration", "up"]);
+      configureLocalCapabilities(root, { execute, env: cleanEnv });
       log("Pending local migrations applied without resetting accounts or sessions.");
       return;
     case "env": {
@@ -59,9 +62,10 @@ export function runLocalCommand(command, {
       const file = resolve(root, ".env.local");
       let lines = [];
       try {
-        lines = readFileSync(file, "utf8").split("\n").filter((line) => !/^NEXT_PUBLIC_(SUPABASE_URL|SUPABASE_PUBLISHABLE_KEY|APP_URL)=/.test(line));
+        lines = readFileSync(file, "utf8").split("\n").filter((line) => !/^(NEXT_PUBLIC_(SUPABASE_URL|SUPABASE_PUBLISHABLE_KEY|APP_URL)|WYP_(DEPLOYMENT_MODE|RELEASE_ENVIRONMENT|SUPABASE_PROJECT_REF|SUPPORT_EMAIL|TURNSTILE_SITE_KEY)|VERCEL_ENV)=/.test(line));
       } catch (error) { if (error.code !== "ENOENT") throw error; }
       writeFileSync(file, [...lines.filter(Boolean),
+        "WYP_DEPLOYMENT_MODE=local",
         `NEXT_PUBLIC_SUPABASE_URL=${data.API_URL}`,
         `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${key}`,
         `NEXT_PUBLIC_APP_URL=${target.disposable ? TEST_APP_ORIGIN : "http://127.0.0.1:3000"}`, "",
@@ -99,6 +103,7 @@ export function runLocalCommand(command, {
       if (!data.SERVICE_ROLE_KEY) throw new Error("Local test administrator key unavailable.");
       const testEnv = {
         ...cleanEnv,
+        WYP_DEPLOYMENT_MODE: "local",
         WYP_TEST_WORKSPACE: target.workspace,
         WYP_TEST_PROJECT_ID: target.projectId,
         WYP_TEST_RUN_ID: target.runId,

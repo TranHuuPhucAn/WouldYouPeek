@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseLocalCommand, runLocalCommand } from "../../scripts/local-supabase.mjs";
-import { localUrl, cleanChildEnvironment } from "../../scripts/local-target.mjs";
+import { localUrl, cleanChildEnvironment, configureLocalCapabilities } from "../../scripts/local-target.mjs";
 import { fixtureProject } from "./helpers.mjs";
 import { prepareTestWorkspace } from "../../scripts/local-test-stack.mjs";
 
@@ -26,10 +26,17 @@ test("additive migrate validates the project and status before invoking the loca
   runLocalCommand("migrate", { root, log() {}, execute(command, args, options) {
     calls.push(args);
     assert.equal(options.cwd, root);
+    if (command === "docker") {
+      if (args[0] === "inspect") return JSON.stringify({ "com.supabase.cli.project": "would-you-peek", "com.supabase.cli.workdir": root });
+      assert.match(options.input, /owned local capability/);
+      return "";
+    }
     assert.ok(command.endsWith("node_modules/.bin/supabase"));
     return args[0] === "status" ? JSON.stringify({ API_URL: "http://127.0.0.1:54321" }) : "";
   } });
-  assert.deepEqual(calls, [["status", "-o", "json"], ["migration", "up"]]);
+  assert.deepEqual(calls.slice(0, 2), [["status", "-o", "json"], ["migration", "up"]]);
+  assert.equal(calls[2][0], "inspect");
+  assert.equal(calls[3][0], "exec");
 });
 
 test("a bad status target cannot apply migrations", (t) => {
@@ -63,12 +70,21 @@ test("environment output preserves unrelated settings and contains no administra
   const value = readFileSync(join(root, ".env.local"), "utf8");
   assert.match(value, /PRIVATE_TEST_SENTINEL=do-not-copy/);
   assert.match(value, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=public-placeholder/);
+  assert.match(value, /WYP_DEPLOYMENT_MODE=local/);
   assert.doesNotMatch(value, /private-placeholder|SERVICE_ROLE_KEY/);
 });
 
 test("provider target and credential environment cannot leak into CLI defaults", () => {
-  const env = cleanChildEnvironment({ PATH: "/bin", SUPABASE_ACCESS_TOKEN: "secret", SUPABASE_DB_URL: "remote", DATABASE_URL: "remote", PGPASSWORD: "secret", WYP_TEST_WORKSPACE: "other", NEXT_PUBLIC_APP_URL: "wrong" });
+  const env = cleanChildEnvironment({ PATH: "/bin", SUPABASE_ACCESS_TOKEN: "secret", SUPABASE_DB_URL: "remote", DATABASE_URL: "remote", PGPASSWORD: "secret", PGSERVICEFILE: "remote", WYP_TEST_WORKSPACE: "other", NEXT_PUBLIC_APP_URL: "wrong", WYP_DEPLOYMENT_MODE: "hosted", WYP_RELEASE_ENVIRONMENT: "production", WYP_HOSTED_ACCESS_TOKEN: "secret", WYP_TURNSTILE_SITE_KEY: "cloud", VERCEL_ENV: "production" });
   assert.deepEqual(env, { PATH: "/bin" });
+});
+
+test("capability setup refuses mismatched Docker ownership before SQL", (t) => {
+  const root = fixtureProject(t), calls = [];
+  assert.throws(() => configureLocalCapabilities(root, { execute(command, args) {
+    calls.push(args); return JSON.stringify({ "com.supabase.cli.project": "would-you-peek", "com.supabase.cli.workdir": "/another/project" });
+  } }), /ownership/);
+  assert.equal(calls.length, 1);
 });
 
 test("failed database tests expose TAP output while status credentials remain captured", (t) => {

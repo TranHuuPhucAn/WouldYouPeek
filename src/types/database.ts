@@ -213,6 +213,9 @@ isOneToOne: false
 "get_active_training_session":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"get_application_capabilities":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "get_creator_playlist":
 { Args: { "p_playlist_id": string }; Returns: Json
                            },

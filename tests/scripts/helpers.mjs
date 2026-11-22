@@ -1,12 +1,14 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 export function fixtureProject(t) {
-  const root = mkdtempSync(join(tmpdir(), "wyp-script-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "wyp-script-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "supabase/migrations"), { recursive: true });
+  mkdirSync(join(root, "supabase/maintenance"), { recursive: true });
+  writeFileSync(join(root, "supabase/maintenance/configure_local_capabilities.sql"), "-- owned local capability fixture\n");
   const config = readFileSync(fileURLToPath(new URL("../../supabase/config.toml", import.meta.url)), "utf8")
     .replace(/^project_id\s*=.*$/m, 'project_id = "would-you-peek"')
     .replace(/\b5532([0-6])\b/g, "5432$1").replace(/:3100\b/g, ":3000")
@@ -24,7 +26,7 @@ export function fixtureProject(t) {
 
 export function fixtureEnvironment(target) {
   return {
-    PATH: process.env.PATH, WYP_TEST_WORKSPACE: target.workspace,
+    PATH: process.env.PATH, WYP_DEPLOYMENT_MODE: "local", WYP_TEST_WORKSPACE: target.workspace,
     WYP_TEST_RUN_ID: target.runId, WYP_TEST_PROJECT_ID: target.projectId,
     SUPABASE_TEST_URL: "http://127.0.0.1:55321", SUPABASE_TEST_MAIL_URL: "http://127.0.0.1:55324",
     SUPABASE_TEST_APP_URL: "http://localhost:3100", SUPABASE_TEST_SERVICE_ROLE_KEY: "test-admin-only",

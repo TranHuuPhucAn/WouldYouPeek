@@ -1,3 +1,4 @@
+import { getAuthChallengeConfig } from "@/server/auth/challenge";
 import Link from "next/link";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { getCurrentAccount } from "@/server/auth/guards";
@@ -21,7 +22,7 @@ export default async function SignUpPage({
           Create an account to play, save your progress and revisit every
           debrief.
         </p>
-        <SignUpForm returnTo={returnTo} />
+        <SignUpForm challenge={getAuthChallengeConfig()} returnTo={returnTo} />
         <p className="auth-switch">
           Already have an account?{" "}
           <Link href={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`}>

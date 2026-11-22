@@ -1,4 +1,5 @@
 import "server-only";
+import { requireUploadsEnabled } from "@/server/deployment/capabilities";
 import type {
   VideoMutationResponse,
   VideoUploadSessionResponse,
@@ -25,12 +26,14 @@ function mutation(value: unknown, id: string): VideoMutationResponse {
 }
 export async function listVideos(cursor?: string | null) {
   await requireCreator();
+  await requireUploadsEnabled();
   return toVideoList(
     await repository.listVideos(validation.parseVideoCursor(cursor)),
   );
 }
 export async function getVideo(rawId: string) {
   await requireCreator();
+  await requireUploadsEnabled();
   const id = validation.parseVideoId(rawId),
     v = toVideoSnapshot(await repository.getVideo(id));
   if (v.id !== id) invalidVideoData();
@@ -38,12 +41,14 @@ export async function getVideo(rawId: string) {
 }
 export async function createVideo(input: unknown) {
   await requireCreator();
+  await requireUploadsEnabled();
   return toVideoMutation(
     await repository.createVideo(validation.parseCreateVideo(input)),
   );
 }
 export async function findVideoRequest(rawId: string) {
   await requireCreator();
+  await requireUploadsEnabled();
   const value = videoRecord(
     await repository.findVideoRequest(validation.parseVideoId(rawId)),
   );
@@ -51,6 +56,7 @@ export async function findVideoRequest(rawId: string) {
 }
 export async function completeUpload(rawId: string, input: unknown) {
   await requireCreator();
+  await requireUploadsEnabled();
   const id = validation.parseVideoId(rawId);
   return mutation(
     await repository.completeUpload(id, validation.parseVideoCommand(input)),
@@ -59,6 +65,7 @@ export async function completeUpload(rawId: string, input: unknown) {
 }
 export async function retryValidation(rawId: string, input: unknown) {
   await requireCreator();
+  await requireUploadsEnabled();
   const id = validation.parseVideoId(rawId);
   return mutation(
     await repository.retryValidation(id, validation.parseVideoCommand(input)),
@@ -70,6 +77,7 @@ export async function getUploadSession(
   input: unknown,
 ): Promise<VideoUploadSessionResponse> {
   await requireCreator();
+  await requireUploadsEnabled();
   validation.parseEmptyVideoCommand(input);
   const id = validation.parseVideoId(rawId),
     config = getPublicSupabaseConfig();
@@ -152,6 +160,7 @@ export async function deleteVideo(
   input: unknown,
 ): Promise<VideoMutationResponse> {
   await requireCreator();
+  await requireUploadsEnabled();
   const id = validation.parseVideoId(rawId),
     command = validation.parseVideoCommand(input),
     raw = videoRecord(await repository.beginDelete(id, command)),

@@ -15,6 +15,9 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
         <Link href="/" className="text-button">
           Back to home
         </Link>
+        <Link href="/help" className="text-button">
+          Get help
+        </Link>
       </div>
     </main>
   );

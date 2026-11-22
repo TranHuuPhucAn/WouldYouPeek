@@ -17,13 +17,16 @@ import { SourceFields } from "./SourceFields";
 import { VideoTimingEditor } from "./VideoTimingEditor";
 import { fieldId } from "./EditorFields";
 import { CreatorStatus } from "./CreatorStatus";
+import type { DeploymentCapabilities } from "@/contracts/deployment";
 
 export function ScenarioEditor({
   initial,
   viewerId,
+  capabilities = { sourceMode: "youtube-only" },
 }: {
   initial: CreatorScenarioSnapshot;
   viewerId: string;
+  capabilities?: DeploymentCapabilities;
 }) {
   const editor = useScenarioEditor(initial, viewerId),
     { state } = editor;
@@ -366,19 +369,28 @@ export function ScenarioEditor({
           </section>
         )}
         <SourceFields
+          capabilities={capabilities}
           source={state.content.source}
           onChange={(source) => editor.update({ ...state.content, source })}
           issues={issues}
           onReplace={replaceSource}
         />
-        <VideoTimingEditor
-          key={`${state.resetKey}-${sourceReset}`}
-          source={state.content.source}
-          media={state.content.media}
-          onChange={(media) => editor.update({ ...state.content, media })}
-          issues={issues}
-          onInputIssues={setInputIssues}
-        />
+        {state.content.source.kind === "uploaded" &&
+        capabilities.sourceMode === "youtube-only" ? (
+          <p className="form-message" role="status">
+            Your timestamps and text are preserved. Replace the recording with a
+            YouTube link to preview and mark decision points here.
+          </p>
+        ) : (
+          <VideoTimingEditor
+            key={`${state.resetKey}-${sourceReset}`}
+            source={state.content.source}
+            media={state.content.media}
+            onChange={(media) => editor.update({ ...state.content, media })}
+            issues={issues}
+            onInputIssues={setInputIssues}
+          />
+        )}
         <DecisionFields
           content={state.content}
           onChange={editor.update}

@@ -56,7 +56,13 @@ beforeEach(() => {
 });
 describe("complete explicit-save creator editor", () => {
   it("explains the known-fact review requirement while keeping other lists optional", () => {
-    render(<ScenarioEditor initial={creatorSnapshot()} viewerId="owner" />);
+    render(
+      <ScenarioEditor
+        capabilities={{ sourceMode: "youtube-and-upload" }}
+        initial={creatorSnapshot()}
+        viewerId="owner"
+      />,
+    );
     expect(screen.getByLabelText("Known facts")).toHaveAccessibleDescription(
       expect.stringContaining(
         "Add at least one player-visible fact before review or publication",
@@ -79,7 +85,11 @@ describe("complete explicit-save creator editor", () => {
   });
   it("saves incomplete work explicitly, without requiring publication fields", async () => {
     render(
-      <ScenarioEditor initial={creatorSnapshot(false)} viewerId="owner" />,
+      <ScenarioEditor
+        capabilities={{ sourceMode: "youtube-and-upload" }}
+        initial={creatorSnapshot(false)}
+        viewerId="owner"
+      />,
     );
     expect(api.saveCreatorScenario).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Scenario title"), {
@@ -109,7 +119,13 @@ describe("complete explicit-save creator editor", () => {
     ).not.toBeInTheDocument();
   });
   it("shows accessible timestamp errors and blocks malformed input without losing text", () => {
-    render(<ScenarioEditor initial={creatorSnapshot()} viewerId="owner" />);
+    render(
+      <ScenarioEditor
+        capabilities={{ sourceMode: "youtube-and-upload" }}
+        initial={creatorSnapshot()}
+        viewerId="owner"
+      />,
+    );
     const input = screen.getByLabelText("Decision pause");
     fireEvent.change(input, { target: { value: "not a time" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
@@ -123,7 +139,13 @@ describe("complete explicit-save creator editor", () => {
   });
   it("guards unsaved navigation and unload, and permits leaving after confirmation", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<ScenarioEditor initial={creatorSnapshot()} viewerId="owner" />);
+    render(
+      <ScenarioEditor
+        capabilities={{ sourceMode: "youtube-and-upload" }}
+        initial={creatorSnapshot()}
+        viewerId="owner"
+      />,
+    );
     fireEvent.change(screen.getByLabelText("Scenario title"), {
       target: { value: "Edited" },
     });
@@ -140,7 +162,11 @@ describe("complete explicit-save creator editor", () => {
     const s = creatorSnapshot();
     s.draft.content.title = "<img src=x onerror=alert(1)>";
     const { container } = render(
-      <ScenarioEditor initial={s} viewerId="owner" />,
+      <ScenarioEditor
+        capabilities={{ sourceMode: "youtube-and-upload" }}
+        initial={s}
+        viewerId="owner"
+      />,
     );
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByLabelText("Scenario title")).toHaveValue(
@@ -157,7 +183,13 @@ describe("complete explicit-save creator editor", () => {
   it("labels list-item validation at the actual list field", () => {
     const s = creatorSnapshot();
     s.draft.content.knownFacts = ["x".repeat(301)];
-    render(<ScenarioEditor initial={s} viewerId="owner" />);
+    render(
+      <ScenarioEditor
+        capabilities={{ sourceMode: "youtube-and-upload" }}
+        initial={s}
+        viewerId="owner"
+      />,
+    );
     fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
     const field = screen.getByLabelText("Known facts");
     expect(field).toHaveAttribute("aria-invalid", "true");
@@ -249,7 +281,13 @@ function savedUploadedScenario() {
 it("cancels source replacement in-page without changing any saved marks or descriptions", () => {
   const initial = creatorSnapshot(),
     nativeConfirm = vi.spyOn(window, "confirm");
-  render(<ScenarioEditor initial={initial} viewerId="owner" />);
+  render(
+    <ScenarioEditor
+      capabilities={{ sourceMode: "youtube-and-upload" }}
+      initial={initial}
+      viewerId="owner"
+    />,
+  );
   const original = screen.getByLabelText("YouTube URL") as HTMLInputElement,
     originalUrl = original.value,
     originalMedia = mediaFieldValues();
@@ -276,7 +314,13 @@ it("cancels source replacement in-page without changing any saved marks or descr
 
 it("confirms a source change, clears only timing and media descriptions, and keeps latest authored text", () => {
   const initial = creatorSnapshot();
-  render(<ScenarioEditor initial={initial} viewerId="owner" />);
+  render(
+    <ScenarioEditor
+      capabilities={{ sourceMode: "youtube-and-upload" }}
+      initial={initial}
+      viewerId="owner"
+    />,
+  );
   fireEvent.change(screen.getByLabelText("YouTube URL"), {
     target: { value: "https://youtu.be/abcdefghijk" },
   });
@@ -307,7 +351,13 @@ it("confirms a source change, clears only timing and media descriptions, and kee
 });
 
 it("cancels and confirms an uploaded-to-YouTube switch with matching dropdown and field state", async () => {
-  render(<ScenarioEditor initial={savedUploadedScenario()} viewerId="owner" />);
+  render(
+    <ScenarioEditor
+      capabilities={{ sourceMode: "youtube-and-upload" }}
+      initial={savedUploadedScenario()}
+      viewerId="owner"
+    />,
+  );
   await screen.findByRole("option", { name: "recording.mp4" });
   const originalMedia = mediaFieldValues();
   const kind = screen.getByLabelText("Video source");
@@ -327,7 +377,13 @@ it("cancels and confirms an uploaded-to-YouTube switch with matching dropdown an
 });
 
 it("keeps an uploaded asset on cancellation and clears marks only after confirming its replacement", async () => {
-  render(<ScenarioEditor initial={savedUploadedScenario()} viewerId="owner" />);
+  render(
+    <ScenarioEditor
+      capabilities={{ sourceMode: "youtube-and-upload" }}
+      initial={savedUploadedScenario()}
+      viewerId="owner"
+    />,
+  );
   await screen.findByRole("option", { name: "second.mp4" });
   const originalMedia = mediaFieldValues();
   const source = screen.getByLabelText("Uploaded recording");
@@ -341,4 +397,37 @@ it("keeps an uploaded asset on cancellation and clears marks only after confirmi
   expect(source).toHaveValue(OWNER_ID);
   expect(mediaFieldValues()).toEqual(timingLabels.map(() => ""));
   expect(screen.getByLabelText("Setup starts")).toHaveFocus();
+});
+
+it("preserves an unsupported uploaded draft without loading media and restores focus after cancelling its explicit replacement", async () => {
+  const initial = savedUploadedScenario();
+  render(
+    <ScenarioEditor
+      initial={initial}
+      viewerId="owner"
+      capabilities={{ sourceMode: "youtube-only" }}
+    />,
+  );
+  expect(screen.getByLabelText("Scenario title")).toHaveValue(
+    initial.draft.content.title,
+  );
+  expect(listCreatorVideos).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText("Uploaded recording")).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/Your timestamps and text are preserved/),
+  ).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Replace with YouTube link" }),
+  );
+  expect(
+    screen.getByRole("alertdialog", { name: "Change the source recording?" }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel source change" }));
+  expect(
+    screen.getByRole("button", { name: "Replace with YouTube link" }),
+  ).toHaveFocus();
+  expect(api.saveCreatorScenario).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Scenario title")).toHaveValue(
+    initial.draft.content.title,
+  );
 });

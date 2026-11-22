@@ -41,3 +41,10 @@ supabase/.branches/
 .sites-runtime/
 test-results/
 .wyp-test-work/
+
+# Private release configuration, encrypted database exports and recovery keys.
+/backups/
+/release-config/
+*.sql.age
+*.agekey
+.pgpass
