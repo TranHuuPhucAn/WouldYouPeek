@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { TestUser } from "./helpers/test-users";
 import { createVerifiedTestUser } from "./helpers/test-users";
 import { createLocalTestClient } from "./helpers/local-supabase";
+import { fixtureSql, sqlLiteral } from "./helpers/database";
 import {
   createVerifiedCreator,
   createDraftFixture,
@@ -187,12 +188,10 @@ describe("creator ownership through actual Auth and Data API", () => {
   it("rechecks current verification and creator role for an existing JWT", async () => {
     const revoked = await createVerifiedCreator();
     const own = await createDraftFixture(revoked);
-    const admin = createLocalTestClient("admin");
-    const update = await admin
-      .from("profiles")
-      .update({ role: "learner", creator_enabled_at: null })
-      .eq("user_id", revoked.id);
-    expect(update.error).toBeNull();
+    const update = fixtureSql(
+      `update public.profiles set role='learner',creator_enabled_at=null where user_id=${sqlLiteral(revoked.id)} returning user_id;`,
+    );
+    expect(update).toBe(revoked.id);
     expect(
       (
         await revoked.client.rpc("get_creator_scenario", {
@@ -200,15 +199,10 @@ describe("creator ownership through actual Auth and Data API", () => {
         })
       ).error?.message,
     ).toBe("CREATOR_REQUIRED");
-    const restore = await admin
-      .from("profiles")
-      .update({
-        role: "creator",
-        creator_enabled_at: new Date().toISOString(),
-        email_verified_at: null,
-      })
-      .eq("user_id", revoked.id);
-    expect(restore.error).toBeNull();
+    const restore = fixtureSql(
+      `update public.profiles set role='creator',creator_enabled_at=clock_timestamp(),email_verified_at=null where user_id=${sqlLiteral(revoked.id)} returning user_id;`,
+    );
+    expect(restore).toBe(revoked.id);
     expect(
       (
         await revoked.client.rpc("get_creator_scenario", {
