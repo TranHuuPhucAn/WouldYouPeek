@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { randomUUID, X509Certificate } from "node:crypto";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { rootCertificates } from "node:tls";
 import {
   assertDisposableTarget,
   cleanChildEnvironment,
@@ -58,6 +59,10 @@ export function runBackupRestoreRehearsal(env = process.env) {
     mkdtempSync(join(tmpdir(), "wyp-local-recovery-")),
   );
   const identity = join(temporary, "identity.agekey");
+  const ca = join(temporary, "synthetic CA +#&%.crt");
+  const comparisonUrl = new URL(`postgresql://postgres@db.${SOURCE_REF}.supabase.co:5432/postgres`);
+  comparisonUrl.searchParams.set("sslmode", "verify-full");
+  comparisonUrl.searchParams.set("sslrootcert", ca);
   const safeEnv = cleanChildEnvironment(env);
   // Strip all inherited provider overrides even though no command uses them.
   for (const name of Object.keys(safeEnv))
@@ -358,6 +363,7 @@ export function runBackupRestoreRehearsal(env = process.env) {
       ...safeEnv,
       WYP_HOSTED_DB_PASSWORD: "synthetic-not-a-provider-password",
       WYP_HOSTED_ACCESS_TOKEN: "synthetic-no-network-access",
+      WYP_HOSTED_CA_FILE: ca,
     },
     sql(value, input) {
       return databaseSql(boundDatabase(value), input);
@@ -399,13 +405,17 @@ export function runBackupRestoreRehearsal(env = process.env) {
           JSON.stringify([
             "db",
             "diff",
-            `--remote=${SOURCE_REF}`,
+            `--remote=${comparisonUrl.href}`,
             "--schema",
             "public,private,auth,storage",
             "--strict-coverage",
           ])
-        )
+        ) {
+          assert.equal(options.env.PGPASSWORD, "synthetic-not-a-provider-password");
+          assert.deepEqual(Object.keys(options.env).filter((name) => name.startsWith("PGSSL")), []);
+          assert.equal(options.env.SUPABASE_ACCESS_TOKEN, "");
           return "-- Provider schema-diff check modeled; local schemas use real canonical migration replay.\n";
+        }
         if (
           JSON.stringify(args) !==
           JSON.stringify([
@@ -461,6 +471,12 @@ export function runBackupRestoreRehearsal(env = process.env) {
   let rolesBefore;
   let result;
   try {
+    const now = Date.now(), pem = rootCertificates.find((value) => {
+      const certificate = new X509Certificate(value);
+      return certificate.ca && Date.parse(certificate.validFrom) <= now && now < Date.parse(certificate.validTo);
+    });
+    assert.ok(pem, "Node provides a current public CA for an isolated fixture");
+    writeFileSync(ca, pem, { mode: 0o600 });
     rolesBefore = clusterRoleSnapshot();
     execute("age-keygen", ["-o", identity]);
     const recipient = execute("age-keygen", ["-y", identity]).trim();

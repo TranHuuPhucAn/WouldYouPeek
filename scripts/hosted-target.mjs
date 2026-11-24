@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { X509Certificate } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +71,32 @@ export function hostedEnvironment(target, env = process.env) {
     PGDATABASE: "postgres", PGPASSWORD: env.WYP_HOSTED_DB_PASSWORD, PGSSLMODE: "verify-full",
     PGSSLROOTCERT: env.WYP_HOSTED_CA_FILE || "system", PGCONNECT_TIMEOUT: "15",
     SUPABASE_ACCESS_TOKEN: env.WYP_HOSTED_ACCESS_TOKEN || "" };
+}
+
+/** Bind TLS to the hosted URL so the CLI's separate local shadow cannot inherit it. */
+export function hostedSchemaConnection(target, env = process.env, { root = PROJECT_ROOT } = {}) {
+  const identity = assertHostedIdentity(target, target?.projectRef, target?.environment);
+  let ca;
+  try {
+    // Native CLI 3.2 reads sslrootcert as a filename; libpq's "system" is not supported here.
+    if (typeof env.WYP_HOSTED_CA_FILE !== "string" || !isAbsolute(env.WYP_HOSTED_CA_FILE)) throw new Error();
+    ca = privateFile(env.WYP_HOSTED_CA_FILE, root);
+    const pem = readFileSync(ca, "utf8"), certificate = new X509Certificate(pem), now = Date.now();
+    if (!pem.trim().startsWith("-----BEGIN CERTIFICATE-----") || !pem.trim().endsWith("-----END CERTIFICATE-----")
+      || !certificate.ca || !(Date.parse(certificate.validFrom) <= now && now < Date.parse(certificate.validTo))) throw new Error();
+  } catch { throw new Error("Hosted schema comparison requires an explicit valid private CA file outside the checkout."); }
+  const url = new URL("postgresql://localhost");
+  url.hostname = identity.database.host;
+  url.port = String(identity.database.port);
+  url.username = identity.database.user;
+  url.pathname = "/postgres";
+  url.searchParams.set("sslmode", "verify-full");
+  url.searchParams.set("sslrootcert", ca);
+  const childEnv = hostedEnvironment(identity, env);
+  for (const key of Object.keys(childEnv)) if (key.startsWith("PGSSL")) delete childEnv[key];
+  childEnv.SUPABASE_ACCESS_TOKEN = "";
+  childEnv.SUPABASE_NO_KEYRING = "1";
+  return { url: url.href, env: childEnv };
 }
 
 /** Child output can contain credentials or private SQL data. Never attach it to a thrown error. */

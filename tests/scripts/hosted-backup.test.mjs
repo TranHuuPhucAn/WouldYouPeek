@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { X509Certificate } from "node:crypto";
+import { rootCertificates } from "node:tls";
 import { mkdtempSync, realpathSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,9 +21,16 @@ function fixture(t) {
   const identity = join(parent, "recovery.agekey");
   execFileSync("age-keygen", ["-o", identity], { stdio: "pipe" });
   const recipient = execFileSync("age-keygen", ["-y", identity], { encoding: "utf8" }).trim();
+  const ca = join(parent, "trusted CA +#&%.crt"), now = Date.now();
+  const pem = rootCertificates.find((value) => {
+    const certificate = new X509Certificate(value);
+    return certificate.ca && Date.parse(certificate.validFrom) <= now && now < Date.parse(certificate.validTo);
+  });
+  assert.ok(pem, "Node provides a current public CA for an isolated fixture");
+  writeFileSync(ca, pem, { mode: 0o600 });
   writeFileSync(join(root, "supabase/maintenance/assert_hosted_ready.sql"), "select 'readiness';");
   const mutations = [];
-  const options = { root, sha: SHA, destination: parent, recipient, env: { ...process.env, WYP_HOSTED_DB_PASSWORD: "never-in-argv", WYP_HOSTED_ACCESS_TOKEN: "never-in-output" },
+  const options = { root, sha: SHA, destination: parent, recipient, env: { ...process.env, WYP_HOSTED_DB_PASSWORD: "never-in-argv", WYP_HOSTED_ACCESS_TOKEN: "never-in-output", WYP_HOSTED_CA_FILE: ca },
     state: () => ({ versions: migrationManifest(root).map((row) => row.version), accounts: 1, objects: 0 }),
     sql(target, input) {
       if (input.startsWith("begin;")) mutations.push(input);
@@ -39,7 +48,7 @@ function fixture(t) {
       if (command.endsWith("/supabase")) { mutations.push(args); return ""; }
       return execFileSync(command, args, { input: config?.input, env: config?.env, encoding: "utf8", stdio: "pipe" });
     } };
-  return { root, parent, identity, options, mutations };
+  return { root, parent, identity, ca, options, mutations };
 }
 
 test("COPY inventory preserves escaped rows and rejects truncated/missing/unsafe schemas", () => {
@@ -122,6 +131,55 @@ test("source schema drift or unreviewed checkout stops before writing backup fil
     } }), /schema|checkout/);
     assert.equal(readdirSync(f.parent).some((name) => name.startsWith("backup-")), false);
   }
+});
+
+test("backup compares one explicit verified host without a PAT or global shadow TLS", (t) => {
+  const f = fixture(t), observed = [];
+  const env = { ...f.options.env };
+  delete env.WYP_HOSTED_ACCESS_TOKEN;
+  const result = exportBackup(makeTarget(source, "production"), { ...f.options, env, run(command, args, config) {
+    observed.push({ command, args, env: config?.env });
+    return f.options.run(command, args, config);
+  } });
+  assert.equal(result.encryptedFiles, 4);
+  const comparisons = observed.filter((call) => call.command.endsWith("/supabase"));
+  assert.equal(comparisons.length, 1);
+  const comparison = comparisons[0], url = new URL(comparison.args[2].slice("--remote=".length));
+  assert.deepEqual(comparison.args, ["db", "diff", `--remote=${url.href}`, "--schema", "public,private,auth,storage", "--strict-coverage"]);
+  assert.equal(url.hostname, `db.${source}.supabase.co`);
+  assert.equal(url.username, "postgres");
+  assert.equal(url.password, "");
+  assert.equal(url.port, "5432");
+  assert.equal(url.pathname, "/postgres");
+  assert.equal(url.searchParams.get("sslmode"), "verify-full");
+  assert.equal(url.searchParams.get("sslrootcert"), f.ca);
+  assert.equal(comparison.env.PGPASSWORD, "never-in-argv");
+  assert.equal(comparison.env.SUPABASE_ACCESS_TOKEN, "");
+  assert.equal(comparison.env.SUPABASE_NO_KEYRING, "1");
+  assert.deepEqual(Object.keys(comparison.env).filter((key) => key.startsWith("PGSSL")), []);
+  for (const call of observed.filter((item) => ["pg_dump", "pg_dumpall", "age"].includes(item.command))) {
+    assert.equal(call.env.PGSSLMODE, "verify-full");
+    assert.equal(call.env.PGSSLROOTCERT, f.ca);
+    assert.equal(call.env.SUPABASE_NO_KEYRING, undefined);
+  }
+  assert.equal(env.WYP_HOSTED_CA_FILE, f.ca);
+});
+
+test("unsafe CA inputs or comparison failures stop before any backup export", (t) => {
+  const f = fixture(t), calls = [];
+  const run = (command, args, config) => { calls.push({ command, args }); return f.options.run(command, args, config); };
+  for (const ca of [undefined, "system", "relative.crt", join(f.parent, "missing.crt")]) {
+    assert.throws(() => exportBackup(makeTarget(source, "production"), { ...f.options, env: { ...f.options.env, WYP_HOSTED_CA_FILE: ca },
+      state() { throw new Error("CA validation must happen before provider reads"); }, run }), /explicit valid private CA/);
+    assert.deepEqual(calls, []);
+  }
+  assert.throws(() => exportBackup(makeTarget(source, "production"), { ...f.options, run(command, args, config) {
+    calls.push({ command, args });
+    if (command.endsWith("/supabase")) throw new Error("comparison failed");
+    return f.options.run(command, args, config);
+  } }), /comparison failed/);
+  assert.equal(calls.some((call) => ["pg_dump", "pg_dumpall", "age"].includes(call.command)), false);
+  assert.equal(readdirSync(f.parent).some((name) => name.startsWith("backup-")), false);
 });
 
 test("unexpected Storage objects prevent claiming a complete YouTube-only backup", (t) => {
