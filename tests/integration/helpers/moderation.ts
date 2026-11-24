@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { LibraryScenarioPreview } from "@/contracts/library";
 import type {
@@ -15,42 +15,9 @@ import { assertDockerOwnership } from "../../../scripts/local-test-stack.mjs";
 import { createLocalTestClient, getLocalTestConfig } from "./local-supabase";
 import { rpc } from "./creator-scenarios";
 import { createVerifiedTestUser, type TestUser } from "./test-users";
+import { fixtureSql as moderationSql, sqlLiteral } from "./database";
 
-/** Administrative fixture operations only, bound to the owned disposable project. */
-export function moderationSql(statement: string): string {
-  getLocalTestConfig();
-  const target = assertDisposableTarget(process.env);
-  assertDockerOwnership(target);
-  return execFileSync(
-    "docker",
-    [
-      "exec",
-      "-i",
-      `supabase_db_${target.projectId}`,
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "postgres",
-      "-X",
-      "-Atq",
-      "-v",
-      "ON_ERROR_STOP=1",
-    ],
-    {
-      cwd: target.workspace,
-      env: { ...cleanChildEnvironment(), NODE_ENV: "test" },
-      input: statement,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 10_000,
-    },
-  ).trim();
-}
-
-export function sqlLiteral(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
+export { moderationSql, sqlLiteral };
 
 export async function createOperator(): Promise<TestUser> {
   const user = await createVerifiedTestUser();

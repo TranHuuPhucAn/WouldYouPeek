@@ -22,6 +22,7 @@ import type {
 } from "@/contracts/session";
 import demoScenarios from "../../supabase/fixtures/demo-scenarios.json";
 import { createLocalTestClient } from "./helpers/local-supabase";
+import { fixtureSql, sqlLiteral } from "./helpers/database";
 import { createVerifiedTestUser, type TestUser } from "./helpers/test-users";
 import {
   createDraftFixture,
@@ -88,11 +89,10 @@ describe("public player catalogue through real Auth and Data API", () => {
       createVerifiedTestUser(),
     ]);
     // A genuine existing JWT must not override the database's current verification state.
-    const revoke = await createLocalTestClient("admin")
-      .from("profiles")
-      .update({ email_verified_at: null })
-      .eq("user_id", revoked.id);
-    expect(revoke.error).toBeNull();
+    const revoke = fixtureSql(
+      `update public.profiles set email_verified_at=null where user_id=${sqlLiteral(revoked.id)} returning user_id;`,
+    );
+    expect(revoke).toBe(revoked.id);
     guest = createLocalTestClient();
     for (const name of [
       alphaName,

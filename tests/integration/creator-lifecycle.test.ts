@@ -8,7 +8,7 @@ import type {
 } from "@/contracts/creator";
 import type { SessionHistoryResponse } from "@/contracts/session";
 import type { TestUser } from "./helpers/test-users";
-import { createLocalTestClient } from "./helpers/local-supabase";
+import { fixtureSql, sqlLiteral } from "./helpers/database";
 import {
   checklist,
   createDraftFixture,
@@ -143,12 +143,12 @@ describe("creator draft, review and atomic publication", () => {
       second.publishedVersion,
     );
     expect(second.publishedVersion).toBe("creator-2");
-    const count = await createLocalTestClient("admin")
-      .from("scenario_versions")
-      .select("id", { count: "exact" })
-      .eq("scenario_id", draft.id);
-    expect(count.error).toBeNull();
-    expect(count.count).toBe(2);
+    const count = Number(
+      fixtureSql(
+        `select count(*) from public.scenario_versions where scenario_id=${sqlLiteral(draft.id)};`,
+      ),
+    );
+    expect(count).toBe(2);
   });
   it("serializes duplicate creates and competing save/publish using independent clients", async () => {
     const second = await independentClient(owner);
@@ -190,12 +190,12 @@ describe("creator draft, review and atomic publication", () => {
       { p_scenario_id: ready.id },
     );
     expect(canonical.revision).toBe(ready.revision + 1);
-    const versions = await createLocalTestClient("admin")
-      .from("scenario_versions")
-      .select("id", { count: "exact" })
-      .eq("scenario_id", ready.id);
-    expect(versions.error).toBeNull();
-    expect(versions.count).toBe(
+    const versions = Number(
+      fixtureSql(
+        `select count(*) from public.scenario_versions where scenario_id=${sqlLiteral(ready.id)};`,
+      ),
+    );
+    expect(versions).toBe(
       canonical.publication.state === "published" ? 1 : 0,
     );
   });

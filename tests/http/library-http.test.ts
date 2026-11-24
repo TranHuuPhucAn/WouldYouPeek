@@ -17,7 +17,7 @@ import {
   publishScenarioFixture,
   validContent,
 } from "../integration/helpers/creator-scenarios";
-import { createLocalTestClient } from "../integration/helpers/local-supabase";
+import { fixtureSql, sqlLiteral } from "../integration/helpers/database";
 import {
   cleanupTestUsers,
   createVerifiedTestUser,
@@ -150,11 +150,10 @@ describe("public player Library through real Next HTTP routes", () => {
     unverified = await loginBrowser(unverifiedUser);
     // Preserve genuine SSR cookies while making the database verification gate fail.
     // Auth metadata stays confirmed; this fixture specifically tests the DB boundary.
-    const changed = await createLocalTestClient("admin")
-      .from("profiles")
-      .update({ email_verified_at: null })
-      .eq("user_id", unverifiedUser.id);
-    expect(changed.error).toBeNull();
+    const changed = fixtureSql(
+      `update public.profiles set email_verified_at=null where user_id=${sqlLiteral(unverifiedUser.id)} returning user_id;`,
+    );
+    expect(changed).toBe(unverifiedUser.id);
     for (let index = 0; index < demos.length; index++) {
       const user = await createVerifiedTestUser();
       users.push(user);
@@ -318,12 +317,10 @@ describe("public player Library through real Next HTTP routes", () => {
       "/api/sessions",
     );
     expect(after.data.sessions).toEqual([]);
-    const count = await createLocalTestClient("admin")
-      .from("training_sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", unverifiedUser.id);
-    expect(count.error).toBeNull();
-    expect(count.count).toBe(0);
+    const count = fixtureSql(
+      `select count(*) from public.training_sessions where user_id=${sqlLiteral(unverifiedUser.id)};`,
+    );
+    expect(count).toBe("0");
   });
 
   it("preserves the exact selected scenario across sign-in, sign-up and verification forms", async () => {

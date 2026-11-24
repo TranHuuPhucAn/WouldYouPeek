@@ -26,7 +26,7 @@ import {
   selected,
   withdrawScenario,
 } from "../integration/helpers/playlists";
-import { createLocalTestClient } from "../integration/helpers/local-supabase";
+import { fixtureSql, sqlLiteral } from "../integration/helpers/database";
 import {
   cleanupTestUsers,
   createVerifiedTestUser,
@@ -155,11 +155,10 @@ describe("Home through the production Next server and real account cookies", () 
     gatedSession = gatedStart.data.session;
     // This is the existing database-verification boundary fixture, not a fake
     // auth cookie: Auth still confirms the user, while private RPC access fails.
-    const gated = await createLocalTestClient("admin")
-      .from("profiles")
-      .update({ email_verified_at: null })
-      .eq("user_id", users[3].id);
-    expect(gated.error).toBeNull();
+    const gated = fixtureSql(
+      `update public.profiles set email_verified_at=null where user_id=${sqlLiteral(users[3].id)} returning user_id;`,
+    );
+    expect(gated).toBe(users[3].id);
   }, 60_000);
 
   afterAll(async () => {
@@ -243,35 +242,17 @@ describe("Home through the production Next server and real account cookies", () 
 
   it("does not create sessions or change saved answers, pins, phases or timestamps on repeated Home reads", async () => {
     async function persistedRows() {
-      const admin = createLocalTestClient("admin");
-      const result = await Promise.all([
-        admin
-          .from("training_sessions")
-          .select("*")
-          .in(
-            "user_id",
-            users.map(({ id }) => id),
-          )
-          .order("id"),
-        admin
-          .from("training_session_items")
-          .select("*")
-          .in(
-            "user_id",
-            users.map(({ id }) => id),
-          )
-          .order("id"),
-        admin
-          .from("attempts")
-          .select("*")
-          .in(
-            "user_id",
-            users.map(({ id }) => id),
-          )
-          .order("id"),
-      ]);
-      for (const item of result) expect(item.error).toBeNull();
-      return result.map(({ data }) => data);
+      const userIds = users.map(({ id }) => sqlLiteral(id)).join(",");
+      return JSON.parse(
+        fixtureSql(`select jsonb_build_array(
+          (select coalesce(jsonb_agg(to_jsonb(saved) order by saved.id),'[]'::jsonb)
+            from public.training_sessions saved where saved.user_id in (${userIds})),
+          (select coalesce(jsonb_agg(to_jsonb(saved) order by saved.id),'[]'::jsonb)
+            from public.training_session_items saved where saved.user_id in (${userIds})),
+          (select coalesce(jsonb_agg(to_jsonb(saved) order by saved.id),'[]'::jsonb)
+            from public.attempts saved where saved.user_id in (${userIds}))
+        );`),
+      );
     }
     const before = await persistedRows();
     for (const browser of [a, b, empty, dbUnverified, a, empty])
