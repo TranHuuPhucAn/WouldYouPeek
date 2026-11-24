@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { X509Certificate } from "node:crypto";
+import { rootCertificates } from "node:tls";
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, symlinkSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertHostedIdentity, readHostedTarget, privateFile, outsideCheckout, safeTargetSummary, hostedEnvironment, runProtected, runHostedSql, parseHostedArguments } from "../../scripts/hosted-target.mjs";
+import { assertHostedIdentity, readHostedTarget, privateFile, outsideCheckout, safeTargetSummary, hostedEnvironment, hostedSchemaConnection, runProtected, runHostedSql, parseHostedArguments } from "../../scripts/hosted-target.mjs";
 
 const project = "a".repeat(20), production = "b".repeat(20);
 const target = () => ({ schemaVersion: 1, environment: "preview", projectRef: project, productionProjectRef: production, appOrigin: "https://staging.example.com", database: { host: `db.${project}.supabase.co`, user: "postgres", port: 5432, name: "postgres" } });
@@ -13,6 +15,16 @@ function temporary(t) {
   const root = join(directory, "checkout");
   mkdirSync(root);
   return { directory, root };
+}
+function caFixture(t) {
+  const value = temporary(t), path = join(value.directory, "trusted CA +#&%.crt"), now = Date.now();
+  const pem = rootCertificates.find((candidate) => {
+    const certificate = new X509Certificate(candidate);
+    return certificate.ca && Date.parse(certificate.validFrom) <= now && now < Date.parse(certificate.validTo);
+  });
+  assert.ok(pem, "Node provides a current public CA for an isolated fixture");
+  writeFileSync(path, pem, { mode: 0o600 });
+  return { ...value, path, pem };
 }
 
 test("hosted identity binds production and preview to distinct explicit projects", () => {
@@ -86,6 +98,56 @@ test("hosted child environment fixes TLS and drops inherited cloud/local target 
   assert.equal(env.SUPABASE_ACCESS_TOKEN, "synthetic-api-secret");
   for (const name of ["WYP_HOSTED_DB_PASSWORD", "WYP_TEST_PROJECT_ID", "PGSERVICE", "PGPASSFILE", "DATABASE_URL", "VERCEL_ENV", "NEXT_PUBLIC_APP_URL"]) assert.equal(env[name], undefined);
   assert.throws(() => hostedEnvironment(target(), {}), /protected environment/);
+});
+
+test("schema comparison binds verified TLS to a password-free direct or pooler URL only", (t) => {
+  const { root, path } = caFixture(t), password = "synthetic-secret :@/?#%", token = "synthetic-api-secret";
+  const input = { WYP_HOSTED_DB_PASSWORD: password, WYP_HOSTED_CA_FILE: path, WYP_HOSTED_ACCESS_TOKEN: token,
+    PGSSLMODE: "disable", PGSSLROOTCERT: "/unsafe", PGSSLCERT: "/unsafe-client", PGSSLKEY: "/unsafe-key", SUPABASE_ACCESS_TOKEN: "inherited" };
+  const before = { ...input };
+  for (const database of [target().database, { host: "aws-1-ap-northeast-1.pooler.supabase.com", user: `postgres.${project}`, port: 5432, name: "postgres" }]) {
+    const configured = { ...target(), database }, comparison = hostedSchemaConnection(configured, input, { root }), url = new URL(comparison.url);
+    assert.equal(url.protocol, "postgresql:");
+    assert.equal(url.hostname, database.host);
+    assert.equal(url.username, database.user);
+    assert.equal(url.password, "");
+    assert.equal(url.port, "5432");
+    assert.equal(url.pathname, "/postgres");
+    assert.deepEqual([...url.searchParams.keys()], ["sslmode", "sslrootcert"]);
+    assert.equal(url.searchParams.get("sslmode"), "verify-full");
+    assert.equal(url.searchParams.get("sslrootcert"), path);
+    for (const value of [password, encodeURI(password), encodeURIComponent(password), token]) assert.ok(!comparison.url.includes(value));
+    assert.equal(comparison.env.PGPASSWORD, password);
+    assert.equal(comparison.env.PGHOST, database.host);
+    assert.equal(comparison.env.PGUSER, database.user);
+    assert.equal(comparison.env.SUPABASE_ACCESS_TOKEN, "");
+    assert.equal(comparison.env.SUPABASE_NO_KEYRING, "1");
+    assert.deepEqual(Object.keys(comparison.env).filter((key) => key.startsWith("PGSSL")), []);
+    const standard = hostedEnvironment(configured, input);
+    assert.equal(standard.PGSSLMODE, "verify-full");
+    assert.equal(standard.PGSSLROOTCERT, path);
+    assert.equal(standard.SUPABASE_ACCESS_TOKEN, token);
+  }
+  assert.deepEqual(input, before);
+});
+
+test("schema comparison rejects unavailable or unsafe CA inputs without a fallback", (t) => {
+  const { directory, root, path, pem } = caFixture(t), env = { WYP_HOSTED_DB_PASSWORD: "synthetic-secret" };
+  for (const ca of [undefined, "system", "relative.crt", join(directory, "missing.crt"), directory])
+    assert.throws(() => hostedSchemaConnection(target(), { ...env, WYP_HOSTED_CA_FILE: ca }, { root }), /explicit valid private CA/);
+  const malformed = join(directory, "malformed.crt");
+  writeFileSync(malformed, "synthetic-sensitive-value", { mode: 0o600 });
+  assert.throws(() => hostedSchemaConnection(target(), { ...env, WYP_HOSTED_CA_FILE: malformed }, { root }), (error) => /explicit valid private CA/.test(error.message) && !error.message.includes("synthetic-sensitive-value"));
+  chmodSync(path, 0o644);
+  assert.throws(() => hostedSchemaConnection(target(), { ...env, WYP_HOSTED_CA_FILE: path }, { root }), /explicit valid private CA/);
+  chmodSync(path, 0o600);
+  const alias = join(directory, "ca-alias.crt");
+  symlinkSync(path, alias);
+  assert.throws(() => hostedSchemaConnection(target(), { ...env, WYP_HOSTED_CA_FILE: alias }, { root }), /explicit valid private CA/);
+  const inside = join(root, "ca.crt");
+  writeFileSync(inside, pem, { mode: 0o600 });
+  assert.throws(() => hostedSchemaConnection(target(), { ...env, WYP_HOSTED_CA_FILE: inside }, { root }), /explicit valid private CA/);
+  assert.throws(() => hostedSchemaConnection({ ...target(), database: { ...target().database, host: "attacker.example.com" } }, { ...env, WYP_HOSTED_CA_FILE: path }, { root }), /identity/);
 });
 
 test("protected command failures omit stderr, stdout and sensitive exception details", () => {

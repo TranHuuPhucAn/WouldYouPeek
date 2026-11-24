@@ -360,9 +360,9 @@ Store a private target JSON file **outside the checkout**, with file mode `600`,
 }
 ```
 
-Production uses `environment: production` and identical `projectRef`/`productionProjectRef`. Preview must use a different reference. If a direct IPv6 connection is unavailable, use the dashboard's **session** pooler on port 5432 with username `postgres.<project-ref>`; transaction pooler port 6543 is rejected. TLS certificate verification is required. `WYP_HOSTED_CA_FILE` may select the provider's trusted CA file; otherwise libpq uses its system trust configuration.
+Production uses `environment: production` and identical `projectRef`/`productionProjectRef`. Preview must use a different reference. If a direct IPv6 connection is unavailable, use the dashboard's **session** pooler on port 5432 with username `postgres.<project-ref>`; transaction pooler port 6543 is rejected. TLS certificate verification is required. SQL commands use `WYP_HOSTED_CA_FILE` when supplied, otherwise libpq uses its system trust configuration. Backup schema comparison requires an explicit, valid CA PEM file outside the checkout with private permissions.
 
-Supply `WYP_HOSTED_DB_PASSWORD` and, for migration, backup schema checks and restore preparation, a scoped `WYP_HOSTED_ACCESS_TOKEN` through a protected environment or password manager. Do not put values in command arguments, screenshots, public workflows or shell history. `WYP_TARGET_FILE`, `WYP_PROJECT_REF`, `WYP_RELEASE_ENVIRONMENT` and `WYP_RELEASE_SHA` in the commands below are non-secret variables identifying the reviewed target and full commit SHA; set them deliberately before running anything.
+Supply `WYP_HOSTED_DB_PASSWORD` and, for migration and restore preparation, a scoped `WYP_HOSTED_ACCESS_TOKEN` through a protected environment or password manager. Backup export uses the database password and the configured CA directly; it does not require an API token. Do not put values in command arguments, screenshots, public workflows or shell history. `WYP_TARGET_FILE`, `WYP_PROJECT_REF`, `WYP_RELEASE_ENVIRONMENT` and `WYP_RELEASE_SHA` in the commands below are non-secret variables identifying the reviewed target and full commit SHA; set them deliberately before running anything.
 
 ```sh
 npm run hosted:release -- preflight --target "$WYP_TARGET_FILE" --project "$WYP_PROJECT_REF" --environment "$WYP_RELEASE_ENVIRONMENT" --sha "$WYP_RELEASE_SHA"
@@ -395,6 +395,8 @@ Create an age recovery key outside the checkout (`age-keygen -o /absolute/privat
 ```sh
 npm run hosted:backup -- export --target "$WYP_TARGET_FILE" --project "$WYP_PROJECT_REF" --environment "$WYP_RELEASE_ENVIRONMENT" --sha "$WYP_RELEASE_SHA" --destination "$WYP_BACKUP_DIRECTORY" --recipient "$WYP_AGE_RECIPIENT"
 ```
+
+Set `WYP_HOSTED_CA_FILE` to the trusted CA file (private permissions, outside the checkout). The schema comparison binds `verify-full` and that CA to the password-free hosted URL, keeping those hosted TLS settings out of its separate local shadow database. SQL queries and dumps retain full TLS verification.
 
 Export from a clean checkout of the recorded source SHA whose migrations match the database. A strict schema comparison against the reviewed migrations must also pass; unresolved drift blocks the backup instead of silently omitting it. Four encrypted files contain role/schema evidence, managed-schema evidence and application/authentication data. A private manifest records migration hashes, encrypted-file checksums and table row hashes. Plaintext exports are not written to disk. Unexpected uploaded objects or a failed hosted-readiness check block export. Backups contain sensitive password hashes and private records even though encrypted. Store a separate protected copy outside the hosting provider. Auth provider settings, SMTP/CAPTCHA secrets, API keys and recovery-key custody require a separate owner-controlled inventory.
 

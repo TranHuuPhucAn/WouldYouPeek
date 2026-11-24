@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PROJECT_ROOT, SHA, PROJECT_REF, outsideCheckout, privateFile, readHostedTarget, hostedEnvironment, runHostedSql, runProtected, parseHostedArguments } from "./hosted-target.mjs";
+import { PROJECT_ROOT, SHA, PROJECT_REF, outsideCheckout, privateFile, readHostedTarget, hostedEnvironment, hostedSchemaConnection, runHostedSql, runProtected, parseHostedArguments } from "./hosted-target.mjs";
 import { migrationManifest, readDatabaseState } from "./hosted-release.mjs";
 
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -53,14 +53,14 @@ export function exportBackup(target, { sha, destination, recipient, root = PROJE
   if (!SHA.test(sha ?? "") || !/^age1[0-9a-z]{58}$/.test(recipient ?? "")) throw new Error("Provide the exact source SHA and an age public recipient.");
   const parent = outsideCheckout(destination, root);
   if (!lstatSync(parent).isDirectory() || (lstatSync(parent).mode & 0o077) !== 0) throw new Error("Backup destination must be a private directory.");
+  const comparison = hostedSchemaConnection(target, env, { root });
   const database = state(target, { root, env }), migrations = migrationManifest(root);
   if (database.objects !== 0) throw new Error("Hosted backup requires zero Storage objects in every bucket.");
   if (JSON.stringify(database.versions) !== JSON.stringify(migrations.map((row) => row.version))) throw new Error("Backup checkout must match the complete source migration history.");
   sql(target, readFileSync(join(root, "supabase/maintenance/assert_hosted_ready.sql"), "utf8"), { root, env });
   const childEnv = hostedEnvironment(target, env);
   if (run("git", ["rev-parse", "HEAD"], { cwd: root }).trim() !== sha || run("git", ["status", "--porcelain"], { cwd: root }).trim()) throw new Error("Backup requires a clean checkout of its recorded source SHA.");
-  if (!env.WYP_HOSTED_ACCESS_TOKEN) throw new Error("A scoped access token is required to compare source schema with reviewed migrations.");
-  const drift = run(join(root, "node_modules/.bin/supabase"), ["db", "diff", `--remote=${target.projectRef}`, "--schema", "public,private,auth,storage", "--strict-coverage"], { cwd: root, env: childEnv });
+  const drift = run(join(root, "node_modules/.bin/supabase"), ["db", "diff", `--remote=${comparison.url}`, "--schema", "public,private,auth,storage", "--strict-coverage"], { cwd: root, env: comparison.env });
   if (drift.replace(/^\s*--.*$/gm, "").trim()) throw new Error("Source schema differs from reviewed migrations; reconcile drift before claiming a restorable backup.");
   run("age", ["--version"], { env: childEnv });
   run("pg_dump", ["--version"], { env: childEnv });
