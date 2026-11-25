@@ -17,6 +17,8 @@ describe("caller-scoped RPC repository", () => {
     expect(rpc).toHaveBeenLastCalledWith("start_training_session", {
       p_request_id: "r",
     });
+    await repository.findActiveSessionSummary();
+    expect(rpc).toHaveBeenLastCalledWith("get_active_training_session");
     await repository.findSession("s");
     expect(rpc).toHaveBeenLastCalledWith("get_training_session", {
       p_session_id: "s",
@@ -41,6 +43,12 @@ describe("caller-scoped RPC repository", () => {
     expect(rpc).toHaveBeenLastCalledWith("advance_training_session", {
       p_session_id: "s",
       p_from_item_id: "i",
+      p_request_id: "r",
+      p_expected_revision: 3,
+    });
+    await repository.endSession("s", { requestId: "r", expectedRevision: 3 });
+    expect(rpc).toHaveBeenLastCalledWith("end_training_session", {
+      p_session_id: "s",
       p_request_id: "r",
       p_expected_revision: 3,
     });

@@ -1,4 +1,9 @@
 import type { AnswerResponse, ChallengeDetail } from "./challenge";
+import type { PlaylistSessionMetadata } from "./playlist";
+export type SessionTarget =
+  | { kind: "demo" }
+  | { kind: "scenario"; scenarioId: string }
+  | { kind: "playlist"; playlistId: string };
 
 export type SavedAnswer = {
   id: string;
@@ -13,13 +18,17 @@ export type SessionItem = {
 };
 export type SessionSnapshot = {
   id: string;
-  status: "in_progress" | "completed";
-  phase: "setup" | "review" | "completed";
+  target: SessionTarget;
+  title: string;
+  playlist?: PlaylistSessionMetadata;
+  status: "in_progress" | "completed" | "ended";
+  phase: "setup" | "review" | "completed" | "ended";
   revision: number;
   currentIndex: number | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  endedAt: string | null;
   items: SessionItem[];
 };
 export type SessionMutationResponse = {
@@ -31,18 +40,32 @@ export type CreateSessionResponse = SessionMutationResponse & {
 };
 export type SessionSummary = {
   id: string;
-  status: "in_progress" | "completed";
+  target: SessionTarget;
+  title: string;
+  playlist?: PlaylistSessionMetadata;
+  status: "in_progress" | "completed" | "ended";
   answeredCount: number;
   totalCount: number;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  endedAt: string | null;
 };
 export type SessionHistoryResponse = {
   sessions: SessionSummary[];
   nextCursor: string | null;
 };
-export type StartSessionRequest = { requestId: string };
+export type StartSessionRequest =
+  | {
+      requestId: string;
+      target?: Exclude<SessionTarget, { kind: "playlist" }>;
+      expectedPublicationVersion?: never;
+    }
+  | {
+      requestId: string;
+      target: Extract<SessionTarget, { kind: "playlist" }>;
+      expectedPublicationVersion: string;
+    };
 export type AnswerSessionRequest = {
   optionId: string;
   requestId: string;
@@ -50,6 +73,10 @@ export type AnswerSessionRequest = {
 };
 export type AdvanceSessionRequest = {
   fromItemId: string;
+  requestId: string;
+  expectedRevision: number;
+};
+export type EndSessionRequest = {
   requestId: string;
   expectedRevision: number;
 };

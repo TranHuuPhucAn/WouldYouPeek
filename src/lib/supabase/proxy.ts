@@ -37,9 +37,11 @@ export async function refreshAuthSession(request: NextRequest) {
     },
   );
   const { data } = await client.auth.getClaims();
-  const protectedPath = /^\/(?:play|history|account|creator)(?:\/|$)/.test(
-    request.nextUrl.pathname,
-  );
+  const protectedPath =
+    request.nextUrl.pathname !== "/play" &&
+    /^\/(?:play|history|account|creator|operator)(?:\/|$)/.test(
+      request.nextUrl.pathname,
+    );
   if (!data?.claims.sub && protectedPath) {
     const destination = request.nextUrl.clone();
     destination.pathname = "/sign-in";

@@ -2,6 +2,7 @@ project_id = "would-you-peek"
 
 [api]
 enabled = true
+auto_expose_new_tables = false
 port = 54321
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
@@ -28,7 +29,8 @@ smtp_port = 54325
 pop3_port = 54326
 
 [storage]
-enabled = false
+enabled = true
+file_size_limit = "2GiB"
 
 [auth]
 enabled = true
@@ -39,8 +41,8 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
-minimum_password_length = 12
-password_requirements = "lower_upper_letters_digits"
+minimum_password_length = 8
+password_requirements = "lower_upper_letters_digits_symbols"
 
 [auth.email]
 enabled = true

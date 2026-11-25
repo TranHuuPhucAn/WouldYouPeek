@@ -1,0 +1,77 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+
+select ok(not (select rolcanlogin or rolinherit or rolbypassrls or rolsuper from pg_roles where rolname='wyp_creator_rpc'),'creator function role has no elevated role flags');
+select is((select count(*)::integer from pg_tables where schemaname in ('public','private') and tableowner='wyp_creator_rpc'),0,'creator role owns no tables');
+select ok(not has_schema_privilege('wyp_creator_rpc','auth','USAGE'),'creator role has no managed auth schema access');
+select ok(not has_schema_privilege('wyp_creator_rpc','public','CREATE'),'temporary schema create privilege was removed');
+select ok(not has_column_privilege('wyp_creator_rpc','public.scenarios','creator_id','UPDATE'),'creator cannot transfer ownership');
+select ok(not has_column_privilege('wyp_creator_rpc','public.scenarios','is_demo','UPDATE'),'creator cannot add content to the demo');
+select ok(not has_column_privilege('wyp_creator_rpc','private.scenario_drafts','scenario_id','UPDATE'),'authoring role cannot move a draft to another scenario');
+select ok(not has_column_privilege('wyp_creator_rpc','public.profiles','role','UPDATE'),'creator function role cannot change account roles');
+select ok(not has_table_privilege('authenticated','private.scenario_drafts','SELECT'),'private drafts have no direct caller grant');
+select ok(not has_table_privilege('authenticated','public.scenarios','INSERT'),'caller cannot insert catalogue rows');
+select ok(not has_table_privilege('wyp_creator_rpc','private.scenario_reviews','UPDATE'),'review evidence cannot be updated by authoring role');
+select ok(not has_table_privilege('wyp_creator_rpc','private.creator_commands','DELETE'),'authoring role cannot delete receipts');
+select ok(not has_function_privilege('anon','public.create_creator_scenario(uuid)','EXECUTE'),'anonymous cannot create drafts');
+select ok(has_function_privilege('anon','public.list_library_previews(text,integer,uuid)','EXECUTE'),'guests receive the safe library RPC');
+select ok(not has_function_privilege('authenticated','private.project_creator_publication(text,text,jsonb)','EXECUTE'),'caller cannot invoke the private answer projection');
+select ok(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proowner='wyp_creator_rpc'::regrole and (p.proconfig is null or not ('search_path=""'=any(p.proconfig)))),'every creator function pins an empty search path');
+select ok(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proowner='wyp_creator_rpc'::regrole and n.nspname='private' and (has_function_privilege('anon',p.oid,'EXECUTE') or has_function_privilege('authenticated',p.oid,'EXECUTE'))),'private creator helpers have no client execute grants');
+
+insert into auth.users(id,email,email_confirmed_at) values
+('41000000-0000-4000-8000-000000000001','creator-access-a@example.test',now()),
+('41000000-0000-4000-8000-000000000002','creator-access-b@example.test',now()),
+('41000000-0000-4000-8000-000000000003','creator-access-unverified@example.test',null);
+create temporary table access_state(name text primary key,value jsonb);
+grant select,insert,update on access_state to authenticated;
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"41000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+select throws_ok($$select public.create_creator_scenario('41000000-0000-4000-8000-000000000010')$$,'P0001','CREATOR_REQUIRED','verified learners cannot write creator drafts');
+select public.enable_creator();
+insert into access_state values('created',public.create_creator_scenario('41000000-0000-4000-8000-000000000010'));
+select is((select value->'scenario'->>'revision' from access_state where name='created'),'0','new draft starts at revision zero');
+select is((select value->'scenario'->'publication'->>'state' from access_state where name='created'),'never_published','new draft is private');
+select is((public.create_creator_scenario('41000000-0000-4000-8000-000000000010'))->>'replayed','true','create command replay returns its original draft');
+select is(jsonb_array_length(public.list_creator_scenarios()->'scenarios'),1,'replayed create does not create a second draft');
+select is(jsonb_array_length(public.list_library_previews()->'scenarios'),3,'only the three curated scenarios appear; private draft absent from library');
+select throws_like($$select * from private.scenario_drafts$$,'%permission denied%','creator cannot directly inspect private draft tables');
+select throws_like($$select * from private.scenario_answer_keys$$,'%permission denied%','creator cannot directly inspect answer keys');
+select throws_ok($$select public.get_creator_scenario('bind-clove-utility-window')$$,'P0001','SCENARIO_NOT_FOUND','system demo is not an owned creator draft');
+select throws_ok($$select public.list_creator_scenarios('reviewed')$$,'P0001','INVALID_REQUEST','unsupported status filter rejects');
+select throws_ok(format('select public.save_creator_scenario(%L,%L,0,%L::jsonb)',value->'scenario'->>'id','41000000-0000-4000-8000-000000000011',(value->'scenario'->'draft'->'content'||'{"creator_id":"41000000-0000-4000-8000-000000000002"}'::jsonb)::text),'P0001','INVALID_REQUEST','draft cannot inject an owner field') from access_state where name='created';
+insert into access_state values('second',public.create_creator_scenario('41000000-0000-4000-8000-000000000013'));
+insert into access_state values('page',public.list_creator_scenarios('all',null,1));
+select is(jsonb_array_length(value->'scenarios'),1,'owner page obeys its bounded page size') from access_state where name='page';
+select ok(value->>'nextCursor' is not null,'owner page returns a continuation cursor') from access_state where name='page';
+select is(jsonb_array_length(public.list_creator_scenarios('all',value->>'nextCursor',1)->'scenarios'),1,'cursor returns remaining owner draft') from access_state where name='page';
+select isnt(public.list_creator_scenarios('all',value->>'nextCursor',1)->'scenarios'->0->>'id',value->'scenarios'->0->>'id','equal-timestamp pagination never repeats its first item') from access_state where name='page';
+select throws_ok(format('select public.list_creator_scenarios(%L,%L,1)','published',value->>'nextCursor'),'P0001','INVALID_REQUEST','creator cursor cannot be reused with a different filter') from access_state where name='page';
+select throws_ok($$select public.list_creator_scenarios('all','AA',1)$$,'P0001','INVALID_REQUEST','malformed encoded cursor rejects');
+
+select set_config('request.jwt.claims','{"sub":"41000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+select public.enable_creator();
+select is(jsonb_array_length(public.list_creator_scenarios()->'scenarios'),0,'second creator does not list first creator draft');
+select throws_ok(format('select public.get_creator_scenario(%L)',value->'scenario'->>'id'),'P0001','SCENARIO_NOT_FOUND','foreign draft read hides existence') from access_state where name='created';
+select throws_ok(format('select public.save_creator_scenario(%L,%L,0,%L::jsonb)',value->'scenario'->>'id','41000000-0000-4000-8000-000000000012',(value->'scenario'->'draft'->'content')::text),'P0001','SCENARIO_NOT_FOUND','foreign draft save is rejected') from access_state where name='created';
+select throws_ok(format('select public.get_creator_review_preview(%L,0)',value->'scenario'->>'id'),'P0001','SCENARIO_NOT_FOUND','foreign preview cannot reveal answers') from access_state where name='created';
+select set_config('request.jwt.claims','{"sub":"41000000-0000-4000-8000-000000000003","role":"authenticated"}',true);
+select throws_ok('select public.list_creator_scenarios()','P0001','EMAIL_NOT_VERIFIED','unverified account cannot read creator content');
+select lives_ok('select public.list_library_previews()','unverified account can browse safe library metadata');
+select set_config('request.jwt.claims','{"role":"authenticated"}',true);
+select lives_ok('select public.list_library_previews()','catalogue browsing does not require an identity');
+reset role;
+update auth.users set email_confirmed_at=null where id='41000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"41000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+select throws_ok(format('select public.get_creator_scenario(%L)',value->'scenario'->>'id'),'P0001','EMAIL_NOT_VERIFIED','confirmation revocation rejects an existing creator JWT') from access_state where name='created';
+reset role;
+update auth.users set email_confirmed_at=now() where id='41000000-0000-4000-8000-000000000001';
+update public.profiles set role='learner',creator_enabled_at=null where user_id='41000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select throws_ok(format('select public.get_creator_scenario(%L)',value->'scenario'->>'id'),'P0001','CREATOR_REQUIRED','creator-role revocation rejects an existing verified JWT') from access_state where name='created';
+reset role;
+select * from finish();
+rollback;

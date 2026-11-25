@@ -1,16 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
 import type { AccountUser } from "@/contracts/auth";
 import type { SessionSnapshot } from "@/contracts/session";
+import type { PlaybackMode } from "@/lib/video/segment-controller";
 import { SessionPersistenceNotice } from "@/components/sessions/SessionPersistenceNotice";
-import { useEffect, useRef } from "react";
+import { EndSessionDialog } from "@/components/sessions/EndSessionDialog";
+import { useScenarioReport } from "@/hooks/use-scenario-report";
+import {
+  ReportScenarioDialog,
+  ReportRequestStatus,
+} from "@/components/reports/ReportScenarioDialog";
 import { useChallengeSession } from "@/hooks/use-challenge-session";
-import { ScenarioMedia } from "./ScenarioMedia";
+import { useReviewPresentation } from "@/hooks/use-review-presentation";
 import { DecisionPanel } from "./DecisionPanel";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { SessionRecap } from "./SessionRecap";
-import { YouTubeScenarioPlayer } from "./YouTubeScenarioPlayer";
+import { ScenarioHeader, type ScenarioPhase } from "./ScenarioHeader";
+import { ScenarioContext } from "./ScenarioContext";
+import { ScenarioPlayback } from "./ScenarioPlayback";
+import { ReviewControls } from "./ReviewControls";
 
 export function ChallengePlayer({
   initialSession,
@@ -21,34 +31,76 @@ export function ChallengePlayer({
 }) {
   const session = useChallengeSession(initialSession, viewer.id);
   const { state } = session;
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    if (["setup", "review", "complete"].includes(state.phase))
-      heading.current?.focus();
-  }, [state.phase, state.currentIndex]);
+  const report = useScenarioReport(viewer.id);
+  const [endOpen, setEndOpen] = useState(false);
+  const terminal = state.phase === "complete" || state.phase === "ended";
+  const answeredCount = state.snapshot.items.filter(
+    (item) => item.answer,
+  ).length;
   const challenge = state.challenge;
+  const item = state.snapshot.items[state.currentIndex];
   const isDecision = state.phase === "decision" || state.phase === "submitting";
-  const media = challenge
-    ? isDecision && challenge.decision.kind === "image"
-      ? {
-          kind: "illustration" as const,
-          src: challenge.decision.imageUrl,
-          alt: challenge.decision.alt,
-        }
-      : state.phase === "review" &&
-          state.reviewMedia === "outcome" &&
-          state.feedback
-        ? state.feedback.reveal
-        : challenge.setup
-    : null;
-  const mediaLabel =
-    challenge?.mediaStatus === "demo"
-      ? state.phase === "review" && state.reviewMedia === "outcome"
-        ? "Authored continuation · Illustrative demo"
-        : "Illustrative demo"
-      : state.phase === "review" && state.reviewMedia === "outcome"
-        ? "Recorded outcome"
-        : "Recorded gameplay";
+  const identityChanged = viewer.id !== state.viewerId;
+  const reviewing =
+    !identityChanged && state.phase === "review" && !!state.feedback;
+  const mode: PlaybackMode = isDecision
+    ? "decision"
+    : reviewing
+      ? state.reviewMedia === "outcome"
+        ? "reveal"
+        : "review-setup"
+      : "setup";
+  const scopeKey = JSON.stringify([
+    viewer.id,
+    state.snapshot.id,
+    item?.id,
+    challenge?.contentVersion,
+  ]);
+  const presentation = useReviewPresentation({
+    scopeKey,
+    answerKey: reviewing ? (item?.answer?.id ?? null) : null,
+    mode,
+  });
+  const heading = useRef<HTMLHeadingElement>(null);
+  const analysisHeading = useRef<HTMLHeadingElement>(null);
+  const focusAnalysis = useRef(false);
+  const analysisId = useId();
+  useEffect(() => {
+    heading.current?.focus();
+  }, [state.currentIndex, terminal]);
+  useEffect(() => {
+    if (focusAnalysis.current && presentation.analysisVisible) {
+      focusAnalysis.current = false;
+      viewAnalysis();
+    }
+  }, [presentation.analysisVisible]);
+  function viewAnalysis() {
+    analysisHeading.current?.focus({ preventScroll: true });
+    analysisHeading.current?.scrollIntoView?.({ block: "start" });
+  }
+  function showAnalysis() {
+    focusAnalysis.current = true;
+    presentation.showAnalysis();
+    if (presentation.analysisVisible) {
+      focusAnalysis.current = false;
+      viewAnalysis();
+    }
+  }
+  function showMedia(media: "setup" | "outcome") {
+    presentation.restartPlayback();
+    if (media === "setup") session.showReviewSetup();
+    else session.showReviewOutcome();
+  }
+  const phase: ScenarioPhase =
+    state.phase === "submitting"
+      ? "saving"
+      : isDecision
+        ? "decision"
+        : reviewing
+          ? presentation.analysisVisible
+            ? "analysis"
+            : "continuation"
+          : "setup";
   return (
     <div>
       <SessionPersistenceNotice
@@ -56,44 +108,29 @@ export function ChallengePlayer({
         error={state.error}
         unresolved={state.unresolved}
         onRetry={session.retrySave}
+        ending={session.pendingKind === "end"}
       />
-      {state.phase === "complete" ? (
+      {terminal && !identityChanged ? (
         <>
           <h2 className="sr-only" ref={heading} tabIndex={-1}>
             Session recap
           </h2>
           <SessionRecap
-            completed={state.completed}
+            items={state.snapshot.items}
+            sessionId={state.snapshot.id}
+            viewerId={viewer.id}
             onRestart={session.restart}
             pending={state.pending}
             completedAt={state.snapshot.completedAt}
+            endedAt={state.snapshot.endedAt}
+            status={state.snapshot.status === "ended" ? "ended" : "completed"}
+            title={state.snapshot.title}
+            playlist={state.snapshot.playlist}
           />
         </>
       ) : (
-        <main className="play-shell">
-          <div className="session-topline">
-            <Link href="/" className="text-button">
-              ← Home
-            </Link>
-            <div
-              className="session-progress"
-              aria-label={`Scenario ${state.currentIndex + 1} of ${state.catalogue.length || 3}`}
-            >
-              <span className="mono">
-                {String(state.currentIndex + 1).padStart(2, "0")} /{" "}
-                {String(state.catalogue.length || 3).padStart(2, "0")}
-              </span>
-              <div className="progress-segments" aria-hidden="true">
-                {[0, 1, 2].map((index) => (
-                  <i
-                    key={index}
-                    className={index <= state.currentIndex ? "filled" : ""}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-          {state.phase === "auth-required" ? (
+        <main className="play-shell scenario-player">
+          {state.phase === "auth-required" || identityChanged ? (
             <div className="status-panel">
               <h1>Sign in to continue.</h1>
               <p>Your confirmed progress is saved.</p>
@@ -101,170 +138,170 @@ export function ChallengePlayer({
                 Sign in
               </Link>
             </div>
-          ) : challenge && media ? (
+          ) : challenge && item ? (
             <>
-              <div className="challenge-heading">
-                <span className="eyebrow">
-                  SCENARIO {String(state.currentIndex + 1).padStart(2, "0")}{" "}
-                  <span className="eyebrow-separator">/</span> {challenge.topic}
-                </span>
-                <h1 ref={heading} tabIndex={-1}>
-                  {challenge.title}
-                </h1>
-              </div>
-              <div className="challenge-grid">
-                <div className="challenge-main">
-                  {challenge.setup.kind === "youtube" ? (
-                    <YouTubeScenarioPlayer
-                      key={challenge.id}
-                      setup={challenge.setup}
-                      reveal={
-                        state.feedback?.reveal.kind === "youtube"
-                          ? state.feedback.reveal
-                          : undefined
-                      }
-                      mode={
-                        isDecision
-                          ? "decision"
-                          : state.phase === "review"
-                            ? state.reviewMedia === "outcome"
-                              ? "reveal"
-                              : "review-setup"
-                            : "setup"
-                      }
-                      onComplete={session.completeSetup}
-                    />
-                  ) : (
-                    <ScenarioMedia
-                      key={`${challenge.id}-${state.phase === "setup" ? "setup" : isDecision ? "decision" : state.reviewMedia}`}
-                      media={media}
-                      label={mediaLabel}
-                      onComplete={
-                        state.phase === "setup"
-                          ? session.completeSetup
-                          : undefined
-                      }
-                    />
-                  )}
-                  {isDecision && (
-                    <DecisionPanel
-                      question={challenge.question}
-                      options={challenge.options}
-                      selectedOptionId={state.selectedOptionId}
-                      pending={state.phase === "submitting" || state.unresolved}
-                      error={state.error}
-                      onSelect={session.selectOption}
-                      onSubmit={session.submitSelection}
-                      onReplay={session.replaySetup}
-                    />
-                  )}
-                  {state.phase === "review" && state.feedback && (
+              <ScenarioHeader
+                challenge={challenge}
+                phase={phase}
+                index={state.currentIndex}
+                total={state.snapshot.items.length}
+                title={
+                  state.snapshot.playlist ? state.snapshot.title : undefined
+                }
+                playlist={state.snapshot.playlist}
+                headingRef={heading}
+              />
+              <ScenarioPlayback
+                key={scopeKey}
+                challenge={challenge}
+                answer={reviewing ? state.feedback : null}
+                mode={mode}
+                context={{
+                  kind: "session-item",
+                  sessionId: state.snapshot.id,
+                  itemId: item.id,
+                  phase: mode === "reveal" ? "reveal" : "setup",
+                }}
+                analysisVisible={presentation.analysisVisible}
+                playbackKey={presentation.playbackKey}
+                autoplay={presentation.autoplay}
+                suspended={
+                  endOpen ||
+                  report.open ||
+                  (session.pendingKind === "end" &&
+                    (state.pending || state.unresolved))
+                }
+                onPlaybackEvent={presentation.onPlaybackEvent}
+                onComplete={session.completeSetup}
+                onReadAnalysis={showAnalysis}
+              />
+              <ScenarioContext challenge={challenge} />
+              {state.phase === "setup" && (
+                <div className="scenario-watch-note">
+                  <span className="eyebrow">WATCH THE SETUP</span>
+                  <h2>Your call is coming up.</h2>
+                  <p>
+                    Read the situation. You will choose when the video pauses.
+                  </p>
+                </div>
+              )}
+              {isDecision && (
+                <DecisionPanel
+                  question={challenge.question}
+                  options={challenge.options}
+                  selectedOptionId={state.selectedOptionId}
+                  pending={
+                    state.pending ||
+                    state.phase === "submitting" ||
+                    state.unresolved
+                  }
+                  error={state.error}
+                  onSelect={session.selectOption}
+                  onSubmit={session.submitSelection}
+                  onReplay={() => {
+                    presentation.restartPlayback();
+                    session.replaySetup();
+                  }}
+                />
+              )}
+              {reviewing && state.feedback && (
+                <>
+                  <p className="sr-only" role="status">
+                    {presentation.analysisVisible
+                      ? "Analysis ready. Your choice is saved."
+                      : "Your choice is saved. Watch the continuation."}
+                  </p>
+                  {presentation.analysisVisible && (
                     <FeedbackPanel
                       challenge={challenge}
                       answer={state.feedback}
-                      reviewMedia={state.reviewMedia}
-                      finalChallenge={
-                        state.currentIndex === state.catalogue.length - 1
-                      }
-                      onShowSetup={session.showReviewSetup}
-                      onShowOutcome={session.showReviewOutcome}
-                      onNext={session.nextChallenge}
-                      pending={state.pending}
+                      headingId={analysisId}
+                      headingRef={analysisHeading}
                     />
                   )}
+                  <ReviewControls
+                    analysisVisible={presentation.analysisVisible}
+                    status={presentation.status}
+                    analysisId={analysisId}
+                    reviewMedia={state.reviewMedia}
+                    onShowAnalysis={showAnalysis}
+                    onViewAnalysis={viewAnalysis}
+                    onShowSetup={() => showMedia("setup")}
+                    onShowOutcome={() => showMedia("outcome")}
+                    onNext={session.nextChallenge}
+                    nextLabel={
+                      state.currentIndex === state.snapshot.items.length - 1
+                        ? "Finish session"
+                        : "Next scenario"
+                    }
+                    pending={state.pending}
+                  />
+                </>
+              )}
+              {answeredCount < state.snapshot.items.length && (
+                <div className="session-end-action" tabIndex={-1}>
+                  <button
+                    className="text-button"
+                    disabled={state.pending || state.unresolved || report.open}
+                    onClick={() => setEndOpen(true)}
+                  >
+                    End session early
+                  </button>
+                  {(state.pending || state.unresolved) && (
+                    <p className="quiet-note">
+                      Confirm the pending save before ending this session.
+                    </p>
+                  )}
                 </div>
-                <aside className="context-panel">
-                  <span className="eyebrow">ROUND INTEL</span>
-                  <h2>The situation</h2>
-                  <p>{challenge.context}</p>
-                  {challenge.linkedScenarioId && (
-                    <p className="linked-note">
-                      Linked follow-up · Same round, a new balance of risk.
-                    </p>
-                  )}
-                  {challenge.source && (
-                    <div className="source-attribution">
-                      <span className="mono">
-                        {challenge.source.player} · {challenge.source.agent} ·{" "}
-                        {challenge.source.map}
-                      </span>
-                      <p>
-                        Round {challenge.source.round} ·{" "}
-                        {challenge.source.score} ·{" "}
-                        {challenge.source.side === "attack"
-                          ? "Attacking"
-                          : "Defending"}
-                      </p>
-                      <a
-                        href={challenge.source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Source: {challenge.source.uploader} ↗
-                      </a>
-                      <p className="source-note">
-                        {challenge.source.matchType === "ranked"
-                          ? "Ranked player recording"
-                          : "Tournament recording"}
-                        . Opening the source can reveal the outcome.
-                      </p>
-                    </div>
-                  )}
-                  {challenge.knownFacts?.length ? (
-                    <div className="context-facts">
-                      <h3>Available information</h3>
-                      <ul>
-                        {challenge.knownFacts.map((fact) => (
-                          <li key={fact}>{fact}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {challenge.unknowns?.length ? (
-                    <details className="context-unknowns">
-                      <summary>What remains unknown</summary>
-                      <ul>
-                        {challenge.unknowns.map((fact) => (
-                          <li key={fact}>{fact}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  ) : null}
-                  <div className="context-divider" />
-                  <div className="intel-tip">
-                    <span className="tip-symbol" aria-hidden="true">
-                      ↗
-                    </span>
-                    <div>
-                      <h3>Use what you know.</h3>
-                      <p>
-                        Consider the information available now. The result comes
-                        after your call.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="demo-notice">
-                    <span className="mono">
-                      {challenge.mediaStatus === "demo"
-                        ? "ILLUSTRATIVE DEMO"
-                        : "RECORDED SCENARIO"}
-                    </span>
-                    <p>
-                      {challenge.mediaStatus === "demo"
-                        ? "An original training diagram with an authored continuation. Not recorded Valorant footage."
-                        : "Review the setup before choosing your next action."}
-                    </p>
-                  </div>
-                </aside>
+              )}
+              <div className="report-entry">
+                <button
+                  className="text-button"
+                  disabled={
+                    state.pending ||
+                    state.unresolved ||
+                    endOpen ||
+                    report.invalid
+                  }
+                  onClick={() =>
+                    report.begin({
+                      kind: "session-item",
+                      sessionId: state.snapshot.id,
+                      itemId: item.id,
+                    })
+                  }
+                >
+                  Report a problem
+                </button>
               </div>
             </>
           ) : null}
         </main>
       )}
+      <EndSessionDialog
+        open={
+          endOpen &&
+          !terminal &&
+          !identityChanged &&
+          state.phase !== "auth-required"
+        }
+        answeredCount={answeredCount}
+        totalCount={state.snapshot.items.length}
+        hasUnsubmittedChoice={!!state.selectedOptionId && !item?.answer}
+        pending={state.pending}
+        unresolved={state.unresolved}
+        error={state.error}
+        onClose={() => setEndOpen(false)}
+        onRetry={session.retrySave}
+        onConfirm={() => void session.endSessionEarly(state.snapshot.revision)}
+      />
+      <ReportRequestStatus report={report} />
+      <ReportScenarioDialog report={report} />
       <footer className="site-footer">
         <span>MAKE THE CALL. THEN LEARN WHY.</span>
         <span>
-          Would You Peek? <span className="footer-dot">·</span> POV Demo
+          Would You Peek? <span className="footer-dot">·</span> Player POV
+          practice
         </span>
       </footer>
     </div>

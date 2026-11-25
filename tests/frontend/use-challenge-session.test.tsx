@@ -13,6 +13,7 @@ vi.mock("@/components/auth/AuthStateSync", () => ({
 vi.mock("@/lib/client/session-api", () => ({
   answerSessionItem: vi.fn(),
   advanceSession: vi.fn(),
+  endSession: vi.fn(),
   getSession: vi.fn(),
   createOrResumeSession: vi.fn(),
   validateSessionContinuity: vi.fn(),
@@ -22,6 +23,9 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ session: snapshot("review"), replayed: false });
   vi.mocked(api.getSession).mockReset().mockResolvedValue(snapshot());
+  vi.mocked(api.endSession)
+    .mockReset()
+    .mockResolvedValue({ session: snapshot("ended"), replayed: false });
   vi.mocked(api.advanceSession)
     .mockReset()
     .mockResolvedValue({ session: snapshot("setup", 1), replayed: false });
@@ -177,5 +181,115 @@ describe("durable command coordination", () => {
     expect(router.push).toHaveBeenCalledWith(
       "/play/55555555-5555-4555-8555-555555555555",
     );
+  });
+});
+
+describe("selected scenario replay", () => {
+  it("starts the original scenario target again and retains its UUID on a lost response", async () => {
+    const { selectedSnapshot } = await import("./creator-fixtures");
+    const selected = selectedSnapshot("completed");
+    vi.mocked(api.createOrResumeSession)
+      .mockReset()
+      .mockRejectedValueOnce(new Error("Lost response"))
+      .mockResolvedValueOnce({
+        session: selectedSnapshot(),
+        created: true,
+        replayed: false,
+      });
+    const { result } = renderHook(() =>
+      useChallengeSession(selected, viewer.id),
+    );
+    await act(() => result.current.createNextSession());
+    await act(() => result.current.createNextSession());
+    const calls = vi.mocked(api.createOrResumeSession).mock.calls;
+    expect(calls[0][0].target).toEqual(selected.target);
+    expect(calls[1][0]).toEqual(calls[0][0]);
+  });
+  it("retains the saved recap when a scenario has been withdrawn", async () => {
+    const { selectedSnapshot } = await import("./creator-fixtures");
+    vi.mocked(api.createOrResumeSession)
+      .mockReset()
+      .mockRejectedValueOnce(
+        new ApiClientError("SCENARIO_UNAVAILABLE", "Unavailable", 404),
+      );
+    const { result } = renderHook(() =>
+      useChallengeSession(selectedSnapshot("completed"), viewer.id),
+    );
+    await act(() => result.current.createNextSession());
+    expect(result.current.state.phase).toBe("complete");
+    expect(result.current.state.completed).toHaveLength(1);
+    expect(result.current.state.error).toMatch(/no longer available/);
+  });
+});
+
+describe("ending durable sessions", () => {
+  it("recovers a lost end response without repeating or fabricating the end", async () => {
+    vi.mocked(api.endSession).mockRejectedValueOnce(new Error("lost"));
+    vi.mocked(api.getSession).mockResolvedValueOnce(snapshot("ended"));
+    const { result } = ready();
+    await act(() => result.current.endSessionEarly(0));
+    expect(result.current.state.phase).toBe("ended");
+    expect(result.current.state.challenge).toBeNull();
+    expect(api.endSession).toHaveBeenCalledTimes(1);
+  });
+  it("retains the exact end UUID after uncertain failure and blocks answers", async () => {
+    vi.mocked(api.endSession).mockRejectedValueOnce(new Error("offline"));
+    vi.mocked(api.getSession).mockRejectedValueOnce(new Error("offline"));
+    const { result } = ready();
+    await act(() => result.current.endSessionEarly(0));
+    expect(result.current.state.unresolved).toBe(true);
+    expect(result.current.pendingKind).toBe("end");
+    await act(() => result.current.retrySave());
+    expect(vi.mocked(api.endSession).mock.calls[0].slice(0, 2)).toEqual(
+      vi.mocked(api.endSession).mock.calls[1].slice(0, 2),
+    );
+    expect(result.current.state.phase).toBe("ended");
+    expect(api.answerSessionItem).not.toHaveBeenCalled();
+  });
+  it("requires a fresh confirmation after another tab answers first", async () => {
+    vi.mocked(api.endSession).mockRejectedValueOnce(
+      new ApiClientError("SESSION_CONFLICT", "changed", 409),
+    );
+    vi.mocked(api.getSession).mockResolvedValueOnce(snapshot("review"));
+    const { result } = ready();
+    await act(() => result.current.endSessionEarly(0));
+    expect(result.current.state.snapshot.revision).toBe(1);
+    expect(result.current.state.error).toMatch(/confirm again/);
+    await act(() => result.current.retrySave());
+    await act(() => result.current.endSessionEarly(0));
+    expect(api.endSession).toHaveBeenCalledTimes(1);
+    vi.mocked(api.endSession).mockResolvedValueOnce({
+      session: { ...snapshot("ended", 1), revision: 2 },
+      replayed: false,
+    });
+    await act(() => result.current.endSessionEarly(1));
+    expect(api.endSession).toHaveBeenCalledTimes(2);
+    expect(result.current.state.phase).toBe("ended");
+  });
+  it("does not end a fully answered run or race an answer save", async () => {
+    const full = renderHook(() =>
+      useChallengeSession(snapshot("review", 2), viewer.id),
+    );
+    await act(() => full.result.current.endSessionEarly(5));
+    expect(api.endSession).not.toHaveBeenCalled();
+    full.unmount();
+    vi.mocked(api.answerSessionItem).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const { result } = ready();
+    act(() => {
+      void result.current.submitSelection();
+      void result.current.endSessionEarly(0);
+    });
+    expect(api.endSession).not.toHaveBeenCalled();
+  });
+  it("settles an uncertain answer when the canonical session was externally ended", async () => {
+    vi.mocked(api.answerSessionItem).mockRejectedValueOnce(new Error("lost"));
+    vi.mocked(api.getSession).mockResolvedValueOnce(snapshot("ended"));
+    const { result } = ready();
+    await act(() => result.current.submitSelection());
+    expect(result.current.state.phase).toBe("ended");
+    expect(result.current.state.unresolved).toBe(false);
+    expect(result.current.state.completed).toHaveLength(0);
   });
 });

@@ -51,12 +51,43 @@ it("does not submit a mismatched confirmation", async () => {
   const user = userEvent.setup();
   render(<SignUpForm />);
   await user.type(screen.getByLabelText("Email"), "learner@example.test");
-  await user.type(screen.getByLabelText("New password"), "LongPassword123");
-  await user.type(screen.getByLabelText("Confirm password"), "Different123");
+  await user.type(screen.getByLabelText("New password"), "Abcd123!");
+  await user.type(screen.getByLabelText("Confirm password"), "Different123!");
   await user.click(screen.getByRole("button", { name: "Create account" }));
   expect(actions.signUpAction).not.toHaveBeenCalled();
   expect(screen.getByLabelText("Confirm password")).toBeInvalid();
 });
+it.each([
+  { Form: SignUpForm, label: "Create account", action: actions.signUpAction },
+  {
+    Form: ResetPasswordForm,
+    label: "Update password",
+    action: actions.updatePasswordAction,
+  },
+])(
+  "accepts an eight-character password in $label",
+  async ({ Form, label, action }) => {
+    const user = userEvent.setup();
+    render(<Form />);
+    const email = screen.queryByLabelText("Email");
+    if (email) await user.type(email, "learner@example.test");
+    const password = screen.getByLabelText("New password");
+    const confirmation = screen.getByLabelText("Confirm password");
+    expect(password).toHaveAttribute("minlength", "8");
+    expect(confirmation).toHaveAttribute("minlength", "8");
+    expect(password).toHaveAttribute("maxlength", "128");
+    expect(password).toHaveAccessibleDescription(
+      "Use 8–128 characters with uppercase, lowercase, a number and a symbol.",
+    );
+    await user.type(password, "Abcd123!");
+    await user.type(confirmation, "Abcd123!");
+    await user.click(screen.getByRole("button", { name: label }));
+    await screen.findByRole("status");
+    const data = vi.mocked(action).mock.calls.at(-1)![1];
+    expect(data.get("password")).toBe("Abcd123!");
+    expect(data.get("confirmPassword")).toBe("Abcd123!");
+  },
+);
 it("shows generic reset response without revealing account existence", async () => {
   const user = userEvent.setup();
   render(<ForgotPasswordForm />);
@@ -68,12 +99,20 @@ it("shows generic reset response without revealing account existence", async () 
 });
 it("supports verification resend", async () => {
   const user = userEvent.setup();
-  render(<ResendVerificationForm />);
+  render(
+    <ResendVerificationForm returnTo="/library/tenz-bind-clove-utility-before-contact" />,
+  );
   await user.type(screen.getByLabelText("Email"), "learner@example.test");
   await user.click(
     screen.getByRole("button", { name: "Resend verification email" }),
   );
   expect(await screen.findByRole("status")).toHaveTextContent("fresh link");
+  expect(
+    vi
+      .mocked(actions.resendVerificationAction)
+      .mock.calls.at(-1)?.[1]
+      .get("returnTo"),
+  ).toBe("/library/tenz-bind-clove-utility-before-contact");
 });
 it("disables repeated submissions during recovery", async () => {
   let resolve!: (value: { status: "success"; message: string }) => void;
@@ -82,12 +121,28 @@ it("disables repeated submissions during recovery", async () => {
   );
   const user = userEvent.setup();
   render(<ResetPasswordForm />);
-  await user.type(screen.getByLabelText("New password"), "LongPassword123");
-  await user.type(screen.getByLabelText("Confirm password"), "LongPassword123");
+  await user.type(screen.getByLabelText("New password"), "Abcd123!");
+  await user.type(screen.getByLabelText("Confirm password"), "Abcd123!");
   await user.click(screen.getByRole("button", { name: "Update password" }));
   expect(screen.getByRole("button", { name: "Please wait…" })).toBeDisabled();
   resolve({ status: "success", message: "Updated" });
   await waitFor(() =>
     expect(screen.getByRole("status")).toHaveTextContent("Updated"),
+  );
+});
+
+it("keeps the selected scenario in verification links and Library as the default", () => {
+  const view = render(
+    <SignInForm returnTo="/library/tenz-bind-clove-utility-before-contact" />,
+  );
+  const href = screen
+    .getByRole("link", { name: "Resend verification" })
+    .getAttribute("href")!;
+  expect(new URL(href, "http://localhost").searchParams.get("returnTo")).toBe(
+    "/library/tenz-bind-clove-utility-before-contact",
+  );
+  view.rerender(<SignInForm />);
+  expect(document.querySelector('input[name="returnTo"]')).toHaveValue(
+    "/library",
   );
 });

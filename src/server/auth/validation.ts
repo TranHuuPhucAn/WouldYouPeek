@@ -1,5 +1,13 @@
 import "server-only";
-import type { AuthFormState } from "@/contracts/auth";
+import {
+  NEW_PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  NEW_PASSWORD_HINT,
+  type AuthFormState,
+} from "@/contracts/auth";
+
+// Supabase Auth's supported symbol set; whitespace alone is not a symbol.
+const PASSWORD_SYMBOLS = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~";
 
 export class AuthValidationError extends Error {
   constructor(
@@ -34,27 +42,33 @@ function email(value: unknown): string {
 function password(value: unknown, newPassword: boolean): string {
   if (
     typeof value !== "string" ||
-    value.length < (newPassword ? 12 : 1) ||
-    value.length > 128 ||
+    value.length < (newPassword ? NEW_PASSWORD_MIN_LENGTH : 1) ||
+    value.length > PASSWORD_MAX_LENGTH ||
     (newPassword &&
-      (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/[0-9]/.test(value)))
+      (!/[A-Z]/.test(value) ||
+        !/[a-z]/.test(value) ||
+        !/[0-9]/.test(value) ||
+        ![...value].some((character) => PASSWORD_SYMBOLS.includes(character))))
   )
     throw new AuthValidationError({
-      password: newPassword
-        ? "Use 12–128 characters with uppercase, lowercase and a number."
-        : "Enter your password.",
+      password: newPassword ? NEW_PASSWORD_HINT : "Enter your password.",
     });
   return value;
 }
 export function parseSignInInput(value: unknown) {
-  const input = record(value, ["email", "password"]);
+  const input = record(value, ["email", "password", "captchaToken"]);
   return {
     email: email(input.email),
     password: password(input.password, false),
   };
 }
 export function parseSignUpInput(value: unknown) {
-  const input = record(value, ["email", "password", "confirmPassword"]);
+  const input = record(value, [
+    "email",
+    "password",
+    "confirmPassword",
+    "captchaToken",
+  ]);
   return {
     email: email(input.email),
     ...parseNewPassword({
@@ -64,7 +78,7 @@ export function parseSignUpInput(value: unknown) {
   };
 }
 export function parseResetRequest(value: unknown) {
-  const input = record(value, ["email"]);
+  const input = record(value, ["email", "captchaToken"]);
   return { email: email(input.email) };
 }
 export function parseNewPassword(value: unknown) {

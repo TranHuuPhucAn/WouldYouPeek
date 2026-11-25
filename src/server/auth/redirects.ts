@@ -1,11 +1,50 @@
 import "server-only";
 import { getServerAppConfig } from "@/server/config";
+import { isScenarioId } from "@/lib/scenario-id";
 
-const destinations =
-  /^\/(?:play(?:\/[0-9a-f-]{36})?|history|account|creator|demo)$/i;
-export function safeReturnTo(value: unknown, fallback = "/play"): string {
-  if (typeof value !== "string" || !destinations.test(value)) return fallback;
-  return value;
+const uuid =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const entryPaths = new Set([
+  "/",
+  "/library",
+  "/play",
+  "/history",
+  "/account",
+  "/creator",
+  "/creator/videos",
+  "/creator/playlists",
+  "/library/playlists",
+  "/demo",
+  "/operator/reports",
+]);
+function isReturnPath(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 512) return false;
+  if (entryPaths.has(value)) return true;
+  const parts = value.split("/");
+  if (parts[0] !== "") return false;
+  if (parts.length === 3 && parts[1] === "play") return uuid.test(parts[2]);
+  if (parts.length === 4 && parts[1] === "operator" && parts[2] === "reports")
+    return uuid.test(parts[3]);
+  if (parts.length === 3 && parts[1] === "library")
+    return (
+      !["players", "playlists"].includes(parts[2]) && isScenarioId(parts[2])
+    );
+  if (
+    parts.length === 4 &&
+    parts[1] === "library" &&
+    ["players", "playlists"].includes(parts[2])
+  )
+    return uuid.test(parts[3]);
+  return (
+    (parts.length === 4 || (parts.length === 5 && parts[4] === "review")) &&
+    parts[1] === "creator" &&
+    ["scenarios", "playlists"].includes(parts[2]) &&
+    uuid.test(parts[3])
+  );
+}
+export function safeReturnTo(value: unknown, fallback = "/library"): string {
+  if (isReturnPath(value)) return value;
+  return isReturnPath(fallback) ? fallback : "/library";
 }
 export function buildAuthRedirect(
   type: "signup" | "recovery",

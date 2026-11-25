@@ -2,13 +2,17 @@ import type {
   AdvanceSessionRequest,
   AnswerSessionRequest,
   CreateSessionResponse,
+  EndSessionRequest,
   SessionHistoryResponse,
   SessionMutationResponse,
   SessionSnapshot,
   SessionSummary,
   StartSessionRequest,
+  SessionTarget,
 } from "@/contracts/session";
 import { ApiClientError, readApiResponse } from "./api-response";
+import { parsePlaylistSessionMetadata } from "./playlist-validation";
+import { isScenarioId } from "@/lib/scenario-id";
 import {
   invalidResponse,
   isRecord,
@@ -29,6 +33,28 @@ export const isDate = (value: unknown): value is string =>
 const isCount = (value: unknown): value is number =>
   Number.isSafeInteger(value) && Number(value) >= 0;
 
+export function parseSessionTarget(value: unknown): SessionTarget {
+  if (!isRecord(value)) invalidResponse();
+  if (value.kind === "demo" && Object.keys(value).length === 1)
+    return { kind: "demo" };
+  if (
+    value.kind === "scenario" &&
+    isScenarioId(value.scenarioId) &&
+    Object.keys(value).length === 2
+  )
+    return { kind: "scenario", scenarioId: value.scenarioId };
+  if (
+    value.kind === "playlist" &&
+    isUuid(value.playlistId) &&
+    Object.keys(value).length === 2
+  )
+    return { kind: "playlist", playlistId: value.playlistId };
+  return invalidResponse();
+}
+function requireTitle(value: unknown) {
+  if (typeof value !== "string" || !value.trim() || value.length > 300)
+    invalidResponse();
+}
 export function parseSessionSnapshot(
   value: unknown,
   expectedId?: string,
@@ -45,11 +71,37 @@ export function parseSessionSnapshot(
   )
     invalidResponse();
   const body = value as SessionSnapshot;
+  parseSessionTarget(body.target);
+  requireTitle(body.title);
+  if (body.target.kind === "playlist") {
+    body.playlist = parsePlaylistSessionMetadata(body.playlist);
+    if (
+      body.items.length > 20 ||
+      body.playlist.players.length > body.items.length
+    )
+      invalidResponse();
+  } else if (body.playlist !== undefined) invalidResponse();
+  if (
+    body.target.kind === "scenario" &&
+    (body.items.length !== 1 ||
+      body.items[0].challenge.id !== body.target.scenarioId)
+  )
+    invalidResponse();
   if (body.status === "completed") {
     if (
       body.phase !== "completed" ||
       body.currentIndex !== null ||
-      !isDate(body.completedAt)
+      !isDate(body.completedAt) ||
+      body.endedAt !== null
+    )
+      invalidResponse();
+  } else if (body.status === "ended") {
+    if (
+      body.phase !== "ended" ||
+      body.currentIndex !== null ||
+      body.completedAt !== null ||
+      !isDate(body.endedAt) ||
+      Date.parse(body.endedAt) !== Date.parse(body.updatedAt)
     )
       invalidResponse();
   } else if (
@@ -57,12 +109,15 @@ export function parseSessionSnapshot(
     !["setup", "review"].includes(body.phase) ||
     !isCount(body.currentIndex) ||
     body.currentIndex >= body.items.length ||
-    body.completedAt !== null
+    body.completedAt !== null ||
+    body.endedAt !== null
   )
     invalidResponse();
   const ids = new Set<string>();
   const answerIds = new Set<string>();
   const challengeIds = new Set<string>();
+  let unansweredSeen = false;
+  let lastAnsweredAt = Date.parse(body.createdAt);
   body.items.forEach((item, index) => {
     if (
       !isRecord(item) ||
@@ -77,19 +132,26 @@ export function parseSessionSnapshot(
     challengeIds.add(challenge.id);
     const needsAnswer =
       body.status === "completed" ||
+      (body.status === "ended" && item.answer !== null) ||
       index < body.currentIndex! ||
       (index === body.currentIndex && body.phase === "review");
     if (!needsAnswer) {
       if (item.answer !== null) invalidResponse();
+      unansweredSeen = true;
       return;
     }
     if (
+      unansweredSeen ||
       !isRecord(item.answer) ||
       !isUuid(item.answer.id) ||
       answerIds.has(item.answer.id) ||
       !isDate(item.answer.answeredAt)
     )
       invalidResponse();
+    const answeredAt = Date.parse(item.answer.answeredAt);
+    if (answeredAt < lastAnsweredAt || answeredAt > Date.parse(body.updatedAt))
+      invalidResponse();
+    lastAnsweredAt = answeredAt;
     answerIds.add(item.answer.id);
     validateAnswerForChallenge(
       parseAnswerResponse(item.answer.result),
@@ -101,13 +163,43 @@ export function parseSessionSnapshot(
     body.status === "completed"
       ? body.items.length * 2
       : body.currentIndex! * 2 + (body.phase === "review" ? 1 : 0);
+  const revisionValid =
+    body.status === "ended"
+      ? answered < body.items.length &&
+        (body.revision === answered * 2 + 1 ||
+          (answered > 0 && body.revision === answered * 2))
+      : body.revision === expectedRevision;
+  const terminalAt = body.endedAt ?? body.completedAt;
   if (
-    body.revision !== expectedRevision ||
+    !revisionValid ||
     answered > body.items.length ||
-    Date.parse(body.updatedAt) < Date.parse(body.createdAt)
+    Date.parse(body.updatedAt) < Date.parse(body.createdAt) ||
+    (terminalAt !== null &&
+      (Date.parse(terminalAt) < lastAnsweredAt ||
+        Date.parse(terminalAt) > Date.parse(body.updatedAt)))
   )
     invalidResponse();
   return body;
+}
+
+function sameJsonValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((item, i) => sameJsonValue(item, right[i]))
+    );
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const keys = Object.keys(left);
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every(
+      (key) =>
+        Object.hasOwn(right, key) && sameJsonValue(left[key], right[key]),
+    )
+  );
 }
 
 /** A saved run keeps its original scenario versions across every command. */
@@ -117,6 +209,23 @@ export function validateSessionContinuity(
 ): void {
   if (
     next.id !== previous.id ||
+    next.createdAt !== previous.createdAt ||
+    next.revision < previous.revision ||
+    Date.parse(next.updatedAt) < Date.parse(previous.updatedAt) ||
+    (next.revision === previous.revision &&
+      (next.phase !== previous.phase ||
+        next.currentIndex !== previous.currentIndex ||
+        next.status !== previous.status ||
+        next.updatedAt !== previous.updatedAt)) ||
+    (previous.status !== "in_progress" &&
+      (next.status !== previous.status ||
+        next.revision !== previous.revision ||
+        next.completedAt !== previous.completedAt ||
+        next.endedAt !== previous.endedAt ||
+        next.updatedAt !== previous.updatedAt)) ||
+    next.title !== previous.title ||
+    JSON.stringify(next.playlist) !== JSON.stringify(previous.playlist) ||
+    JSON.stringify(next.target) !== JSON.stringify(previous.target) ||
     next.items.length !== previous.items.length ||
     next.items.some((item, index) => {
       const before = previous.items[index];
@@ -125,11 +234,14 @@ export function validateSessionContinuity(
         item.position !== before.position ||
         item.challenge.id !== before.challenge.id ||
         item.challenge.contentVersion !== before.challenge.contentVersion ||
+        !sameJsonValue(item.challenge, before.challenge) ||
         (before.answer !== null &&
-          (!item.answer ||
-            item.answer.id !== before.answer.id ||
-            item.answer.result.selectedOptionId !==
-              before.answer.result.selectedOptionId))
+          !sameJsonValue(item.answer, before.answer)) ||
+        (next.revision === previous.revision &&
+          !sameJsonValue(item.answer, before.answer)) ||
+        (previous.status !== "in_progress" &&
+          before.answer === null &&
+          item.answer !== null)
       );
     })
   )
@@ -140,16 +252,44 @@ export function parseSessionSummary(value: unknown): SessionSummary {
   if (
     !isRecord(value) ||
     !isUuid(value.id) ||
-    !["in_progress", "completed"].includes(String(value.status)) ||
+    !["in_progress", "completed", "ended"].includes(String(value.status)) ||
     !isCount(value.answeredCount) ||
     !isCount(value.totalCount) ||
     value.totalCount === 0 ||
     value.answeredCount > value.totalCount ||
     !isDate(value.createdAt) ||
     !isDate(value.updatedAt) ||
+    Date.parse(value.updatedAt) < Date.parse(value.createdAt) ||
     (value.status === "completed"
-      ? !isDate(value.completedAt) || value.answeredCount !== value.totalCount
-      : value.completedAt !== null)
+      ? !isDate(value.completedAt) ||
+        value.answeredCount !== value.totalCount ||
+        value.endedAt !== null
+      : value.status === "ended"
+        ? !isDate(value.endedAt) ||
+          Date.parse(value.endedAt) !== Date.parse(value.updatedAt) ||
+          value.completedAt !== null ||
+          value.answeredCount >= value.totalCount
+        : value.completedAt !== null || value.endedAt !== null)
+  )
+    invalidResponse();
+  const terminalAt = value.endedAt ?? value.completedAt;
+  if (
+    terminalAt !== null &&
+    (Date.parse(terminalAt as string) < Date.parse(value.createdAt) ||
+      Date.parse(terminalAt as string) > Date.parse(value.updatedAt))
+  )
+    invalidResponse();
+  parseSessionTarget(value.target);
+  requireTitle(value.title);
+  if ((value.target as SessionTarget).kind === "playlist") {
+    const playlist = parsePlaylistSessionMetadata(value.playlist);
+    value.playlist = playlist;
+    if (value.totalCount > 20 || playlist.players.length > value.totalCount)
+      invalidResponse();
+  } else if (value.playlist !== undefined) invalidResponse();
+  if (
+    (value.target as SessionTarget).kind === "scenario" &&
+    value.totalCount !== 1
   )
     invalidResponse();
   return value as SessionSummary;
@@ -214,9 +354,33 @@ export async function createOrResumeSession(
   signal?: AbortSignal,
 ): Promise<CreateSessionResponse> {
   requireCommand(input.requestId);
+  if (input.target !== undefined) parseSessionTarget(input.target);
+  if (
+    input.target?.kind === "playlist"
+      ? !isUuid(input.expectedPublicationVersion)
+      : input.expectedPublicationVersion !== undefined
+  )
+    throw new ApiClientError(
+      "INVALID_REQUEST",
+      "Refresh the playlist preview before starting.",
+      400,
+    );
   const value = await request("/api/sessions", signal, input);
   if (!isRecord(value) || typeof value.created !== "boolean") invalidResponse();
-  return { ...mutation(value), created: value.created };
+  const result = { ...mutation(value), created: value.created };
+  if (
+    input.target &&
+    JSON.stringify(input.target) !== JSON.stringify(result.session.target)
+  )
+    invalidResponse();
+  if (
+    input.target?.kind === "playlist" &&
+    result.created &&
+    result.session.playlist?.publicationVersion !==
+      input.expectedPublicationVersion
+  )
+    invalidResponse();
+  return result;
 }
 export async function getSession(id: string, signal?: AbortSignal) {
   requireId(id);
@@ -281,9 +445,28 @@ export async function advanceSession(
   );
   if (
     !item?.answer ||
-    (result.session.status !== "completed" &&
+    (result.session.status === "in_progress" &&
       result.session.currentIndex! <= item.position)
   )
     invalidResponse();
+  return result;
+}
+
+export async function endSession(
+  sessionId: string,
+  input: EndSessionRequest,
+  signal?: AbortSignal,
+) {
+  requireId(sessionId);
+  requireCommand(input.requestId, input.expectedRevision);
+  const result = mutation(
+    await request(
+      `/api/sessions/${encodeURIComponent(sessionId)}/end`,
+      signal,
+      input,
+    ),
+    sessionId,
+  );
+  if (result.session.status !== "ended") invalidResponse();
   return result;
 }

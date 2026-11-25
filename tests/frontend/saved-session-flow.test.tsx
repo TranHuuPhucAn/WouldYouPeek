@@ -38,6 +38,12 @@ it("withholds reveal during uncertain saves, retries the same command, and resto
   );
   await user.click(await screen.findByRole("button", { name: "Retry save" }));
   expect(
+    screen.queryByRole("region", { name: "Answer feedback" }),
+  ).not.toBeInTheDocument();
+  await user.click(
+    await screen.findByRole("button", { name: /Read analysis/ }),
+  );
+  expect(
     await screen.findByRole("region", { name: "Answer feedback" }),
   ).toBeVisible();
   expect(fetcher.mock.calls[2][1]?.body).toBe(fetcher.mock.calls[0][1]?.body);

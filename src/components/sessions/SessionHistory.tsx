@@ -57,8 +57,8 @@ export function SessionHistory({
       <section className="surface-card">
         <h2>Your first session starts here.</h2>
         <p>Saved decisions and completed debriefs will appear here.</p>
-        <Link href="/play" className="button button-primary">
-          Start playing →
+        <Link href="/library" className="button button-primary">
+          Browse scenarios →
         </Link>
       </section>
     );
@@ -69,14 +69,30 @@ export function SessionHistory({
           <article className="surface-card history-row" key={item.id}>
             <div>
               <span className="eyebrow">
-                {item.status === "completed" ? "COMPLETED" : "IN PROGRESS"}
+                {item.status === "completed"
+                  ? "COMPLETED"
+                  : item.status === "ended"
+                    ? "ENDED EARLY"
+                    : "IN PROGRESS"}
               </span>
               <h2>
-                {new Date(item.createdAt).toLocaleDateString("en", {
-                  dateStyle: "long",
-                  timeZone: "UTC",
-                })}
+                {new Date(item.endedAt ?? item.createdAt).toLocaleDateString(
+                  "en",
+                  {
+                    dateStyle: "long",
+                    timeZone: "UTC",
+                  },
+                )}
               </h2>
+              <p className="history-title">{item.title}</p>
+              {item.playlist && (
+                <p className="quiet-note">
+                  Playlist by {item.playlist.credit.displayName} ·{" "}
+                  {item.playlist.players
+                    .map((player) => player.displayName)
+                    .join(", ")}
+                </p>
+              )}
               <p>
                 {item.answeredCount} of {item.totalCount} decisions saved
               </p>
@@ -84,7 +100,11 @@ export function SessionHistory({
             <Link href={`/play/${item.id}`} className="button button-secondary">
               {item.status === "completed"
                 ? "Review session"
-                : "Resume session"}{" "}
+                : item.status === "ended"
+                  ? item.answeredCount
+                    ? "Review saved decisions"
+                    : "View ended session"
+                  : "Resume session"}{" "}
               →
             </Link>
           </article>

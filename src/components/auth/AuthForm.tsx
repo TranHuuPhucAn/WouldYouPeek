@@ -1,6 +1,14 @@
 "use client";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { INITIAL_AUTH_STATE, type AuthFormState } from "@/contracts/auth";
+import {
+  INITIAL_AUTH_STATE,
+  NEW_PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  NEW_PASSWORD_HINT,
+  type AuthFormState,
+  type AuthChallengeConfig,
+} from "@/contracts/auth";
+import { AuthChallenge } from "./AuthChallenge";
 type Field = "email" | "password" | "confirmPassword";
 export function AuthForm({
   action,
@@ -8,13 +16,18 @@ export function AuthForm({
   label,
   returnTo,
   newPassword = false,
+  challenge = { kind: "none" },
 }: {
   action: (state: AuthFormState, data: FormData) => Promise<AuthFormState>;
   fields: Field[];
   label: string;
   returnTo?: string;
   newPassword?: boolean;
+  challenge?: AuthChallengeConfig;
 }) {
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [resetKey, setResetKey] = useState(0);
   const [state, formAction, pending] = useActionState(
     action,
     INITIAL_AUTH_STATE,
@@ -24,7 +37,11 @@ export function AuthForm({
   const form = useRef<HTMLFormElement>(null);
   const id = useId();
   useEffect(() => {
-    if (state.status !== "idle") summary.current?.focus();
+    if (state.status !== "idle") {
+      summary.current?.focus();
+      setCaptchaToken(null);
+      setResetKey((value) => value + 1);
+    }
   }, [state]);
   useEffect(() => {
     setCooldown(state.retryAfter ?? 0);
@@ -47,6 +64,9 @@ export function AuthForm({
       aria-label={label}
     >
       {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
+      {challenge.kind === "turnstile" && (
+        <input type="hidden" name="captchaToken" value={captchaToken ?? ""} />
+      )}
       {fields.map((field) => (
         <div className="form-field" key={field}>
           <label htmlFor={`${id}-${field}`}>{labels[field]}</label>
@@ -54,9 +74,19 @@ export function AuthForm({
             id={`${id}-${field}`}
             name={field}
             type={field === "email" ? "email" : "password"}
+            value={field === "email" ? email : undefined}
+            onChange={
+              field === "email"
+                ? (event) => setEmail(event.target.value)
+                : undefined
+            }
             required
-            maxLength={field === "email" ? 254 : 128}
-            minLength={field !== "email" && newPassword ? 12 : undefined}
+            maxLength={field === "email" ? 254 : PASSWORD_MAX_LENGTH}
+            minLength={
+              field !== "email" && newPassword
+                ? NEW_PASSWORD_MIN_LENGTH
+                : undefined
+            }
             autoComplete={
               field === "email"
                 ? "email"
@@ -88,10 +118,7 @@ export function AuthForm({
             }}
           />
           {field === "password" && newPassword && (
-            <small id={`${id}-password-hint`}>
-              Use 12–128 characters, with an uppercase letter, a lowercase
-              letter and a number.
-            </small>
+            <small id={`${id}-password-hint`}>{NEW_PASSWORD_HINT}</small>
           )}
           {state.fieldErrors?.[field] && (
             <p id={`${id}-${field}-error`} className="field-error">
@@ -100,6 +127,13 @@ export function AuthForm({
           )}
         </div>
       ))}
+      {challenge.kind === "turnstile" && (
+        <AuthChallenge
+          siteKey={challenge.siteKey}
+          onToken={setCaptchaToken}
+          resetKey={resetKey}
+        />
+      )}
       {state.status !== "idle" && (
         <div
           ref={summary}
@@ -116,7 +150,11 @@ export function AuthForm({
       <button
         type="submit"
         className="button button-primary"
-        disabled={pending || cooldown > 0}
+        disabled={
+          pending ||
+          cooldown > 0 ||
+          (challenge.kind === "turnstile" && !captchaToken)
+        }
       >
         {pending
           ? "Please wait…"

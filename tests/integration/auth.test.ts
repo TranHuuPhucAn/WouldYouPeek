@@ -21,24 +21,45 @@ describe("real local authentication and captured email", () => {
     ]) {
       expect(() => assertLocalTestTarget(value)).toThrow();
     }
-    expect(assertLocalTestTarget("http://127.0.0.1:54321").port).toBe("54321");
+    expect(() => assertLocalTestTarget("http://127.0.0.1:54321")).toThrow();
+    expect(assertLocalTestTarget("http://127.0.0.1:55321").port).toBe("55321");
   });
 
-  it("requires real email confirmation, rejects replay, resets password and signs out", async () => {
-    const credentials = newTestCredentials();
+  it.each([
+    ["seven characters", "Aa1!aaa"],
+    ["missing lowercase", "ABC1234!"],
+    ["missing uppercase", "abc1234!"],
+    ["missing digit", "Abcdefg!"],
+    ["missing symbol", "Abcd1234"],
+    ["space instead of symbol", "Abcd123 "],
+    ["emoji instead of symbol", "Abcd123🙂"],
+  ])("rejects %s at the real Auth provider", async (_reason, password) => {
+    const { email } = newTestCredentials();
+    const signup = await createLocalTestClient().auth.signUp({
+      email,
+      password,
+    });
+    if (signup.data.user?.id) users.push({ id: signup.data.user.id });
+    expect(signup.error?.code).toBe("weak_password");
+    expect(signup.data.user).toBeNull();
+  });
+
+  it("accepts eight-character passwords through email confirmation, replay rejection, recovery and sign-out", async () => {
+    const credentials = { ...newTestCredentials(), password: "Abcd123!" };
     const client = createLocalTestClient();
     const signup = await client.auth.signUp({
       ...credentials,
       options: { data: { role: "creator" } },
     });
+    if (signup.data.user?.id) users.push({ id: signup.data.user.id });
     expect(signup.error).toBeNull();
     expect(signup.data.user?.id).toBeTruthy();
-    users.push({ id: signup.data.user!.id });
     expect(signup.data.session).toBeNull();
     expect(
       (await client.auth.signInWithPassword(credentials)).error?.code,
     ).toBe("email_not_confirmed");
     const confirmation = await readEmailLink(credentials.email, "signup");
+    expect(confirmation.searchParams.get("next")).toBe("/library");
     const token = confirmation.searchParams.get("token_hash")!;
     const verified = await client.auth.verifyOtp({
       type: "signup",
@@ -67,7 +88,7 @@ describe("real local authentication and captured email", () => {
       token_hash: recovery.searchParams.get("token_hash")!,
     });
     expect(recovered.error).toBeNull();
-    const newPassword = `${credentials.password}-Changed2`;
+    const newPassword = "Reset12!";
     expect(
       (await recoveryClient.auth.updateUser({ password: newPassword })).error,
     ).toBeNull();
@@ -86,4 +107,35 @@ describe("real local authentication and captured email", () => {
     expect((await client.auth.signOut({ scope: "local" })).error).toBeNull();
     expect((await client.auth.getSession()).data.session).toBeNull();
   }, 60_000);
+
+  it("keeps the selected scenario in a real captured verification email", async () => {
+    const credentials = newTestCredentials();
+    const client = createLocalTestClient();
+    const destination = "/library/bind-clove-smoke-contest";
+    const callback = new URL(
+      "/auth/confirm",
+      process.env.SUPABASE_TEST_APP_URL,
+    );
+    callback.searchParams.set("next", destination);
+    const signup = await client.auth.signUp({
+      ...credentials,
+      options: { emailRedirectTo: callback.toString() },
+    });
+    expect(signup.error).toBeNull();
+    expect(signup.data.user?.id).toBeTruthy();
+    users.push({ id: signup.data.user!.id });
+    const confirmation = await readEmailLink(credentials.email, "signup");
+    expect(confirmation.origin).toBe(callback.origin);
+    expect(confirmation.pathname).toBe("/auth/confirm");
+    expect(confirmation.searchParams.get("next")).toBe(destination);
+    expect(confirmation.searchParams.getAll("token_hash")).toHaveLength(1);
+    expect(
+      (
+        await client.auth.verifyOtp({
+          type: "signup",
+          token_hash: confirmation.searchParams.get("token_hash")!,
+        })
+      ).error,
+    ).toBeNull();
+  }, 30_000);
 });

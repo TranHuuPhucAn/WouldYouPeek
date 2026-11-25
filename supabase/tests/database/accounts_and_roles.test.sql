@@ -10,7 +10,9 @@ select ok(not has_schema_privilege('wyp_rpc', 'auth', 'USAGE'), 'RPC role does n
 select ok(not has_column_privilege('wyp_rpc', 'public.profiles', 'email_verified_at', 'UPDATE'), 'RPC role cannot forge confirmation status');
 select ok(not has_column_privilege('wyp_auth_sync', 'public.profiles', 'role', 'UPDATE'), 'auth sync role cannot elevate creator capability');
 select ok(not has_schema_privilege('anon', 'private', 'USAGE'), 'anonymous cannot access private schema');
-select ok(not has_schema_privilege('authenticated', 'private', 'USAGE'), 'authenticated cannot access private schema');
+-- Storage policies require schema usage for narrowly granted video predicates;
+-- usage must not confer access to sensitive private tables or auth helpers.
+select ok(not has_table_privilege('authenticated', 'private.scenario_answer_keys', 'SELECT') and not has_function_privilege('authenticated', 'private.require_verified_user()', 'EXECUTE'), 'authenticated has no direct answer table or private auth helper access');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'UPDATE'), 'ordinary clients cannot update roles');
 select ok(not has_function_privilege('anon', 'public.enable_creator()', 'EXECUTE'), 'anonymous cannot enable creator');
 select ok(not exists (

@@ -10,16 +10,26 @@ export type YouTubeSegment = {
   caption?: string;
 };
 
+export type UploadedVideoSegment = {
+  kind: "uploaded-video";
+  assetId: string;
+  startSeconds: number;
+  endSeconds: number;
+  alt: string;
+  caption?: string;
+};
+
 export type MediaAsset =
   | { kind: "video"; src: string; alt: string; caption?: string }
   | { kind: "illustration"; src: string; alt: string; caption?: string }
-  | YouTubeSegment;
+  | YouTubeSegment
+  | UploadedVideoSegment;
 
 export type DecisionAsset =
   | { kind: "image"; imageUrl: string; alt: string }
   | { kind: "paused-video"; atSeconds: number; alt: string };
 
-export type ChallengeSource = {
+export type YouTubeChallengeSource = {
   kind: "youtube";
   videoId: string;
   url: string;
@@ -36,14 +46,21 @@ export type ChallengeSource = {
   dateNote?: string;
 };
 
+export type UploadedChallengeSource = Omit<
+  YouTubeChallengeSource,
+  "kind" | "videoId" | "url"
+> & { kind: "uploaded"; assetId: string; creditUrl: string };
+export type ChallengeSource = YouTubeChallengeSource | UploadedChallengeSource;
+
 export type ObservedAction = { optionId: string; description: string };
 
-export type AIAnalysis = {
-  author: "ai";
+export type ScenarioAnalysis = {
+  author: "ai" | "creator" | "ai-assisted";
   notice: string;
   rationale: string;
   limitations: string[];
 };
+export type AIAnalysis = ScenarioAnalysis & { author: "ai" };
 
 export type ChallengeSummary = {
   id: string;
@@ -97,10 +114,15 @@ export type AnswerResponse = {
   outcomeText: string;
   observedAction?: ObservedAction;
   matchesPro?: boolean;
-  analysis?: AIAnalysis;
+  analysis?: ScenarioAnalysis;
 };
 
 export type ApiErrorCode =
+  | "OPERATOR_REQUIRED"
+  | "REPORT_NOT_FOUND"
+  | "REPORT_CONFLICT"
+  | "VISIBILITY_CONFLICT"
+  | "REPORT_TARGET_CHANGED"
   | "INVALID_JSON"
   | "INVALID_REQUEST"
   | "INVALID_OPTION"
@@ -113,10 +135,34 @@ export type ApiErrorCode =
   | "ANSWER_LOCKED"
   | "IDEMPOTENCY_CONFLICT"
   | "SESSION_REQUIRED"
+  | "SCENARIO_NOT_FOUND"
+  | "SCENARIO_CONFLICT"
+  | "DRAFT_NOT_READY"
+  | "REVIEW_REQUIRED"
+  | "SCENARIO_UNAVAILABLE"
+  | "ACTIVE_SESSION_EXISTS"
+  | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
   | "STORAGE_UNAVAILABLE"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "PLAYLIST_NOT_FOUND"
+  | "PLAYLIST_UNAVAILABLE"
+  | "PLAYLIST_CONFLICT"
+  | "PLAYLIST_CHANGED"
+  | "CREATOR_PROFILE_CONFLICT"
+  | "VIDEO_NOT_FOUND"
+  | "VIDEO_CONFLICT"
+  | "VIDEO_NOT_READY"
+  | "VIDEO_IN_USE"
+  | "UPLOAD_LIMIT_REACHED"
+  | "UPLOADS_DISABLED"
+  | "UPLOAD_EXPIRED"
+  | "VIDEO_UNSUPPORTED"
+  | "MEDIA_UNAVAILABLE";
 
 export type ApiErrorResponse = {
-  error: { code: ApiErrorCode; message: string };
+  error: { code: ApiErrorCode; message: string; details?: ApiErrorDetails };
 };
+export type ApiErrorDetails =
+  | { issues: import("./creator").ValidationIssue[] }
+  | { activeSession: import("./session").SessionSummary };

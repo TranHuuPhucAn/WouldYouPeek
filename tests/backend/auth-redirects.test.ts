@@ -12,9 +12,19 @@ describe("trusted auth destinations and configuration", () => {
     "/play#x",
     "/auth/confirm",
     "/unknown",
+    "/library/../account",
+    "/library/%2f%2fevil",
+    "/library/bind-clove-utility-window?next=//evil",
+    "/library/players/not-a-uuid",
+    "/library/playlists/not-a-uuid",
+    "/library/playlists/11111111-1111-4111-8111-111111111111?next=//evil",
+    "/creator/playlists/11111111-1111-4111-8111-111111111111/review#bad",
+    "/play/not-a-uuid",
+    "/creator/scenarios/not-a-uuid",
+    "/library/a\n",
     null,
   ])("rejects redirect %j", (value) =>
-    expect(safeReturnTo(value)).toBe("/play"),
+    expect(safeReturnTo(value)).toBe("/library"),
   );
   it.each([
     "/play",
@@ -22,20 +32,47 @@ describe("trusted auth destinations and configuration", () => {
     "/creator",
     "/history",
     "/demo",
+    "/operator/reports",
+    "/operator/reports/11111111-1111-4111-8111-111111111111",
+    "/library",
+    "/library/bind-clove-utility-window",
+    "/library/11111111-1111-4111-8111-111111111111",
+    "/library/players/11111111-1111-4111-8111-111111111111",
+    "/creator/videos",
+    "/creator/playlists",
+    "/library/playlists",
+    "/library/playlists/11111111-1111-4111-8111-111111111111",
+    "/creator/playlists/11111111-1111-4111-8111-111111111111",
+    "/creator/playlists/11111111-1111-4111-8111-111111111111/review",
+    "/creator/scenarios/11111111-1111-4111-8111-111111111111/review",
     "/play/11111111-1111-4111-8111-111111111111",
   ])("keeps %s", (value) => expect(safeReturnTo(value)).toBe(value));
   it("builds callback from configured origin only", () => {
+    vi.stubEnv("WYP_DEPLOYMENT_MODE", "local");
+    vi.stubEnv("WYP_RELEASE_ENVIRONMENT", "");
+    vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "public-test");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://127.0.0.1:3000");
     expect(buildAuthRedirect("recovery")).toBe(
       "http://127.0.0.1:3000/auth/confirm?next=%2Freset-password",
     );
-    expect(buildAuthRedirect("signup", "//evil")).toContain("next=%2Fplay");
+    expect(buildAuthRedirect("signup", "//evil")).toContain("next=%2Flibrary");
+    expect(
+      new URL(
+        buildAuthRedirect("signup", "/library/bind-clove-utility-window"),
+      ).searchParams.get("next"),
+    ).toBe("/library/bind-clove-utility-window");
+  });
+  it("does not accept an external fallback", () => {
+    expect(safeReturnTo(null, "//evil.example")).toBe("/library");
   });
   it("rejects missing, malformed and secret configuration", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
     expect(getPublicSupabaseConfig).toThrow();
+    vi.stubEnv("WYP_DEPLOYMENT_MODE", "local");
+    vi.stubEnv("WYP_RELEASE_ENVIRONMENT", "");
+    vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_secret_bad");
     expect(getPublicSupabaseConfig).toThrow();

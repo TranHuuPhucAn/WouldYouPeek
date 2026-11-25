@@ -1,7 +1,7 @@
 import "server-only";
 import type { AccountUser } from "@/contracts/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { ApiError } from "@/server/http";
+import { ApiError, databaseError } from "@/server/http";
 import { getPublicSupabaseConfig } from "@/server/config";
 
 function checkIdentityError(error: unknown) {
@@ -86,5 +86,26 @@ export async function requireCreator(): Promise<AccountUser> {
       "CREATOR_REQUIRED",
       "Enable creator access in your account first.",
     );
+  return user;
+}
+async function readOperatorAccess(): Promise<boolean> {
+  const client = await createServerSupabaseClient();
+  const { data, error } = await client.rpc("get_operator_access");
+  if (error) databaseError(error);
+  if (typeof data !== "boolean")
+    throw new ApiError(
+      "STORAGE_UNAVAILABLE",
+      "Operator access could not be checked.",
+    );
+  return data;
+}
+export async function hasOperatorAccess(): Promise<boolean> {
+  await requireVerifiedUser();
+  return readOperatorAccess();
+}
+export async function requireOperator(): Promise<AccountUser> {
+  const user = await requireVerifiedUser();
+  if (!(await readOperatorAccess()))
+    throw new ApiError("OPERATOR_REQUIRED", "Operator access is required.");
   return user;
 }

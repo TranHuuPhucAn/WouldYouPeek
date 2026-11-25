@@ -20,7 +20,7 @@ import {
 } from "../integration/helpers/test-users";
 
 function appOrigin() {
-  return assertLocalTestTarget(process.env.SUPABASE_TEST_APP_URL ?? "", "3000")
+  return assertLocalTestTarget(process.env.SUPABASE_TEST_APP_URL ?? "", "3100")
     .origin;
 }
 

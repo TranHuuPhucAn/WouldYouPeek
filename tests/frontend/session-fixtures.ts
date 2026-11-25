@@ -16,14 +16,24 @@ export function snapshot(
 ): SessionSnapshot {
   return {
     id: sessionId,
-    status: phase === "completed" ? "completed" : "in_progress",
+    target: { kind: "demo" },
+    title: "TenZ · Clove · Bind",
+    status:
+      phase === "completed"
+        ? "completed"
+        : phase === "ended"
+          ? "ended"
+          : "in_progress",
     phase,
     revision:
-      phase === "completed" ? 6 : index * 2 + (phase === "review" ? 1 : 0),
-    currentIndex: phase === "completed" ? null : index,
+      phase === "completed"
+        ? 6
+        : index * 2 + (phase === "review" || phase === "ended" ? 1 : 0),
+    currentIndex: phase === "completed" || phase === "ended" ? null : index,
     createdAt: viewer.createdAt,
     updatedAt: viewer.createdAt,
     completedAt: phase === "completed" ? viewer.createdAt : null,
+    endedAt: phase === "ended" ? viewer.createdAt : null,
     items: challenges.map((challenge, position) => ({
       id: `33333333-3333-4333-8333-33333333333${position}`,
       position,
@@ -45,11 +55,14 @@ export function sessionSummary(phase: SessionSnapshot["phase"] = "setup") {
   const value = snapshot(phase);
   return {
     id: value.id,
+    target: value.target,
+    title: value.title,
     status: value.status,
     answeredCount: value.items.filter((item) => item.answer).length,
     totalCount: value.items.length,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     completedAt: value.completedAt,
+    endedAt: value.endedAt,
   };
 }

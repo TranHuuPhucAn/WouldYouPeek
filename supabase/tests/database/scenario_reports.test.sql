@@ -1,0 +1,66 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+
+select ok(not (select rolcanlogin or rolinherit or rolsuper or rolbypassrls or rolcreaterole from pg_roles where rolname='wyp_moderation_rpc'),'moderation role has no login or bypass privileges');
+select ok(not has_schema_privilege('wyp_moderation_rpc','public','CREATE'),'temporary function creation grant is removed');
+select ok(not has_table_privilege('authenticated','private.operator_memberships','INSERT'),'browser callers cannot self-grant operator membership');
+select ok(not has_table_privilege('wyp_moderation_rpc','private.operator_memberships','UPDATE'),'runtime moderator cannot grant or revoke membership');
+select ok(not has_table_privilege('authenticated','private.scenario_reports','SELECT'),'reports have no direct browser read grant');
+select ok(not has_table_privilege('wyp_moderation_rpc','private.moderation_events','UPDATE'),'runtime audit events cannot be changed');
+select ok(not has_table_privilege('wyp_moderation_rpc','private.moderation_events','DELETE'),'runtime audit events cannot be removed');
+select ok(not has_function_privilege('anon','public.create_scenario_report(uuid,jsonb,text,text)','EXECUTE'),'guest cannot submit reports');
+select ok(not exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='private' and c.relname in ('operator_memberships','scenario_reports','scenario_visibility','moderation_commands','moderation_events') and not(c.relrowsecurity and c.relforcerowsecurity)),'moderation tables enable and force row security');
+select ok(not exists(select 1 from pg_proc p where p.proowner='wyp_moderation_rpc'::regrole and (p.proconfig is null or not('search_path=""'=any(p.proconfig)))),'moderation functions pin empty search paths');
+
+insert into auth.users(id,email,email_confirmed_at) values
+('93000000-0000-4000-8000-000000000001','report-learner@example.test',now()),
+('93000000-0000-4000-8000-000000000002','report-operator@example.test',now()),
+('93000000-0000-4000-8000-000000000003','report-unverified@example.test',null);
+insert into private.operator_memberships(user_id) values('93000000-0000-4000-8000-000000000002');
+create temporary table report_state(name text primary key,value jsonb);
+grant select,insert,update on report_state to authenticated;
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"93000000-0000-4000-8000-000000000001","role":"authenticated","operator":true}',true);
+select is(public.get_operator_access(),false,'untrusted claims never grant operator access');
+select public.enable_creator();
+select is(public.get_operator_access(),false,'creator enrollment never grants operator access');
+select throws_ok('select public.list_operator_reports()','P0001','OPERATOR_REQUIRED','creator cannot enumerate reports');
+select throws_like($$insert into private.operator_memberships(user_id) values('93000000-0000-4000-8000-000000000001')$$,'%permission denied%','direct membership injection is denied');
+insert into report_state values('target',jsonb_build_object('kind','publication','scenarioId','bind-clove-utility-window','contentVersion',public.get_library_preview('bind-clove-utility-window')->>'contentVersion'));
+insert into report_state select 'receipt',public.create_scenario_report('93000000-0000-4000-8000-000000000010',value,'broken_video','Original explanation') from report_state where name='target';
+select is(value->'report'->>'status','open','new report starts open') from report_state where name='receipt';
+select is(value->>'replayed','false','initial report is not replayed') from report_state where name='receipt';
+select is(value->>'duplicate','false','initial report is not a duplicate') from report_state where name='receipt';
+select is((select array_agg(key order by key) from jsonb_object_keys(value->'report') as fields(key)),array['createdAt','id','status'],'learner receipt contains only safe receipt fields') from report_state where name='receipt';
+select is(public.create_scenario_report('93000000-0000-4000-8000-000000000010',value,'broken_video','Original explanation')->>'replayed','true','matching command replays original receipt') from report_state where name='target';
+select is(public.create_scenario_report('93000000-0000-4000-8000-000000000011',value,'broken_video','Different duplicate details')->>'duplicate','true','distinct duplicate command is acknowledged without another report') from report_state where name='target';
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000010',value::text,'broken_video','Changed same request'),'P0001','IDEMPOTENCY_CONFLICT','request UUID cannot change its report text') from report_state where name='target';
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000012',(value||'{"contentVersion":"old-version"}'::jsonb)::text,'analysis_issue','Old version'),'P0001','REPORT_TARGET_CHANGED','stale public version is not silently retargeted') from report_state where name='target';
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000013',(value||'{"reporterId":"93000000-0000-4000-8000-000000000002"}'::jsonb)::text,'analysis_issue','Forged identity'),'P0001','INVALID_REQUEST','extra target identity fields are rejected') from report_state where name='target';
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000014',value::text,'other','  '),'P0001','INVALID_REQUEST','Other needs an actual explanation') from report_state where name='target';
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000015',value::text,'analysis_issue',repeat('x',2001)),'P0001','INVALID_REQUEST','report detail is bounded at the database boundary') from report_state where name='target';
+select public.create_scenario_report(gen_random_uuid(),value,category,'Additional distinct report') from report_state cross join unnest(array['spoiler','incorrect_context','analysis_issue','inappropriate_content']) category where name='target';
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000016',value::text,'other','Sixth report'),'P0001','RATE_LIMITED','sixth distinct report within the hour is rejected') from report_state where name='target';
+select is(public.create_scenario_report('93000000-0000-4000-8000-000000000010',value,'broken_video','Original explanation')->>'replayed','true','retry does not spend quota again') from report_state where name='target';
+select set_config('request.jwt.claims','{"sub":"93000000-0000-4000-8000-000000000003","role":"authenticated"}',true);
+select throws_ok(format('select public.create_scenario_report(%L,%L::jsonb,%L,%L)','93000000-0000-4000-8000-000000000017',value::text,'broken_video','Unverified report'),'P0001','EMAIL_NOT_VERIFIED','unverified account cannot report') from report_state where name='target';
+select set_config('request.jwt.claims','{"sub":"93000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+select is(public.get_operator_access(),true,'trusted membership grants access independently of creator role');
+insert into report_state select 'detail',public.get_operator_report((value->'report'->>'id')::uuid) from report_state where name='receipt';
+select is(value->'report'->>'detail','Original explanation','duplicate does not append or replace report text') from report_state where name='detail';
+select is(value->'report'->>'contentVersion',(select value->>'contentVersion' from report_state where name='target'),'operator sees the originally reported version') from report_state where name='detail';
+select ok(value->'media' ? 'reveal' and value->'media' ? 'analysis' and not(value->'media' ? 'selectedOptionId'),'operator sees authored context without a fabricated learner answer') from report_state where name='detail';
+select is(public.resolve_scenario_report((value->'report'->>'id')::uuid,'93000000-0000-4000-8000-000000000020',(value->'report'->>'revision')::integer,'dismissed','Reviewed original source')->'report'->>'status','resolved','operator resolves a report explicitly') from report_state where name='detail';
+select is(public.get_operator_report((value->'report'->>'id')::uuid)->'visibility'->>'hidden','false','resolution never implicitly hides content') from report_state where name='receipt';
+select is(public.resolve_scenario_report((value->'report'->>'id')::uuid,'93000000-0000-4000-8000-000000000020',(value->'report'->>'revision')::integer,'dismissed','Reviewed original source')->>'replayed','true','resolution retries are idempotent') from report_state where name='detail';
+reset role;
+select is((select count(*)::integer from private.scenario_reports where reporter_id='93000000-0000-4000-8000-000000000001'),5,'duplicates and rejected reports consume no rows');
+update private.operator_memberships set revoked_at=now() where user_id='93000000-0000-4000-8000-000000000002';
+set local role authenticated;
+select is(public.get_operator_access(),false,'revocation is visible without replacing the JWT');
+select throws_ok('select public.list_operator_reports()','P0001','OPERATOR_REQUIRED','revoked operator cannot list private reports');
+reset role;
+select * from finish();
+rollback;

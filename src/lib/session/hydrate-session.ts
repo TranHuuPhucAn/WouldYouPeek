@@ -14,7 +14,7 @@ export function hydrateSessionSnapshot(
   viewerId: string,
 ): SessionState {
   const index = snapshot.currentIndex ?? snapshot.items.length - 1;
-  const item = snapshot.items[index];
+  const item = snapshot.status === "ended" ? undefined : snapshot.items[index];
   return {
     snapshot,
     viewerId,

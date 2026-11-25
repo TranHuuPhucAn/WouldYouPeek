@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   answerSessionItem: vi.fn(),
   advanceSession: vi.fn(),
+  endSession: vi.fn(),
   getAccount: vi.fn(),
   enableCreator: vi.fn(),
 }));
@@ -14,6 +15,7 @@ import { GET as history, POST as start } from "@/app/api/sessions/route";
 import { GET as get } from "@/app/api/sessions/[sessionId]/route";
 import { POST as answer } from "@/app/api/sessions/[sessionId]/items/[itemId]/answer/route";
 import { POST as advance } from "@/app/api/sessions/[sessionId]/advance/route";
+import { POST as end } from "@/app/api/sessions/[sessionId]/end/route";
 import { GET as account } from "@/app/api/account/route";
 import { POST as creator } from "@/app/api/account/creator/route";
 import { ApiError } from "@/server/http";
@@ -56,6 +58,33 @@ describe("authenticated session HTTP adapters", () => {
     expect(mocks.getHistory).toHaveBeenCalledWith("cursor");
     await account();
     expect(mocks.getAccount).toHaveBeenCalled();
+  });
+  it("ends through a bounded same-origin command with awaited session ID", async () => {
+    const command = { requestId: "r", expectedRevision: 2 };
+    expect(
+      (
+        await end(request(command), {
+          params: Promise.resolve({ sessionId: "s" }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(mocks.endSession).toHaveBeenCalledWith("s", command);
+    mocks.endSession.mockClear();
+    expect(
+      (
+        await end(request(command, { origin: "https://evil.example" }), {
+          params: Promise.resolve({ sessionId: "s" }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await end(request({ detail: "x".repeat(1_025) }), {
+          params: Promise.resolve({ sessionId: "s" }),
+        })
+      ).status,
+    ).toBe(413);
+    expect(mocks.endSession).not.toHaveBeenCalled();
   });
   it.each([401, 403, 404, 409, 503])(
     "preserves status%d without leaking unknown details",

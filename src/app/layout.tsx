@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
 import { getCurrentAccount } from "@/server/auth/guards";
 import { SiteHeader } from "@/components/navigation/SiteHeader";
 import { AuthStateSync } from "@/components/auth/AuthStateSync";
+import { SiteFooter } from "@/components/SiteFooter";
+import { getSiteMetadata } from "@/server/metadata";
 import "./globals.css";
-export const metadata: Metadata = {
-  title: "Would You Peek? — Make the call",
-  description:
-    "Watch real Valorant POVs, make your call, and return to saved decisions and debriefs.",
-};
+export const generateMetadata = getSiteMetadata;
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -23,6 +20,7 @@ export default async function RootLayout({
           <div className="app-shell">
             <SiteHeader viewer={viewer} />
             {children}
+            <SiteFooter />
           </div>
         </AuthStateSync>
       </body>

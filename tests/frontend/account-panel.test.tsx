@@ -32,6 +32,11 @@ it("waits for enrollment confirmation and preserves learner access", async () =>
     await screen.findByRole("link", { name: /Open creator/ }),
   ).toBeVisible();
   expect(screen.getByText(/Creator and learner/)).toBeVisible();
+  expect(
+    screen.getByText(
+      /review every choice, and publish it to the learner library/,
+    ),
+  ).toBeVisible();
 });
 it("offers retry without optimistic role change after failure", async () => {
   vi.mocked(enableCreatorAccess).mockRejectedValueOnce(new Error("Offline"));
@@ -43,5 +48,28 @@ it("offers retry without optimistic role change after failure", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("try again");
   expect(
     screen.queryByRole("link", { name: /Open creator/ }),
+  ).not.toBeInTheDocument();
+});
+it("only exposes operator access from its separate verified membership flag", () => {
+  const view = render(
+    <AccountPanel
+      viewer={{ ...viewer, role: "creator", capabilities: ["learn", "create"] }}
+    />,
+  );
+  expect(
+    screen.queryByRole("link", { name: /Review scenario reports/ }),
+  ).not.toBeInTheDocument();
+  view.rerender(<AccountPanel viewer={viewer} operatorAccess />);
+  expect(
+    screen.getByRole("link", { name: /Review scenario reports/ }),
+  ).toHaveAttribute("href", "/operator/reports");
+  view.rerender(
+    <AccountPanel
+      viewer={{ ...viewer, emailVerified: false }}
+      operatorAccess
+    />,
+  );
+  expect(
+    screen.queryByRole("link", { name: /Review scenario reports/ }),
   ).not.toBeInTheDocument();
 });

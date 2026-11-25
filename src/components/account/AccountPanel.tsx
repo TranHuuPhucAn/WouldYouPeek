@@ -7,7 +7,15 @@ import { ApiClientError } from "@/lib/client/api-response";
 import { enableCreatorAccess } from "@/lib/client/account-api";
 import { signOutAction } from "@/app/(auth)/actions";
 import { invalidateAccountView } from "@/components/auth/AuthStateSync";
-export function AccountPanel({ viewer }: { viewer: AccountUser }) {
+export function AccountPanel({
+  viewer,
+  operatorAccess = false,
+  operatorAccessUnavailable = false,
+}: {
+  viewer: AccountUser;
+  operatorAccess?: boolean;
+  operatorAccessUnavailable?: boolean;
+}) {
   const [account, setAccount] = useState(viewer);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +91,8 @@ export function AccountPanel({ viewer }: { viewer: AccountUser }) {
           and saved sessions.
         </p>
         <p className="quiet-note">
-          Scenario authoring arrives in the next milestone.
+          Turn a video moment into a scenario, review every choice, and publish
+          it to the learner library.
         </p>
         {account.role === "creator" ? (
           <Link href="/creator" className="button button-primary">
@@ -104,6 +113,21 @@ export function AccountPanel({ viewer }: { viewer: AccountUser }) {
           </p>
         )}
       </section>
+      {operatorAccess && viewer.emailVerified && account.emailVerified && (
+        <section className="surface-card">
+          <span className="eyebrow">OPERATOR</span>
+          <h2>Review scenario reports.</h2>
+          <p>Review reported moments and manage their public visibility.</p>
+          <Link href="/operator/reports" className="button button-secondary">
+            Review scenario reports →
+          </Link>
+        </section>
+      )}
+      {operatorAccessUnavailable && (
+        <p role="status">
+          Operator access couldn’t be checked. Refresh to try again.
+        </p>
+      )}
     </div>
   );
 }

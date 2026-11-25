@@ -1,15 +1,8 @@
-import { listChallengePreviews } from "@/server/challenges/service";
-import { DemoPreview } from "@/components/demo/DemoPreview";
+import { redirect } from "next/navigation";
+import { TENZ_PLAYER_ID } from "@/contracts/player";
+import { getPlayer } from "@/server/players/service";
+
 export default async function DemoPage() {
-  const previews = await listChallengePreviews();
-  return (
-    <main className="page-shell">
-      <div className="page-heading">
-        <span className="eyebrow">EXPLORE THE LAB</span>
-        <h1>See the moment before the call.</h1>
-        <p>Three real pro POV setups. Sign in when you’re ready to decide.</p>
-      </div>
-      <DemoPreview previews={previews} />
-    </main>
-  );
+  const player = await getPlayer(TENZ_PLAYER_ID);
+  redirect(player ? `/library/players/${player.id}` : "/library");
 }

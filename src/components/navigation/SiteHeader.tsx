@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AccountUser } from "@/contracts/auth";
+import { NavigationLinks } from "./NavigationLinks";
 export function SiteHeader({ viewer }: { viewer: AccountUser | null }) {
   return (
     <header className="site-header">
@@ -11,24 +12,10 @@ export function SiteHeader({ viewer }: { viewer: AccountUser | null }) {
           WOULD YOU <strong>PEEK?</strong>
         </span>
       </Link>
-      <nav className="site-nav" aria-label="Main navigation">
-        <Link href="/demo">Demo</Link>
-        {viewer ? (
-          <>
-            <Link href="/play">Play</Link>
-            <Link href="/history">History</Link>
-            {viewer.role === "creator" && <Link href="/creator">Creator</Link>}
-            <Link href="/account">Account</Link>
-          </>
-        ) : (
-          <>
-            <Link href="/sign-in">Sign in</Link>
-            <Link className="nav-accent" href="/sign-up">
-              Join the lab ↗
-            </Link>
-          </>
-        )}
-      </nav>
+      <NavigationLinks
+        signedIn={!!viewer}
+        creator={viewer?.role === "creator"}
+      />
     </header>
   );
 }

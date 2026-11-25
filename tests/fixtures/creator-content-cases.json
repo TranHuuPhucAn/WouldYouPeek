@@ -1,0 +1,283 @@
+{
+  "validContent": {
+    "title": "Utility before the next fight",
+    "topic": "Utility timing",
+    "context": "Bind, attacking at 7–3. You are Clove near A Short/Lamps with a Vandal reload in progress. Your teammates are taking A while smokes obscure parts of the site. Decide what to do as the reload completes.",
+    "question": "You are finishing your reload while your team takes A. What do you do next?",
+    "knownFacts": [
+      "At the pause, both teams still have five players alive.",
+      "You have 100 HP and 50 armour; your Vandal reload is in progress.",
+      "Nearby teammates and A-site smokes are visible from your POV."
+    ],
+    "unknowns": [
+      "Exact enemy positions behind the smoke and cover.",
+      "Whether a teammate has explicitly taken over your angle.",
+      "Complete team communications and the intended utility target."
+    ],
+    "takeaway": "Choose a utility window around who can cover the next contact and who can exploit the timing.",
+    "outcomeText": "Meddle is visibly equipped and released, followed by rifle fire. This sequence does not confirm an enemy hit or establish that the utility caused a later kill.",
+    "source": {
+      "url": "https://www.youtube.com/watch?v=_yPrykaB2nE",
+      "title": "WASHED GAMER PLAYS APAC RANKED",
+      "uploader": "TenZ",
+      "player": "TenZ",
+      "map": "Bind",
+      "agent": "Clove",
+      "score": "7-3",
+      "matchType": "ranked",
+      "round": 11,
+      "side": "attack",
+      "publishedDate": "2025-08-15",
+      "dateNote": "YouTube displayed August 15, 2025; earlier indexed metadata used August 14. The reason for this date discrepancy is unverified."
+    },
+    "media": {
+      "startSeconds": 1705,
+      "decisionSeconds": 1713,
+      "endSeconds": 1718,
+      "setupAlt": "TenZ's Clove POV approaching the smoked A site on Bind and beginning a Vandal reload.",
+      "decisionAlt": "Paused before the next action: a reload is finishing near A Short/Lamps while teammates take the site.",
+      "revealAlt": "TenZ completes the reload, throws Clove's Meddle toward A-site cover, and returns to the rifle."
+    },
+    "options": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "label": "Throw Meddle toward site cover, then ready the rifle",
+        "assessment": "reasonable",
+        "explanation": "A short protected utility window can prepare the next fight while your teammates gain space. Its value depends on their ability to cover the animation and act on the timing; the smoke prevents certainty about the target.",
+        "acceptableWhen": [
+          "A teammate can cover the immediate contact while your weapon is unavailable.",
+          "The team is close enough to exploit the utility timing."
+        ],
+        "risks": [
+          "An immediate fight may arrive during the equip and throw animation.",
+          "Hidden enemy positions can make the throw ineffective."
+        ]
+      },
+      {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "label": "Keep the rifle ready and cover the next contact",
+        "assessment": "reasonable",
+        "explanation": "Keeping your rifle ready preserves an immediate trade if a teammate meets resistance. That can be preferable when responsibility for the angle is unclear, although it delays the utility window.",
+        "acceptableWhen": [
+          "A teammate may need an immediate trade from your current angle.",
+          "No one has clearly taken over your weapon coverage."
+        ],
+        "risks": [
+          "Waiting can miss the opportunity to combine utility with the site's entry timing.",
+          "Your angle may duplicate a teammate's coverage instead of adding support."
+        ]
+      },
+      {
+        "id": "33333333-3333-4333-8333-333333333333",
+        "label": "Advance with a teammate and retain Meddle",
+        "assessment": "reasonable",
+        "explanation": "Moving closer can improve access to the next trade while retaining utility for new information. It is conditional on the route being clear and the movement creating useful spacing rather than another exposed player.",
+        "acceptableWhen": [
+          "The path is clear enough to move with your weapon ready.",
+          "The new position gives you a timely trade without abandoning necessary coverage."
+        ],
+        "risks": [
+          "Smokes and cover can conceal angles along the route.",
+          "Advancing without coordination can duplicate exposure and lose the original angle."
+        ]
+      }
+    ],
+    "observedAction": {
+      "optionId": "11111111-1111-4111-8111-111111111111",
+      "description": "TenZ finishes the reload, equips Meddle, throws it toward A-site cover, then re-equips the Vandal and fires from the position."
+    },
+    "analysis": {
+      "author": "creator",
+      "rationale": "This choice uses a brief moment near cover to prepare the next engagement. The relevant tradeoff is utility timing versus immediate weapon coverage. The POV supports what was thrown, but does not establish a uniquely best choice without the team's coverage and timing commitments.",
+      "limitations": [
+        "The selected footage does not establish that Meddle affected an enemy or caused a kill.",
+        "Complete communications and the player's intended target are unknown.",
+        "Several options can be defensible under different coverage assumptions."
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "incomplete title",
+      "path": "title",
+      "value": "",
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "title bound",
+      "path": "title",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "unicode title counts characters",
+      "path": "title",
+      "value": "🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯",
+      "draftValid": true,
+      "publishValid": true
+    },
+    {
+      "name": "unknown owner key",
+      "path": "ownerId",
+      "value": "11111111-1111-4111-8111-111111111111",
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "null source",
+      "path": "source",
+      "value": null,
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "wrong assessment type",
+      "path": "options.0.assessment",
+      "value": [
+        "reasonable"
+      ],
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "nullable assessment",
+      "path": "options.0.assessment",
+      "value": null,
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "duplicate choice ID",
+      "path": "options.1.id",
+      "value": "11111111-1111-4111-8111-111111111111",
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "missing observed option",
+      "path": "observedAction.optionId",
+      "value": null,
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "dangling observed option",
+      "path": "observedAction.optionId",
+      "value": "44444444-4444-4444-8444-444444444444",
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "unsupported source",
+      "path": "source.url",
+      "value": "https://youtube.com.evil.example/watch?v=_yPrykaB2nE",
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "shared source alias",
+      "path": "source.url",
+      "value": "https://youtu.be/_yPrykaB2nE?si=demo&t=42",
+      "draftValid": true,
+      "publishValid": true
+    },
+    {
+      "name": "blank time",
+      "path": "media.startSeconds",
+      "value": null,
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "out of order time",
+      "path": "media.decisionSeconds",
+      "value": 1,
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "negative time",
+      "path": "media.startSeconds",
+      "value": -1,
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "excess precision",
+      "path": "media.startSeconds",
+      "value": 1.1234,
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "bad calendar date",
+      "path": "source.publishedDate",
+      "value": "2026-02-31",
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "known information is required before preview and publication",
+      "path": "knownFacts",
+      "value": [],
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "empty uncertainty",
+      "path": "unknowns",
+      "value": [],
+      "draftValid": true,
+      "publishValid": true
+    },
+    {
+      "name": "oversized list",
+      "path": "unknowns",
+      "value": [
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown"
+      ],
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "unsupported provenance",
+      "path": "analysis.author",
+      "value": "ai",
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "sub-millisecond precision cannot be hidden by numeric tolerance",
+      "path": "media.startSeconds",
+      "value": 0.0000000001,
+      "draftValid": false,
+      "publishValid": false
+    },
+    {
+      "name": "calendar has no year zero",
+      "path": "source.publishedDate",
+      "value": "0000-01-01",
+      "draftValid": true,
+      "publishValid": false
+    },
+    {
+      "name": "invalid score",
+      "path": "source.score",
+      "value": "5 - 6",
+      "draftValid": true,
+      "publishValid": false
+    }
+  ]
+}

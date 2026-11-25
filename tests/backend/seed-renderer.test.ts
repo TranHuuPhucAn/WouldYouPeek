@@ -4,9 +4,45 @@ import {
   readFixtures,
   renderSeedSql,
   validateFixtures,
+  validateCuratedPlaylist,
 } from "../../scripts/render-demo-seed.mjs";
 
 describe("canonical demo seed", () => {
+  it("keeps the editorial starter canonical and rejects changed order/version", async () => {
+    const fixtures = await readFixtures();
+    const playlist = JSON.parse(
+      await readFile(
+        new URL(
+          "../../supabase/fixtures/curated-playlist.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    expect(validateCuratedPlaylist(playlist, fixtures)).toBe(playlist);
+    expect(() =>
+      validateCuratedPlaylist(
+        { ...playlist, items: [...playlist.items].reverse() },
+        fixtures,
+      ),
+    ).toThrow();
+    expect(() =>
+      validateCuratedPlaylist(
+        {
+          ...playlist,
+          items: playlist.items.map((item: object) => ({
+            ...item,
+            scenarioVersion: "changed",
+          })),
+        },
+        fixtures,
+      ),
+    ).toThrow();
+    const sql = renderSeedSql(fixtures);
+    expect(sql).toContain("private.ensure_curated_starter_playlist()");
+    expect(sql).toContain("p.creator_id is null");
+    expect(sql).not.toContain("insert into auth.users");
+  });
   it("renders exactly the committed SQL deterministically", async () => {
     const fixtures = await readFixtures();
     const rendered = renderSeedSql(fixtures);

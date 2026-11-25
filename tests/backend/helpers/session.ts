@@ -9,6 +9,8 @@ export const requestId = "22222222-2222-4222-8222-222222222222";
 export function snapshot(): SessionSnapshot {
   return {
     id: sessionId,
+    target: { kind: "demo" },
+    title: "Three-scenario demo",
     status: "in_progress",
     phase: "setup",
     revision: 0,
@@ -16,6 +18,7 @@ export function snapshot(): SessionSnapshot {
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     completedAt: null,
+    endedAt: null,
     items: listChallenges().map((summary, index) => ({
       id: `33333333-3333-4333-8333-${String(index + 1).padStart(12, "0")}`,
       position: index,

@@ -20,6 +20,9 @@ AGENTS.md
 .npmrc
 .netrc
 
+# Local project plans and verification notes.
+/docs/
+
 # Keep only the curated evidence required by docs and content tests.
 /artifacts/*
 !/artifacts/vod-review/
@@ -37,3 +40,11 @@ supabase/.temp/
 supabase/.branches/
 .sites-runtime/
 test-results/
+.wyp-test-work/
+
+# Private release configuration, encrypted database exports and recovery keys.
+/backups/
+/release-config/
+*.sql.age
+*.agekey
+.pgpass

@@ -1,9 +1,12 @@
 import "server-only";
+import { isScenarioId, normalizeScenarioId } from "@/lib/scenario-id";
 import { ApiError } from "@/server/http";
 import type {
   StartSessionRequest,
   AnswerSessionRequest,
   AdvanceSessionRequest,
+  EndSessionRequest,
+  SessionTarget,
 } from "@/contracts/session";
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -43,14 +46,59 @@ function revision(value: unknown): number {
   return value;
 }
 export function parseStartSession(value: unknown): StartSessionRequest {
-  const input = object(value, ["requestId"]);
-  return { requestId: parseUuid(input.requestId) };
+  const raw =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  if (!Object.hasOwn(raw, "target")) {
+    const input = object(value, ["requestId"]);
+    return { requestId: parseUuid(input.requestId) };
+  }
+  const target = parseSessionTarget(raw.target);
+  const input = object(
+    value,
+    target.kind === "playlist"
+      ? ["requestId", "target", "expectedPublicationVersion"]
+      : ["requestId", "target"],
+  );
+  const requestId = parseUuid(input.requestId);
+  if (target.kind === "playlist")
+    return {
+      requestId,
+      target,
+      expectedPublicationVersion: parseUuid(
+        input.expectedPublicationVersion,
+      ).toLowerCase(),
+    };
+  return { requestId, target };
+}
+export function parseSessionTarget(value: unknown): SessionTarget {
+  if (value && typeof value === "object" && "kind" in value) {
+    if (value.kind === "demo") {
+      object(value, ["kind"]);
+      return { kind: "demo" };
+    }
+    if (value.kind === "playlist") {
+      const target = object(value, ["kind", "playlistId"]);
+      return {
+        kind: "playlist",
+        playlistId: parseUuid(target.playlistId).toLowerCase(),
+      };
+    }
+  }
+  const target = object(value, ["kind", "scenarioId"]);
+  if (target.kind !== "scenario" || !isScenarioId(target.scenarioId))
+    throw new ApiError("INVALID_REQUEST", "Choose a valid session target.");
+  return {
+    kind: "scenario",
+    scenarioId: normalizeScenarioId(target.scenarioId),
+  };
 }
 export function parseAnswerCommand(value: unknown): AnswerSessionRequest {
   const input = object(value, ["optionId", "requestId", "expectedRevision"]);
   if (
     typeof input.optionId !== "string" ||
-    !/^[a-z0-9-]{1,100}$/.test(input.optionId)
+    !/^[a-z0-9-]{1,100}$/i.test(input.optionId)
   )
     throw new ApiError("INVALID_REQUEST", "Choose a valid option.");
   return {
@@ -69,4 +117,11 @@ export function parseAdvanceCommand(value: unknown): AdvanceSessionRequest {
 }
 export function parseHistoryCursor(value?: unknown): string | null {
   return value === undefined || value === null ? null : parseUuid(value);
+}
+export function parseEndCommand(value: unknown): EndSessionRequest {
+  const input = object(value, ["requestId", "expectedRevision"]);
+  return {
+    requestId: parseUuid(input.requestId),
+    expectedRevision: revision(input.expectedRevision),
+  };
 }

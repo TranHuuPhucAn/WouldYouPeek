@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     },
   },
   requireVerifiedUser: vi.fn(),
+  appConfig: vi.fn(),
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: vi.fn(async () => mocks.client),
@@ -19,11 +20,13 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/server/auth/guards", () => ({
   requireVerifiedUser: mocks.requireVerifiedUser,
 }));
+vi.mock("@/server/config", () => ({ getServerAppConfig: mocks.appConfig }));
 vi.mock("@/server/auth/redirects", () => ({
   buildAuthRedirect: vi.fn(() => "http://127.0.0.1:3000/auth/confirm"),
 }));
 import * as auth from "@/server/auth/service";
 beforeEach(() => {
+  mocks.appConfig.mockReset().mockReturnValue({ deploymentMode: "local" });
   for (const fn of Object.values(mocks.client.auth))
     fn.mockReset().mockResolvedValue({ error: null });
   mocks.requireVerifiedUser.mockReset().mockResolvedValue({ id: "u" });
@@ -32,12 +35,12 @@ describe("auth provider operations", () => {
   it("signs up without accepting role metadata", async () => {
     await auth.signUp({
       email: "a@b.com",
-      password: "Password12345",
-      confirmPassword: "Password12345",
+      password: "Abcd123!",
+      confirmPassword: "Abcd123!",
     });
     expect(mocks.client.auth.signUp).toHaveBeenCalledWith({
       email: "a@b.com",
-      password: "Password12345",
+      password: "Abcd123!",
       options: { emailRedirectTo: "http://127.0.0.1:3000/auth/confirm" },
     });
   });
@@ -103,8 +106,8 @@ describe("auth provider operations", () => {
     mocks.requireVerifiedUser.mockRejectedValue(new Error("denied"));
     await expect(
       auth.updatePassword({
-        password: "Password12345",
-        confirmPassword: "Password12345",
+        password: "Abcd123!",
+        confirmPassword: "Abcd123!",
       }),
     ).rejects.toThrow("denied");
     expect(mocks.client.auth.updateUser).not.toHaveBeenCalled();
@@ -112,5 +115,70 @@ describe("auth provider operations", () => {
   it("logs out only the current device", async () => {
     await auth.signOut();
     expect(mocks.client.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+});
+
+describe("hosted auth challenge forwarding", () => {
+  const captchaToken = "opaque-provider-token";
+  beforeEach(() =>
+    mocks.appConfig.mockReturnValue({
+      deploymentMode: "hosted",
+      turnstileSiteKey: "0x4AAAApublic",
+    }),
+  );
+  it("forwards challenge tokens on all supported requests", async () => {
+    await auth.signUp({
+      email: "a@b.com",
+      password: "Abcd123!",
+      confirmPassword: "Abcd123!",
+      captchaToken,
+    });
+    expect(mocks.client.auth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({ captchaToken }),
+      }),
+    );
+    await auth.signIn({ email: "a@b.com", password: "secret", captchaToken });
+    expect(mocks.client.auth.signInWithPassword).toHaveBeenCalledWith(
+      expect.objectContaining({ options: { captchaToken } }),
+    );
+    await auth.requestPasswordReset({ email: "a@b.com", captchaToken });
+    expect(mocks.client.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      "a@b.com",
+      expect.objectContaining({ captchaToken }),
+    );
+    await auth.resendVerification({ email: "a@b.com", captchaToken });
+    expect(mocks.client.auth.resend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({ captchaToken }),
+      }),
+    );
+  });
+  it.each([undefined, "", "x".repeat(2049), "two tokens", 1])(
+    "rejects missing or invalid hosted challenge",
+    async (token) => {
+      await expect(
+        auth.signIn({
+          email: "a@b.com",
+          password: "secret",
+          captchaToken: token,
+        }),
+      ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+      expect(mocks.client.auth.signInWithPassword).not.toHaveBeenCalled();
+    },
+  );
+  it("reports provider challenge failure on reset/resend without pretending mail was sent", async () => {
+    mocks.client.auth.resetPasswordForEmail.mockResolvedValue({
+      error: { code: "captcha_failed", status: 400 },
+    });
+    mocks.client.auth.resend.mockResolvedValue({
+      error: { code: "captcha_failed", status: 400 },
+    });
+    await expect(
+      auth.requestPasswordReset({ email: "a@b.com", captchaToken }),
+    ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+    await expect(
+      auth.resendVerification({ email: "a@b.com", captchaToken }),
+    ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
   });
 });
